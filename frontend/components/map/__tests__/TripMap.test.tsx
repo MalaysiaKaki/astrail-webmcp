@@ -188,6 +188,50 @@ describe('TripMap', () => {
       expect(mapInstance.flyTo).toHaveBeenCalledTimes(1)
     })
 
+    it('does not let a deferred padding ease restart when unmount stops the map', async () => {
+      /* Mapbox's stop() fires `moveend` SYNCHRONOUSLY. The padding effect defers its ease to a
+         one-shot moveend while a fly is in flight, and the route's release() calls stop(): if that
+         callback is still armed it starts a fresh easeTo with trip padding AFTER the zero reset,
+         and the shared map carries it into the next screen. Modelled here, not hand-invoked. */
+      const once: [string, () => void][] = []
+      mapInstance.once.mockImplementation((ev: string, fn: () => void) => { once.push([ev, fn]) })
+      mapInstance.off.mockImplementation((ev: string, fn: () => void) => {
+        const i = once.findIndex(([e, f]) => e === ev && f === fn)
+        if (i >= 0) once.splice(i, 1)
+      })
+      mapInstance.stop.mockImplementation(() => {
+        const due = once.filter(([e]) => e === 'moveend')
+        once.length = 0
+        due.forEach(([, fn]) => fn())
+      })
+      try {
+        mapInstance.getCanvas.mockReturnValue({ clientWidth: 390, clientHeight: 844 })
+        const view = renderMap()
+        await flush()
+        fireLoad()
+        await flush()
+        mapInstance.isMoving.mockReturnValue(true)
+        act(() => { setSheetObstruction(380) })             // arms the deferred ease
+        expect(once.some(([e]) => e === 'moveend')).toBe(true)
+        mapInstance.easeTo.mockClear(); mapInstance.setPadding.mockClear()
+        const calls: string[] = []
+        mapInstance.easeTo.mockImplementation(() => { calls.push('easeTo') })
+        mapInstance.setPadding.mockImplementation((p: object) => { calls.push(`setPadding:${JSON.stringify(p)}`) })
+
+        view.rerender(<MapProvider>{null}</MapProvider>)   // route unmount: release() -> stop()
+
+        expect(calls.filter((c) => c === 'easeTo')).toEqual([])
+        expect(calls.at(-1)).toBe(`setPadding:${JSON.stringify({ top: 0, right: 0, bottom: 0, left: 0 })}`)
+      } finally {
+        mapInstance.isMoving.mockReturnValue(false)
+        mapInstance.once.mockImplementation(() => {})
+        mapInstance.off.mockImplementation(() => {})
+        mapInstance.stop.mockImplementation(() => {})
+        mapInstance.easeTo.mockImplementation(() => {})
+        mapInstance.setPadding.mockImplementation(() => {})
+      }
+    })
+
     it('clears the padding on the shared map when the trip route unmounts', async () => {
       const view = renderMap()
       await flush()

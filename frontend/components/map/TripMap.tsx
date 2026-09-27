@@ -360,6 +360,9 @@ export default function TripMap({
   const activePopupRef = useRef<mapboxgl.Popup | null>(null)
   const buildingLayerAddedRef = useRef(false)
   const framedRef = useRef(false)
+  // Route teardown in progress, and the padding ease currently deferred to `moveend` (if any).
+  const tornDownRef = useRef(false)
+  const cancelDeferredEaseRef = useRef<(() => void) | null>(null)
   // Read here only to re-run the padding effect below; framePadding() reads the live value.
   const sheetObstruction = useSheetObstruction()
   const layout = useTripLayout()
@@ -417,6 +420,7 @@ export default function TripMap({
   // Arriving from generation the map is already relighting to dawn, and re-setting the
   // same preset is a no-op, so the transition is never interrupted.
   useEffect(() => {
+    tornDownRef.current = false
     const first = bundle.places[0]?.place
     acquire({
       interactive: true,
@@ -432,10 +436,15 @@ export default function TripMap({
       markerLabelsRef.current = []
       clearRoutes()
       clearBuildings()
-      // The map outlives this route, and camera padding persists on it: /app/trips (or the next
+      // Order matters. release() calls map.stop(), and Mapbox's stop() fires `moveend`
+      // SYNCHRONOUSLY — so a padding ease deferred to moveend (the effect below) would start a
+      // fresh easeTo with this trip's padding after any reset. Disarm it first, stop the map,
+      // and only then clear the padding: the map outlives this route, and /app/trips (or the next
       // trip) must not inherit a sheet-sized dead zone at the bottom of its canvas.
-      getMap()?.setPadding?.({ top: 0, right: 0, bottom: 0, left: 0 })
+      tornDownRef.current = true
+      cancelDeferredEaseRef.current?.()
       release()
+      getMap()?.setPadding?.({ top: 0, right: 0, bottom: 0, left: 0 })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -796,10 +805,16 @@ export default function TripMap({
     if (!ready || !framedRef.current) return
     const map = getMap()
     if (!map || typeof map.easeTo !== 'function') return
-    const apply = () => map.easeTo({ padding: framePadding(), duration: 300, essential: true })
+    const apply = () => {
+      cancelDeferredEaseRef.current = null
+      if (tornDownRef.current) return
+      map.easeTo({ padding: framePadding(), duration: 300, essential: true })
+    }
     if (map.isMoving?.()) {
       map.once('moveend', apply)
-      return () => { map.off('moveend', apply) }
+      const cancel = () => { map.off('moveend', apply); cancelDeferredEaseRef.current = null }
+      cancelDeferredEaseRef.current = cancel
+      return cancel
     }
     apply()
     // eslint-disable-next-line react-hooks/exhaustive-deps
