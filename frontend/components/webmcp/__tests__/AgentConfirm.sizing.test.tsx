@@ -67,3 +67,58 @@ describe.each<Variant>(['confirm', 'prompt'])('AgentConfirm (%s) on small screen
     expect(decline.className).toMatch(/min-h-11/)
   })
 })
+
+/* Codex #5: the card takes focus when it opens, so it must give it back when it closes —
+   otherwise Escape (or either action) leaves focus on <body> and the next Tab starts elsewhere. */
+function Trigger({ variant }: { variant: Variant }) {
+  const { requestConfirm, requestPrompt } = useWebMcpRegistry()
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void (variant === 'confirm'
+          ? requestConfirm('Plan a trip')
+          : requestPrompt('Plan a trip', { label: 'Different this trip?', placeholder: 'x' }))
+      }}
+    >
+      Ask
+    </button>
+  )
+}
+
+describe.each<Variant>(['confirm', 'prompt'])('AgentConfirm (%s) focus return', (variant) => {
+  const open = async () => {
+    render(
+      <WebMcpRegistryProvider>
+        <Trigger variant={variant} />
+        <AgentConfirm />
+      </WebMcpRegistryProvider>,
+    )
+    const ask = screen.getByRole('button', { name: 'Ask' })
+    await userEvent.click(ask)                      // focus is on "Ask" when the card opens
+    const dialog = await screen.findByRole('dialog')
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true))
+    return ask
+  }
+
+  it('returns focus to the control that had it after Escape', async () => {
+    const ask = await open()
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(document.activeElement).toBe(ask)
+  })
+
+  it('returns focus after the decline button closes the card', async () => {
+    const ask = await open()
+    await userEvent.click(screen.getByRole('button', { name: /not now/i }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(document.activeElement).toBe(ask)
+  })
+
+  it('returns focus after the approve button closes the card', async () => {
+    const ask = await open()
+    await userEvent.click(screen.getByRole('button', { name: /approve|try what it remembers|use this instead/i }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(document.activeElement).toBe(ask)
+  })
+})

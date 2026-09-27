@@ -27,7 +27,8 @@ const DECLINE = 'min-h-11 flex-1 rounded-lg border border-white/25 px-3 py-2 tex
 
 /**
  * Focus lands on the card when it opens, so a keyboard or screen-reader user meets the request
- * rather than whatever they were on; Escape DECLINES. Dismissal is never approval — the only way
+ * rather than whatever they were on, and returns to that control when the card closes; Escape
+ * DECLINES. Dismissal is never approval — the only way
  * to authorize is the approve button itself.
  */
 function useCardBehaviour(decline: () => void) {
@@ -35,10 +36,16 @@ function useCardBehaviour(decline: () => void) {
   const declineRef = useRef(decline)
   declineRef.current = decline
   useEffect(() => {
+    // Remember where focus was so closing the card (Escape, Approve or Not now all unmount it)
+    // hands it back, instead of stranding keyboard users on <body>.
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
     ref.current?.focus()
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') declineRef.current() }
     document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      if (previous && previous !== document.body && previous.isConnected) previous.focus()
+    }
   }, [])
   return ref
 }
