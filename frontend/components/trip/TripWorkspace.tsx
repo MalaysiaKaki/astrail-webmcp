@@ -25,6 +25,7 @@ import AgentDecisionRail from './AgentDecisionRail'
 import TripPreferenceNote from './TripPreferenceNote'
 import TradeoffPanel from './TradeoffPanel'
 import TripFeedbackPanel from './TripFeedbackPanel'
+import { useFeedbackComposer } from './use-feedback-composer'
 import MobileTripView, { type MobileListView } from './mobile/MobileTripView'
 import type { SheetState } from './mobile/MobileTripSheet'
 import { useTripLayout } from '@/lib/trip/use-trip-layout'
@@ -161,6 +162,10 @@ export default function TripWorkspace({
      before, and a phone shows no desktop flash before the client snapshot picks the phone tree.
      Hooks stay above the early returns below. */
   const layout = useTripLayout()
+  /* The feedback composer's draft, held HERE rather than in the panel: rotating across 768px
+     swaps the phone tree for the desktop rail, each with its own composer, and a panel-owned
+     draft (note, rating, an in-flight send) was lost in the swap. */
+  const feedback = useFeedbackComposer(tripId)
 
   useEffect(() => {
     // A seeded bundle is already the answer, and there is nothing to read: the fixture has no
@@ -289,7 +294,7 @@ export default function TripWorkspace({
               Tell us what went wrong — it&apos;s the most useful feedback we get.
             </p>
             <div className="w-full max-w-md">
-              <TripFeedbackPanel key={bundle.trip.id} tripId={bundle.trip.id} />
+              <TripFeedbackPanel key={bundle.trip.id} tripId={bundle.trip.id} composer={feedback} />
             </div>
           </>
         )}
@@ -413,6 +418,7 @@ export default function TripWorkspace({
           onHideSheet={() => setPanelOpen(false)}
           onReopenSheet={() => { setExpanded(false); setPanelOpen(true) }}
           summaryRewriting={summaryRewriting}
+          feedback={feedback}
         />
       ) : (
       <div className={layout === null ? 'max-md:hidden' : undefined}>
@@ -634,7 +640,7 @@ export default function TripWorkspace({
               trip-to-trip route transition. */}
           {!readOnly && (bundle.trip.status === 'complete' || bundle.trip.status === 'saved_with_gaps') && (
             <Section title="How was this trail?">
-              <TripFeedbackPanel key={bundle.trip.id} tripId={bundle.trip.id} />
+              <TripFeedbackPanel key={bundle.trip.id} tripId={bundle.trip.id} composer={feedback} />
             </Section>
           )}
         </div>

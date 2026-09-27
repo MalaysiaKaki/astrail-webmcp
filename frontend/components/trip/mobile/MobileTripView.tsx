@@ -10,6 +10,7 @@ import TradeoffPanel from '../TradeoffPanel'
 import MobileTopBar from './MobileTopBar'
 import MobileTripSheet, { type SheetState } from './MobileTripSheet'
 import StopTimeline from './StopTimeline'
+import type { FeedbackComposer } from '../use-feedback-composer'
 import AboutThisTrip from './AboutThisTrip'
 
 export type MobileListView = 'stops' | 'stay'
@@ -43,6 +44,8 @@ export type MobileTripViewProps = {
   onHideSheet: () => void
   onReopenSheet: () => void
   summaryRewriting: boolean
+  /** Owned by TripWorkspace so a draft survives the phone/desktop switch. */
+  feedback: FeedbackComposer
 }
 
 function shortDate(iso: string | null): string {
@@ -186,7 +189,7 @@ export default function MobileTripView(p: MobileTripViewProps) {
             {p.activeDay ? <DayDisclosure day={p.activeDay} rewriting={p.summaryRewriting} /> : null}
           </>
         )}
-        <AboutThisTrip bundle={p.bundle} readOnly={p.readOnly} />
+        <AboutThisTrip bundle={p.bundle} readOnly={p.readOnly} feedback={p.feedback} />
       </MobileTripSheet>
     </div>
   )

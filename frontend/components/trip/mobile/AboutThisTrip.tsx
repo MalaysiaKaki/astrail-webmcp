@@ -6,6 +6,7 @@ import TripPreferenceNote from '../TripPreferenceNote'
 import TradeoffPanel from '../TradeoffPanel'
 import AgentDecisionRail from '../AgentDecisionRail'
 import TripFeedbackPanel from '../TripFeedbackPanel'
+import type { FeedbackComposer } from '../use-feedback-composer'
 
 /**
  * Everything the desktop rail shows ABOVE the stops, moved to the end of the phone list behind
@@ -15,9 +16,13 @@ import TripFeedbackPanel from '../TripFeedbackPanel'
  * A native <details>, not a conditional render: the feedback composer inside keeps its draft when
  * the section is closed and reopened.
  */
-export default function AboutThisTrip({ bundle, readOnly }: { bundle: TripBundle; readOnly: boolean }) {
+export default function AboutThisTrip({ bundle, readOnly, feedback }: {
+  bundle: TripBundle
+  readOnly: boolean
+  feedback?: FeedbackComposer
+}) {
   // Same explicit status allowlist as the desktop rail (plan T3), not reachability.
-  const feedback = !readOnly && (bundle.trip.status === 'complete' || bundle.trip.status === 'saved_with_gaps')
+  const showFeedback = !readOnly && (bundle.trip.status === 'complete' || bundle.trip.status === 'saved_with_gaps')
   return (
     <details className="group mt-6 border-t border-[var(--line)]">
       <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 py-2 [&::-webkit-details-marker]:hidden">
@@ -42,10 +47,10 @@ export default function AboutThisTrip({ bundle, readOnly }: { bundle: TripBundle
           <h3 className="type-display mb-2 text-[16px] text-[var(--starlight)]">How Astrail built this</h3>
           <AgentDecisionRail events={bundle.events} />
         </section>
-        {feedback ? (
+        {showFeedback ? (
           <section>
             <h3 className="type-display mb-2 text-[16px] text-[var(--starlight)]">How was this trail?</h3>
-            <TripFeedbackPanel key={bundle.trip.id} tripId={bundle.trip.id} />
+            <TripFeedbackPanel key={bundle.trip.id} tripId={bundle.trip.id} composer={feedback} />
           </section>
         ) : null}
       </div>

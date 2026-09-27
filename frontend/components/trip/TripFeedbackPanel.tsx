@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useFeedbackComposer, type FeedbackComposer, type Signal, type Status } from './use-feedback-composer'
 import { getAccessToken } from '@/lib/supabase/session'
 import { ApiError, submitTripFeedback, type TripFeedbackDraft } from '@/lib/trip/api'
 import type { TripFeedback } from '@/lib/trip/backend-types'
@@ -17,13 +17,6 @@ import type { TripFeedback } from '@/lib/trip/backend-types'
    re-press from inserting a duplicate permanent row (there is no delete endpoint). */
 
 // Mutually-exclusive selection: a thumb verdict, a star rating, or nothing.
-type Signal = 'thumbs_up' | 'thumbs_down' | { rating: 1 | 2 | 3 | 4 | 5 }
-
-type Status =
-  | { kind: 'idle' }
-  | { kind: 'sending'; message: string }
-  | { kind: 'ok'; message: string }
-  | { kind: 'error'; message: string }
 
 // Pure, exported, unit-tested directly: the trim/null guard must have its own test separate from
 // the Send predicate, or removing either leaves the other green (BUILD-LOOP §7). Returns null when
@@ -102,18 +95,21 @@ function pillClass(active: boolean): string {
 const SEND_BTN =
   'self-start rounded-lg border border-[var(--line)] bg-[var(--brass-soft)] px-3 py-2 text-[12px] font-semibold uppercase tracking-wide text-[var(--brass-bright)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40'
 
-export default function TripFeedbackPanel({ tripId }: { tripId: string }) {
-  const [signal, setSignal] = useState<Signal | null>(null)
-  const [note, setNote] = useState('')
-  const [confirmed, setConfirmed] = useState<string | null>(null)
-  // Fingerprint of the last SUCCESSFULLY submitted draft; a matching current draft keeps Send off
-  // so an unchanged re-press can't insert an identical permanent row (Codex r2 #1).
-  const [lastSent, setLastSent] = useState<string | null>(null)
-  const [pending, setPending] = useState(false)
-  const [status, setStatus] = useState<Status>({ kind: 'idle' })
-  // Synchronous single-flight guard: the `pending` state only styles/disables the UI, and the
-  // disabled attribute has not re-rendered within a same-frame double click (Codex r1 ref lock).
-  const inFlight = useRef(false)
+/**
+ * @param composer  State owned by a parent that outlives this panel (TripWorkspace, across the
+ *                  phone/desktop switch). Omitted, the panel holds its own, as it always did.
+ */
+export default function TripFeedbackPanel({ tripId, composer }: { tripId: string; composer?: FeedbackComposer }) {
+  const own = useFeedbackComposer(tripId)
+  const c = composer ?? own
+  const { signal, note, confirmed, lastSent, pending, status, inFlight } = c
+  const setSignal = (v: Signal | null | ((p: Signal | null) => Signal | null)) =>
+    c.update((prev) => ({ signal: typeof v === 'function' ? v(prev.signal) : v }))
+  const setNote = (v: string) => c.update({ note: v })
+  const setConfirmed = (v: string | null) => c.update({ confirmed: v })
+  const setLastSent = (v: string | null) => c.update({ lastSent: v })
+  const setPending = (v: boolean) => c.update({ pending: v })
+  const setStatus = (v: Status) => c.update({ status: v })
 
   const ratingValue = typeof signal === 'object' && signal !== null ? signal.rating : null
   const draft = buildDraft(signal, note)
