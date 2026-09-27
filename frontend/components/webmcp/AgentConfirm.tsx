@@ -153,7 +153,7 @@ function PreferenceCard({ pending }: { pending: PendingPrompt }) {
           onChange={(e) => setText(e.target.value)}
           placeholder={prompt.placeholder}
           maxLength={MAX_OVERRIDE}
-          className="w-full rounded-lg border border-white/25 bg-white/5 px-3 py-2 text-white/90 outline-none transition placeholder:text-white/35 focus:border-[#C9974E]"
+          className="w-full rounded-lg border border-white/25 bg-white/5 px-3 py-2 text-white/90 max-md:text-base outline-none transition placeholder:text-white/35 focus:border-[#C9974E]"
         />
       </label>
       </div>

@@ -278,7 +278,7 @@ export default function TripWorkspace({
         <p className="type-body max-w-md text-center text-sm text-[var(--muted)]">
           Astrail couldn&apos;t build this trip. Start a new one — repeat Reels are cached, so retrying is fast.
         </p>
-        <a href="/app" className="type-label text-xs uppercase tracking-wide text-[var(--brass-bright)] underline-offset-2 hover:underline">
+        <a href="/app" className="type-label text-xs uppercase tracking-wide text-[var(--brass-bright)] underline-offset-2 hover:underline max-md:inline-flex max-md:min-h-11 max-md:items-center max-md:px-3">
           Plan a new trip
         </a>
         {/* Same gate as the composer in the main return: a seeded bundle has no trip row for
@@ -306,7 +306,7 @@ export default function TripWorkspace({
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="type-label text-xs uppercase tracking-wide text-[var(--brass-bright)] underline-offset-2 hover:underline"
+            className="type-label text-xs uppercase tracking-wide text-[var(--brass-bright)] underline-offset-2 hover:underline max-md:min-h-11 max-md:px-3"
           >
             Refresh
           </button>

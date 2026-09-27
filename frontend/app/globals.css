@@ -1656,3 +1656,15 @@ button:focus-visible {
     white-space: nowrap;
   }
 }
+
+/* Trip feedback on phones (plan Phase 5: About this trip, and the failed-generation screen). The
+   thumbs, stars and Send are shared with desktop, where they stay compact; phones get 44px targets
+   and a 16px field, because iOS Safari zooms the whole page when a smaller input takes focus. */
+@media (max-width: 767.98px) {
+  .trip-feedback button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .trip-feedback > div:first-child { flex-wrap: wrap; }
+  .trip-feedback textarea { font-size: 16px; }
+}

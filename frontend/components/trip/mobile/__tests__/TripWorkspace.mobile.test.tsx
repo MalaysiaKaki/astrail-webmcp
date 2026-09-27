@@ -44,10 +44,10 @@ function setMobile(next: boolean) {
   act(() => { h.listeners.forEach((l) => l()) })
 }
 
-function renderSeeded(bundle: TripBundle = TOKYO_TRIP, strict = false) {
+function renderSeeded(bundle: TripBundle = TOKYO_TRIP, strict = false, readOnly = true) {
   const ui = (
     <MapProvider>
-      <TripWorkspace tripId={bundle.trip.id} bundle={bundle} readOnly />
+      <TripWorkspace tripId={bundle.trip.id} bundle={bundle} readOnly={readOnly} />
     </MapProvider>
   )
   return render(strict ? <StrictMode>{ui}</StrictMode> : ui)
@@ -188,5 +188,49 @@ describe('TripWorkspace — the phone branch', () => {
     await screen.findByTestId('trip-map')
     expect(screen.getAllByTestId('trip-map')).toHaveLength(1)
     expect(sheet()).toBeInTheDocument()
+  })
+
+  /* Phase 5 — real-trip states on a phone. */
+  const withStatus = (status: TripBundle['trip']['status']): TripBundle =>
+    ({ ...TOKYO_TRIP, trip: { ...TOKYO_TRIP.trip, status } })
+  const about = () => screen.getByText('About this trip').closest('details')!
+
+  it.each(['complete', 'saved_with_gaps'] as const)(
+    'offers the feedback composer inside About this trip for a %s real trip', (status) => {
+      renderSeeded(withStatus(status), false, false)
+      expect(within(about()).getByTestId('trip-feedback-panel')).toBeInTheDocument()
+    })
+
+  it('keeps the feedback allowlist: none on a read-only sample, none on places_ready', () => {
+    const { unmount } = renderSeeded(withStatus('complete'), false, true)
+    expect(screen.queryByTestId('trip-feedback-panel')).toBeNull()
+    unmount()
+    renderSeeded(withStatus('places_ready'), false, false)
+    expect(screen.queryByTestId('trip-feedback-panel')).toBeNull()
+  })
+
+  it('renders the shared failed screen (with feedback) rather than a sheet', () => {
+    renderSeeded(withStatus('failed'), false, false)
+    expect(screen.getByText('Generation failed')).toBeInTheDocument()
+    expect(screen.getByTestId('trip-feedback-panel')).toBeInTheDocument()
+    expect(sheet()).toBeNull()
+  })
+
+  it.each(['generating', 'draft'] as const)('renders the shared still-generating screen for %s', (status) => {
+    renderSeeded(withStatus(status))
+    expect(screen.getByText(/Still generating/)).toBeInTheDocument()
+    expect(sheet()).toBeNull()
+  })
+
+  it('offers a chip for every day of a long trip, and switches the list to it', () => {
+    const days = Array.from({ length: 6 }, (_, i) => ({ ...TOKYO_TRIP.days[0], id: `d${i + 1}`, day_number: i + 1 }))
+    const places = days.map((d, i) => ({
+      ...TOKYO_TRIP.places[0], id: `tp${i}`, place_id: `p${i}`, day_number: d.day_number, sort_order: 0,
+      place: { ...TOKYO_TRIP.places[0].place, id: `p${i}`, name: `Stop on day ${d.day_number}` },
+    }))
+    renderSeeded({ ...TOKYO_TRIP, days, places, transport_legs: [], restaurants: [] })
+    for (const d of days) expect(screen.getByRole('button', { name: new RegExp(`^Day ${d.day_number}\\b`) })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Day 6\b/ }))
+    expect(within(sheet()!).getByText('Stop on day 6')).toBeInTheDocument()
   })
 })

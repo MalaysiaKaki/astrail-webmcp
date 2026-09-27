@@ -49,7 +49,7 @@ export default function MobileTopBar({
       </div>
 
       {showLayerToggle ? (
-        <div role="group" aria-label="Map layer" className={`${FLOAT} flex h-11 shrink-0 items-center rounded-full p-0.5`}>
+        <div role="group" aria-label="Map layer" className={`${FLOAT} flex shrink-0 items-center rounded-full`}>
           {(['route', 'hub'] as const).map((mode) => {
             const active = layerMode === mode
             const disabled = mode === 'hub' && !canUseHubLayer
@@ -62,7 +62,7 @@ export default function MobileTopBar({
                 disabled={disabled}
                 title={disabled ? 'No hotel could be placed on the map' : undefined}
                 className={[
-                  'type-label h-10 min-w-11 rounded-full px-3 text-[13px] transition-colors',
+                  'type-label h-11 min-w-11 rounded-full px-3 text-[13px] transition-colors',
                   active ? 'bg-[var(--brass-soft)] text-[var(--brass-bright)]' : 'text-[var(--muted)]',
                   disabled ? 'cursor-not-allowed opacity-40' : '',
                 ].join(' ')}

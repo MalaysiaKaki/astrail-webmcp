@@ -168,7 +168,7 @@ export default function TripFeedbackPanel({ tripId }: { tripId: string }) {
   }
 
   return (
-    <div aria-busy={pending} className="flex flex-col gap-3">
+    <div aria-busy={pending} className="trip-feedback flex flex-col gap-3">
       <div className="flex items-center gap-2">
         <button
           type="button"
