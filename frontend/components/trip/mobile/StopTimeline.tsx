@@ -156,9 +156,6 @@ export default function StopTimeline({
     row?.closest('li')?.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' })
   }, [selectedPlaceId])
 
-  if (places.length === 0) {
-    return <p className="type-body py-4 text-[14px] text-[var(--muted)]">No stops planned for this day.</p>
-  }
   const { above, trailing } = buildRouteLinks(places, legs, placeIndex)
   const onList = new Set(places.map((tp) => tp.place_id))
   const anchoredTo = (placeId: string) => restaurants.filter((r) => r.near_place_id === placeId)
@@ -168,6 +165,11 @@ export default function StopTimeline({
 
   return (
     <>
+      {/* No early return for an empty day: its restaurant suggestions (all unanchored then) still
+          render in "Where to eat" below, as they do in the desktop rail's separate strip. */}
+      {places.length === 0 ? (
+        <p className="type-body py-4 text-[14px] text-[var(--muted)]">No stops planned for this day.</p>
+      ) : (
       <ol ref={listRef} aria-label="Stops" className="flex flex-col">
         {places.map((tp, i) => {
           const selected = tp.place_id === selectedPlaceId
@@ -241,6 +243,7 @@ export default function StopTimeline({
           )
         })}
       </ol>
+      )}
       {trailing.map((t) => <LegRow key={t.leg.id} link={t} />)}
       {unanchored.length > 0 ? (
         <section className="mt-5">

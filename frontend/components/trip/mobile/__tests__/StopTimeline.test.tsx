@@ -177,3 +177,20 @@ describe('StopTimeline selection visibility', () => {
     spy.mockRestore()
   })
 })
+
+/* Codex #4: a day with no scheduled stops can still have restaurant suggestions; desktop shows
+   them in its separate strip, so the phone list must not return before "Where to eat". */
+describe('StopTimeline on a day with no stops', () => {
+  it('says there are no stops AND keeps the day restaurant suggestions reachable', () => {
+    const restaurants = restaurantsForDay(TOKYO_TRIP, 'day_1')
+    expect(restaurants.length).toBeGreaterThan(0)   // the fixture must pose the question
+    renderDay(1, { places: [], restaurants })
+    expect(screen.getByText(/No stops planned for this day/)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Where to eat' })).toBeInTheDocument()
+    for (const r of restaurants) {
+      const name = index.get(r.restaurant_place_id ?? '')?.name
+        ?? TOKYO_TRIP.suggestion_places.find((p) => p.id === r.restaurant_place_id)?.name
+      if (name) expect(screen.getByText(name)).toBeInTheDocument()
+    }
+  })
+})
