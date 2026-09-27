@@ -455,3 +455,27 @@
     min-width: 44px;
   }
 }
+
+/* Hero on phones: the fine print ran under Aster, because the copy was absolutely positioned and
+   the mascot was sized from a guess at how tall the copy is. Put the copy in normal flow with a
+   fixed bottom reserve, and pin Aster inside that reserve at a fixed size, so the two cannot
+   overlap whatever the copy wraps to; the hero grows past 100dvh when it needs to. Desktop
+   (>= 768px) is untouched. */
+@media (max-width: 767.98px) {
+  .story-hero {
+    height: auto;
+    min-height: 100dvh;
+  }
+  .story-hero .story-copy--center {
+    position: relative;
+    top: auto;
+    padding-top: 4.75rem;
+    padding-bottom: 308px;      /* 72px scroll hint + 220px Aster + 16px air */
+  }
+  .story-hero .story-hero-aster-mobile {
+    top: auto;
+    bottom: 72px;
+    height: 220px;
+    max-height: none;
+  }
+}
