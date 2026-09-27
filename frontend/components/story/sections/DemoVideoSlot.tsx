@@ -87,7 +87,7 @@ export default function DemoVideoSlot() {
             href={DEMO_YOUTUBE_URL}
             target="_blank"
             rel="noreferrer"
-            className="font-medium text-[color:var(--story-teal-ink)] underline underline-offset-4"
+            className="story-footer__link font-medium text-[color:var(--story-teal-ink)] underline underline-offset-4"
           >
             {DEMO_YOUTUBE_URL.replace('https://', '')}
           </a>

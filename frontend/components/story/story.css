@@ -406,3 +406,52 @@
     -webkit-backdrop-filter: none;
   }
 }
+
+/* ============================================================
+   Phones (< 768px), plan Phase 4. The nav is STICKY in normal flow (StoryStage mounts it first
+   in <main>, straight after the challenge banner), so once the banner scrolls away the nav sits
+   at the very top with no stale --challenge-banner-h gap. The negative margin keeps it overlaying
+   the hero exactly as the fixed nav did. Nav targets and hero CTAs meet 44px; the CTAs stack
+   full-width. Desktop keeps the fixed nav and the measured banner offset.
+   ============================================================ */
+@media (max-width: 767.98px) {
+  .story-nav {
+    position: sticky;
+    top: 0;
+    height: 68px;
+    margin-bottom: -68px;
+  }
+  /* Only the two controls a phone shows (the section links are hidden below 640px). */
+  .story-nav__pill > a[aria-label='Astrail home'] { min-height: 44px; min-width: 44px; justify-content: center; }
+  .story-nav__cta {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 18px;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+  .story-hero .story-copy--center { top: 4.75rem; }
+  .story-hero__ctas {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    margin-top: 1.5rem;
+  }
+  .story-hero__ctas .story-btn {
+    width: 100%;
+    min-height: 48px;
+    padding: 12px 24px;
+  }
+}
+
+/* Footer on phones: each link is a 44px row (the list's 12px gap folds into that height). */
+@media (max-width: 767.98px) {
+  .story-footer__list { gap: 0; }
+  .story-footer__link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    min-width: 44px;
+  }
+}

@@ -43,7 +43,7 @@ const COLUMNS: { title: string; links: FooterLink[] }[] = [
 
 function FooterItem({ link }: { link: FooterLink }) {
   const cls =
-    'text-sm text-[color:var(--starlight-70)] transition hover:text-[color:var(--starlight)]'
+    'story-footer__link text-sm text-[color:var(--starlight-70)] transition hover:text-[color:var(--starlight)]'
   if (link.external) {
     return (
       <a
@@ -90,7 +90,7 @@ export default function StoryFooter() {
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--starlight)]">
               {col.title}
             </p>
-            <ul className="mt-4 flex flex-col gap-3">
+            <ul className="story-footer__list mt-4 flex flex-col gap-3">
               {col.links.map((link) => (
                 <li key={link.label}>
                   <FooterItem link={link} />

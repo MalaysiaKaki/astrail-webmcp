@@ -37,6 +37,9 @@ export default function StoryStage() {
 
   return (
     <main className="story">
+      {/* First in <main>: on phones the nav is sticky in normal flow right after the challenge
+          banner (story.css). Desktop positions it fixed, where DOM order does not move it. */}
+      <StoryNav />
       {/* ---- HERO: Aster walks in and idles. No metaphor transition. ---- */}
       <section className="story-hero relative h-[100dvh] min-h-[640px] overflow-hidden bg-[color:var(--story-ivory)]">
         <Beat0Layer />
@@ -55,7 +58,7 @@ export default function StoryStage() {
             a map, where every stop says where it came from. This build adds WebMCP,
             so an agent can work on it with you, on the page you are looking at.
           </p>
-          <div className="mt-8 flex flex-wrap items-center gap-4">
+          <div className="story-hero__ctas mt-8 flex flex-wrap items-center gap-4">
             <Link href="/sign-in" className="story-btn story-btn--primary">
               Sign in to try it
             </Link>
@@ -96,7 +99,6 @@ export default function StoryStage() {
       <ChallengePanels />
       <StoryFooter />
 
-      <StoryNav />
     </main>
   )
 }

@@ -1604,3 +1604,55 @@ button:focus-visible {
   min-height: 44px;
   min-width: 44px;
 }
+
+/* Challenge banner on phones (plan Phase 4). One 44px line that scrolls away with the page
+   rather than sticking; the whole row is the sample-trail link via the link's ::after. Desktop
+   (>= 768px) keeps the sticky two-row notice untouched: nothing below applies there, and the
+   phone lead is display:none. Unlayered, so these beat the component's Tailwind utilities. */
+.challenge-banner__phone,
+.challenge-banner__short { display: none; }
+
+@media (max-width: 767.98px) {
+  .challenge-banner {
+    position: relative;
+    padding: 0 16px;
+  }
+  .challenge-banner__row {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: center;
+    min-height: 44px;
+    gap: 0;
+    white-space: nowrap;
+  }
+  .challenge-banner__lead,
+  .challenge-banner__note { display: none; }
+  .challenge-banner__phone { display: inline; white-space: pre; }
+  .challenge-banner__short { display: inline; }
+  .challenge-banner__link {
+    position: static;
+    align-self: stretch;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    gap: 6px;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .challenge-banner__link:hover { background: none; color: var(--brass-bright); }
+  .challenge-banner__link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+  .challenge-banner__full {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}

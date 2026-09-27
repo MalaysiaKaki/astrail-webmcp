@@ -37,6 +37,12 @@ const SAMPLE_TRAIL_PATH = '/app/trip/demo'
  * fixed offset would either gap on desktop or keep clipping on mobile. A ResizeObserver also covers
  * font loading, which changes the height after first paint.
  *
+ * PHONES (< 768px, globals.css) get a different banner: one 44px line, not sticky, and the whole
+ * row is the sample-trail link (its ::after covers the row). The long sentence and the fine print
+ * stay in the DOM for assistive tech; "no account needed" stays in the link's accessible name. The
+ * nav on phones is sticky in normal flow rather than offset by this banner's height, so nothing
+ * gaps once the banner scrolls away.
+ *
  * The row is capped at max-w-5xl deliberately: the sentence and the link together measure ~1070px,
  * so they wrap to two rows at EVERY width rather than snapping between one row and two as the
  * window crosses some threshold. A banner whose height jumps would drag the fixed nav with it.
@@ -70,10 +76,15 @@ export default function ChallengeBanner() {
       ref={ref}
       role="status"
       aria-label="Challenge build notice"
-      className="sticky top-0 z-[100] border-b border-[color:var(--paper-line-2)] bg-[color:var(--night-900)] px-5 py-3 text-center font-[family-name:var(--font-figtree)] text-sm leading-5 text-[color:var(--starlight)] shadow-[0_4px_20px_rgba(10,13,20,0.18)]"
+      className="challenge-banner sticky top-0 z-[100] border-b border-[color:var(--paper-line-2)] bg-[color:var(--night-900)] px-5 py-3 text-center font-[family-name:var(--font-figtree)] text-sm leading-5 text-[color:var(--starlight)] shadow-[0_4px_20px_rgba(10,13,20,0.18)]"
     >
-      <div className="mx-auto flex max-w-5xl flex-col items-center justify-center gap-x-5 gap-y-2 sm:flex-row sm:flex-wrap">
-        <p className="min-w-0">
+      <div className="challenge-banner__row mx-auto flex max-w-5xl flex-col items-center justify-center gap-x-5 gap-y-2 sm:flex-row sm:flex-wrap">
+        {/* Phones only (globals.css): the notice collapses to one line, this lead plus the link. */}
+        <span className="challenge-banner__phone">
+          <b className="font-semibold text-[color:var(--brass-bright)]">WebMCP Challenge</b> build
+          <span aria-hidden> · </span>
+        </span>
+        <p className="challenge-banner__lead min-w-0">
           This is a <b className="font-semibold text-[color:var(--brass-bright)]">WebMCP Challenge</b>{' '}
           build of Astrail, an experiment in planning trips with an agent.
         </p>
@@ -83,13 +94,16 @@ export default function ChallengeBanner() {
         <Link
           href={SAMPLE_TRAIL_PATH}
           prefetch={false}
-          className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[color:var(--brass-bright)] px-4 py-1.5 font-semibold text-[color:var(--brass-bright)] transition-colors hover:bg-[color:var(--brass-bright)] hover:text-[color:var(--night-900)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-bright)]"
+          className="challenge-banner__link inline-flex shrink-0 items-center gap-2 rounded-full border border-[color:var(--brass-bright)] px-4 py-1.5 font-semibold text-[color:var(--brass-bright)] transition-colors hover:bg-[color:var(--brass-bright)] hover:text-[color:var(--night-900)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-bright)]"
         >
-          See a finished trip, no account needed
+          {/* Desktop keeps this exact text run; phones visually swap in the short label and keep
+              this one for assistive tech, so the accessible name never loses "no account". */}
+          <span className="challenge-banner__full">See a finished trip, no account needed</span>
+          <span aria-hidden className="challenge-banner__short">See a finished trip</span>
           <span aria-hidden>&rarr;</span>
         </Link>
       </div>
-      <p className="mt-2 text-xs leading-5 text-[color:var(--muted)]">
+      <p className="challenge-banner__note mt-2 text-xs leading-5 text-[color:var(--muted)]">
         A real generated trail, free to open, in any browser.
       </p>
     </aside>
