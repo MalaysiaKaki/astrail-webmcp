@@ -47,7 +47,7 @@ export default function OrchestratorSummary({ bundle }: { bundle: TripBundle }) 
 
   return (
     <div className="surface rounded-xl p-4">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="type-display text-lg text-[var(--starlight)]">
             {trip.title ?? trip.inferred_destination ?? trip.destination_hint ?? 'Your trip'}

@@ -3,6 +3,8 @@ import { act, render, screen } from '@testing-library/react'
 import { TOKYO_TRIP } from '@/lib/trip/fixtures'
 import { TOKYO_TRIP_WITH_HOTELS } from '@/lib/trip/fixtures/tokyo-hotels'
 import { markTripFramed } from '@/lib/trip/map-handoff'
+import { setSheetObstruction } from '@/lib/trip/sheet-obstruction'
+import { MOBILE_SHEET_GAP } from '@/components/map/frame-padding'
 import MapProvider from '@/components/map/MapProvider'
 import TripMap from '@/components/map/TripMap'
 
@@ -19,6 +21,7 @@ const {
     getSource: vi.fn((_id?: string) => undefined), getLayer: vi.fn((_id?: string) => undefined),
     removeLayer: vi.fn(), removeSource: vi.fn(),
     flyTo: vi.fn(), fitBounds: vi.fn(), setConfigProperty: vi.fn(),
+    easeTo: vi.fn(), isMoving: vi.fn(() => false), once: vi.fn(), setPadding: vi.fn(),
     remove: vi.fn(), resize: vi.fn(), stop: vi.fn(),
     style: { setTransition: vi.fn() },
     scrollZoom: handler(), boxZoom: handler(), dragRotate: handler(), dragPan: handler(),
@@ -114,6 +117,87 @@ describe('TripMap', () => {
   afterEach(() => {
     delete process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN
     vi.unstubAllGlobals()
+    setSheetObstruction(0)
+  })
+
+  // Mobile geometry contract: the camera pads by the sheet the page really has.
+  describe('the mobile sheet obstruction', () => {
+    it('frames a phone above the sheet it measured, not a fixed 42%', async () => {
+      mapInstance.getCanvas.mockReturnValue({ clientWidth: 390, clientHeight: 844 })
+      setSheetObstruction(380)
+      renderMap()
+      await flush()
+      fireLoad()
+      await flush()
+      const pad = mapInstance.fitBounds.mock.calls.at(-1)![1].padding
+      expect(pad.bottom).toBe(380 + MOBILE_SHEET_GAP)
+    })
+
+    it('re-applies padding with an ease when the sheet height changes, not a fresh fly', async () => {
+      mapInstance.getCanvas.mockReturnValue({ clientWidth: 390, clientHeight: 844 })
+      setSheetObstruction(380)
+      renderMap()
+      await flush()
+      fireLoad()
+      await flush()
+      mapInstance.flyTo.mockClear(); mapInstance.fitBounds.mockClear(); mapInstance.easeTo.mockClear()
+      act(() => { setSheetObstruction(0) })
+      expect(mapInstance.easeTo).toHaveBeenCalledTimes(1)
+      expect(mapInstance.easeTo.mock.calls[0][0].padding.bottom).toBeLessThan(100)
+      expect(mapInstance.flyTo).not.toHaveBeenCalled()
+      expect(mapInstance.fitBounds).not.toHaveBeenCalled()
+    })
+
+    it('does not interrupt an in-flight selection fly; it pads once the camera settles', async () => {
+      mapInstance.getCanvas.mockReturnValue({ clientWidth: 390, clientHeight: 844 })
+      renderMap()
+      await flush()
+      fireLoad()
+      await flush()
+      mapInstance.easeTo.mockClear(); mapInstance.once.mockClear()
+      mapInstance.isMoving.mockReturnValue(true)
+      act(() => { setSheetObstruction(380) })
+      expect(mapInstance.easeTo).not.toHaveBeenCalled()
+      const settle = mapInstance.once.mock.calls.find((c) => c[0] === 'moveend')?.[1] as () => void
+      expect(settle).toBeTypeOf('function')
+      mapInstance.isMoving.mockReturnValue(false)
+      act(() => { settle() })
+      expect(mapInstance.easeTo).toHaveBeenCalledTimes(1)
+      expect(mapInstance.easeTo.mock.calls[0][0].padding.bottom).toBe(380 + MOBILE_SHEET_GAP)
+    })
+
+    it('re-frames the selected place when asked again (a re-tap of the selected row)', async () => {
+      const view = renderMap({ selectedPlaceId: null })
+      await flush()
+      fireLoad()
+      await flush()
+      const at = (focusNonce: number) => (
+        <MapProvider>
+          <TripMap bundle={TOKYO_TRIP} activeDayNumber={1} selectedPlaceId="pl_akasaka"
+            onSelectPlace={() => {}} focusNonce={focusNonce} />
+        </MapProvider>
+      )
+      view.rerender(at(0))
+      await flush()
+      mapInstance.flyTo.mockClear()
+      view.rerender(at(0))
+      await flush()
+      expect(mapInstance.flyTo).not.toHaveBeenCalled()   // a plain re-render is not a request
+      view.rerender(at(1))
+      await flush()
+      expect(mapInstance.flyTo).toHaveBeenCalledTimes(1)
+    })
+
+    it('clears the padding on the shared map when the trip route unmounts', async () => {
+      const view = renderMap()
+      await flush()
+      fireLoad()
+      await flush()
+      mapInstance.setPadding.mockClear()
+      // The provider (and its map) outlive the route — only the trip driver goes.
+      view.rerender(<MapProvider>{null}</MapProvider>)
+      expect(mapInstance.setPadding).toHaveBeenCalledWith({ top: 0, right: 0, bottom: 0, left: 0 })
+    })
   })
 
   // It drives the shell's instance rather than building one, so the map arriving from

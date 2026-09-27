@@ -25,6 +25,9 @@ import AgentDecisionRail from './AgentDecisionRail'
 import TripPreferenceNote from './TripPreferenceNote'
 import TradeoffPanel from './TradeoffPanel'
 import TripFeedbackPanel from './TripFeedbackPanel'
+import MobileTripView, { type MobileListView } from './mobile/MobileTripView'
+import type { SheetState } from './mobile/MobileTripSheet'
+import { useTripLayout } from '@/lib/trip/use-trip-layout'
 
 const TripMap = dynamic(() => import('@/components/map/TripMap'), { ssr: false })
 
@@ -148,6 +151,16 @@ export default function TripWorkspace({
   const [panelOpen, setPanelOpen] = useState(true)
   // A "Where to eat" suggestion the user picked from the panel, so the map can show where it is.
   const [selectedRestaurantPlaceId, setSelectedRestaurantPlaceId] = useState<string | null>(null)
+  /* Phone layout only. Which list the sheet shows — stops or Stay — is separate state from the map
+     layer (route | hub): the Stay list renders even when no hotel has coordinates for a hub. */
+  const [mobileList, setMobileList] = useState<MobileListView>('stops')
+  // Bumped when the selected stop is tapped again, so the map re-frames the same place.
+  const [focusNonce, setFocusNonce] = useState(0)
+  /* Which panel tree to render. null during SSR and hydration: the desktop tree then renders
+     behind `max-md:hidden`, so desktop paints its rail straight from the server HTML exactly as
+     before, and a phone shows no desktop flash before the client snapshot picks the phone tree.
+     Hooks stay above the early returns below. */
+  const layout = useTripLayout()
 
   useEffect(() => {
     // A seeded bundle is already the answer, and there is nothing to read: the fixture has no
@@ -314,9 +327,22 @@ export default function TripWorkspace({
     const day = bundle?.places.find((tp) => tp.place_id === placeId)?.day_number
     if (typeof day === 'number') setActiveDayNumber(day)
     setSelectedPlaceId(placeId)
-    setExpanded(true)
     setPanelOpen(true)
+    if (layout === 'mobile') {
+      // On a phone the pin stays in view: select, show its row, keep the sheet compact.
+      setMobileList('stops')
+      setExpanded(false)
+      return
+    }
+    setExpanded(true)
   }
+
+  function selectPlaceFromList(placeId: string) {
+    if (placeId === selectedPlaceId) setFocusNonce((n) => n + 1)
+    else setSelectedPlaceId(placeId)
+  }
+
+  const sheetState: SheetState = !panelOpen ? 'hidden' : expanded ? 'expanded' : 'compact'
 
   return (
     <>
@@ -325,7 +351,7 @@ export default function TripWorkspace({
       <TripTools
         key={tripId}
         bundle={bundle}
-        showDay={setActiveDayNumber}
+        showDay={(n) => { setActiveDayNumber(n); setMobileList('stops') }}
         selectPlace={setSelectedPlaceId}
         setLayerMode={setLayerMode}
         openPanel={() => setPanelOpen(true)}
@@ -353,8 +379,43 @@ export default function TripWorkspace({
           onSelectPlace={(id) => selectPlaceFromMap(id)}
           selectedHotelId={selectedHotelId}
           layerMode={layerMode}
+          focusNonce={focusNonce}
         />
       </div>
+
+      {layout === 'mobile' ? (
+        <MobileTripView
+          bundle={bundle}
+          readOnly={readOnly}
+          days={days}
+          activeDay={activeDay}
+          activeDayNumber={activeDayNumber}
+          onSelectDay={(n) => { setActiveDayNumber(n); setMobileList('stops'); setLayerMode('route') }}
+          dayPlaces={dayPlaces}
+          dayLegs={dayLegs}
+          dayRestaurants={dayRestaurants}
+          placeIndex={placeIndex}
+          trailNumbers={trailNumbers}
+          selectedPlaceId={selectedPlaceId}
+          onSelectPlace={selectPlaceFromList}
+          selectedRestaurantPlaceId={selectedRestaurantPlaceId}
+          onSelectRestaurant={setSelectedRestaurantPlaceId}
+          hotels={hotels}
+          selectedHotelId={selectedHotelId}
+          onSelectHotel={setSelectedHotelId}
+          layerMode={layerMode}
+          onLayerMode={setLayerMode}
+          canUseHubLayer={canUseHubLayer}
+          listView={mobileList}
+          onStay={() => { setMobileList('stay'); if (canUseHubLayer) setLayerMode('hub') }}
+          sheet={sheetState}
+          onToggleSheetHeight={() => setExpanded((v) => !v)}
+          onHideSheet={() => setPanelOpen(false)}
+          onReopenSheet={() => { setExpanded(false); setPanelOpen(true) }}
+          summaryRewriting={summaryRewriting}
+        />
+      ) : (
+      <div className={layout === null ? 'max-md:hidden' : undefined}>
 
       {/* Map layer switch — route line vs. hotel hub-and-spokes, never both (plan decision #3).
           Floats over the map, clear of the left/bottom details panel. The Hotel segment is
@@ -603,6 +664,8 @@ export default function TripWorkspace({
       >
         <Chevron className="-rotate-90 md:rotate-0" />
       </button>
+      </div>
+      )}
     </main>
     </>
   )

@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useEffect } from 'react'
 import WebMcpDock from '../WebMcpDock'
 import { WebMcpRegistryProvider, useWebMcpRegistry } from '../WebMcpRegistry'
+import { dockChipBottom, setSheetObstruction } from '@/lib/trip/sheet-obstruction'
 
 const mockPath = vi.hoisted(() => ({ value: '/app' }))
 vi.mock('next/navigation', () => ({ usePathname: () => mockPath.value }))
@@ -467,5 +468,59 @@ describe('WebMcpDock — clearing outlives the fold', () => {
     expect(screen.getByText('WATCHING')).toBeInTheDocument()
     // The spared call, and ONLY it: the cleared read is not hiding in the read-back behind it.
     expect(screen.queryByRole('button', { name: /earlier/i })).toBeNull()
+  })
+})
+
+/* Mobile trip view, Phase 2 (plan amendment 8): the dock must not bury the stop sheet. On a phone
+   over a canvas route it starts folded as a LAYOUT default — never written to storage, so a
+   desktop visit is unaffected — and the folded chip rides the sheet's measured top edge. */
+describe('WebMcpDock — over the mobile trip sheet', () => {
+  const phone = () => vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+    matches: true, media: query, onchange: null,
+    addListener: () => {}, removeListener: () => {},
+    addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+  }) as MediaQueryList)
+  const container = () => document.querySelector<HTMLElement>('.fixed.z-40')!
+  const showActivity = () => screen.getByRole('button', { name: /show agent activity/i })
+
+  beforeEach(() => { mockPath.value = '/app/trip/abc' })
+  afterEach(() => { act(() => { setSheetObstruction(0) }) })
+
+  it('starts folded on a phone without writing the stored preference', () => {
+    phone()
+    dock()
+    expect(showActivity()).toBeInTheDocument()
+    expect(screen.queryByText(/move stop 7 to day 3/)).not.toBeInTheDocument()
+    expect(window.localStorage.getItem('astrail:webmcp:dock-collapsed')).toBeNull()
+  })
+
+  it('keeps the desktop default (open) when the layout is wide', () => {
+    dock()
+    expect(screen.getByText(/move stop 7 to day 3/)).toBeInTheDocument()
+  })
+
+  it('rides the sheet top edge while folded', () => {
+    phone()
+    setSheetObstruction(380)
+    dock()
+    expect(container().style.bottom).toBe(`${dockChipBottom(380, window.innerHeight)! - 16}px`)
+  })
+
+  it('sits in its safe-area corner when nothing covers the map', () => {
+    phone()
+    dock()
+    expect(container().style.bottom).toBe('')
+  })
+
+  it('holds an explicit expand across sheet changes, and is not offset while expanded', async () => {
+    phone()
+    setSheetObstruction(380)
+    dock()
+    await userEvent.click(showActivity())
+    expect(screen.getByText(/move stop 7 to day 3/)).toBeInTheDocument()
+    act(() => { setSheetObstruction(0) })
+    act(() => { setSheetObstruction(300) })
+    expect(screen.getByText(/move stop 7 to day 3/)).toBeInTheDocument()
+    expect(container().style.bottom).toBe('')
   })
 })

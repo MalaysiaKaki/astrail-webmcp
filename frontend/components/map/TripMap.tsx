@@ -11,6 +11,9 @@ import {
   orderedDays, restaurantsForDay,
 } from '@/lib/trip/selectors'
 import { consumeTripFramed } from '@/lib/trip/map-handoff'
+import { getSheetObstruction, useSheetObstruction } from '@/lib/trip/sheet-obstruction'
+import { useTripLayout } from '@/lib/trip/use-trip-layout'
+import { computeFramePadding } from './frame-padding'
 import { useSharedMap } from '@/components/map/MapProvider'
 
 const DAY_ROUTE_COLORS = [
@@ -330,6 +333,7 @@ export default function TripMap({
   selectedHotelId = null, layerMode = 'route',
   selectedRestaurantPlaceId = null,
   onSelectRestaurant,
+  focusNonce = 0,
 }: {
   bundle: TripBundle
   activeDayNumber: number
@@ -346,6 +350,9 @@ export default function TripMap({
   // both explicitly (`string | null` / `'route' | 'hub'`) to drive the Route/Hotel toggle.
   selectedHotelId?: string | null
   layerMode?: 'route' | 'hub'
+  /** Bumped to fly to the SAME selected place again (the phone's re-tap of a selected stop).
+   *  Omitted on desktop, where selection alone drives the camera as before. */
+  focusNonce?: number
 }) {
   const { hasToken, ready, getMap, acquire, release, setMarkers } = useSharedMap()
   const routeIdsRef = useRef<string[]>([])
@@ -353,6 +360,9 @@ export default function TripMap({
   const activePopupRef = useRef<mapboxgl.Popup | null>(null)
   const buildingLayerAddedRef = useRef(false)
   const framedRef = useRef(false)
+  // Read here only to re-run the padding effect below; framePadding() reads the live value.
+  const sheetObstruction = useSheetObstruction()
+  const layout = useTripLayout()
 
   function clearRoutes() {
     const map = getMap()
@@ -422,6 +432,9 @@ export default function TripMap({
       markerLabelsRef.current = []
       clearRoutes()
       clearBuildings()
+      // The map outlives this route, and camera padding persists on it: /app/trips (or the next
+      // trip) must not inherit a sheet-sized dead zone at the bottom of its canvas.
+      getMap()?.setPadding?.({ top: 0, right: 0, bottom: 0, left: 0 })
       release()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -687,57 +700,24 @@ export default function TripMap({
     else drawTrail()
   }
 
-  // The details panel overlays the map — the left 440px on desktop, a bottom sheet on
-  // mobile — so uniform padding would frame a day's pins right underneath it. Bias the
-  // padding toward the panel's edge so framed pins always land in the visible strip.
-  //
-  // Measured against the CANVAS, not the window. An earlier version derived the bottom padding
-  // from window.innerHeight, which on a phone asked for 394px of padding inside a canvas that
-  // was shorter than that. Mapbox then logs "Map cannot fit within canvas with the given bounds,
-  // padding, and/or offset" and REFUSES TO MOVE — so opening a Tokyo trip on mobile showed the
-  // default globe over the Indian Ocean, with no error anyone would notice.
+  // The details panel overlays the map — the left 440px on desktop, the stop sheet on a phone —
+  // so uniform padding would frame a day's pins right underneath it. The geometry (and why it is
+  // measured against the CANVAS, capped at 70%) lives in ./frame-padding; this only measures.
   // `popupRoom` biases the pin into the upper third so an evidence popup has somewhere to go.
-  // Mapbox picks a popup anchor by asking "is there room ABOVE?" before "is there room BELOW?",
-  // and when neither fits it falls through to placing the popup below and simply overflows the
-  // canvas. Centring a selected place on a 720px-tall laptop canvas is exactly that case: a
-  // ~395px popup fits in neither direction. Fixing it at the camera (land the pin high) is what
-  // map apps do, and it leaves the popup component itself unconstrained.
   function framePadding(opts?: { popupRoom?: boolean }) {
     const map = getMap()
     // Defensive: the map may not be ready, and framing must never throw — a padding helper
     // taking down the whole map effect would be a far worse bug than a loosely framed camera.
     const canvas = typeof map?.getCanvas === 'function' ? map.getCanvas() : null
-    // `?? `, not `|| `: a canvas measured at ZERO (transiently, mid-layout) is a real
-    // measurement, and `||` treated it as missing and substituted the much larger window —
-    // reintroducing the very mismatch the 70% cap below exists to prevent. No canvas at all
-    // still falls back to the window.
+    // `??`, not `||`: a canvas measured at ZERO (transiently, mid-layout) is a real measurement.
+    // No canvas at all still falls back to the window.
     const win = typeof window === 'undefined' ? { w: 1024, h: 768 } : { w: window.innerWidth, h: window.innerHeight }
-    const width = canvas?.clientWidth ?? win.w
-    const height = canvas?.clientHeight ?? win.h
-
-    const wide = width >= 768
-    const wanted = wide
-      ? { top: 80, right: 80, bottom: 80, left: 480 }   // desktop: clear the left panel
-      : { top: 72, right: 48, bottom: Math.round(height * 0.42) + 32, left: 48 }
-
-    // Solving `0.3H = top + (H - top - bottom)/2` for bottom. Only desktop needs it: the mobile
-    // bottom-sheet pad above already pushes the pin well above centre. Applied BEFORE the cap
-    // below, so an extreme viewport degrades to "framed tight" rather than an abandoned camera.
-    if (opts?.popupRoom && wide) wanted.bottom = wanted.top + Math.round(height * 0.4)
-
-    // Never let opposing pads consume the canvas: Mapbox abandons the fit entirely rather than
-    // doing its best, so a too-greedy pad costs the whole camera move. Cap each axis at 70% and
-    // shrink proportionally, which degrades to "framed a bit tight" instead of "not framed".
-    const fit = (a: number, b: number, extent: number) => {
-      const budget = extent * 0.7
-      const total = a + b
-      if (total <= budget || total === 0) return [a, b] as const
-      const scale = budget / total
-      return [Math.floor(a * scale), Math.floor(b * scale)] as const
-    }
-    const [top, bottom] = fit(wanted.top, wanted.bottom, height)
-    const [left, right] = fit(wanted.left, wanted.right, width)
-    return { top, right, bottom, left }
+    return computeFramePadding({
+      width: canvas?.clientWidth ?? win.w,
+      height: canvas?.clientHeight ?? win.h,
+      obstruction: getSheetObstruction(),
+      popupRoom: opts?.popupRoom,
+    })
   }
 
   // essential: framing is not decoration — reduced-motion must still land on the pins,
@@ -808,6 +788,23 @@ export default function TripMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready])
 
+  // The sheet changed height (compact, expanded, hidden) or the viewport crossed the md line:
+  // re-apply padding with a short ease, keeping the camera's centre. Not a fresh fly-to — the
+  // framing already chosen stays, it just shifts into the part of the map that is visible now.
+  // A selection fly still in the air is not interrupted: the new padding lands when it settles.
+  useEffect(() => {
+    if (!ready || !framedRef.current) return
+    const map = getMap()
+    if (!map || typeof map.easeTo !== 'function') return
+    const apply = () => map.easeTo({ padding: framePadding(), duration: 300, essential: true })
+    if (map.isMoving?.()) {
+      map.once('moveend', apply)
+      return () => { map.off('moveend', apply) }
+    }
+    apply()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheetObstruction, layout])
+
   // Fly to the active day's pins when the day changes. Markers and the trail are whole-trip
   // and day-independent now (global numbering, one continuous journey line), so switching a
   // day only moves the camera — it never relabels pins or redraws the trail. Falls back to
@@ -836,7 +833,7 @@ export default function TripMap({
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPlaceId])
+  }, [selectedPlaceId, focusNonce])
 
   /* Selecting from the sidebar has to move the map, not just restyle a pin. "Where to eat" set
      `selectedRestaurantPlaceId`, TripMap added `eat-pin--selected`, and that was the whole

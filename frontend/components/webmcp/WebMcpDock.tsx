@@ -7,6 +7,8 @@ import AgentActivityRail, { NOTHING_CLEARED, type ClearedMark } from './AgentAct
 import ExamplePrompts from './ExamplePrompts'
 import WebMcpStatus from './WebMcpStatus'
 import { useOptionalWebMcpRegistry, type ActivityEntry } from './WebMcpRegistry'
+import { dockChipBottom, useSheetObstruction } from '@/lib/trip/sheet-obstruction'
+import { useTripLayout } from '@/lib/trip/use-trip-layout'
 
 /**
  * One dock, not three floating boxes.
@@ -129,12 +131,15 @@ export default function WebMcpDock() {
    * to take the prompts panel with it. Two independent collapses would be two gestures for one
    * intent, and would leave a "minimised" dock still holding ~160px of the map.
    *
-   * Starts open, and the stored value arrives in an effect. That is the right default rather than
-   * a compromise: a first visitor must find the agent surface, and there is no flash to trade it
-   * against — the rail renders nothing until a tool has run, and `activity` starts empty on every
-   * mount, so this effect has always landed before there is anything for it to hide.
+   * `choice` is the user's explicit fold, or null when they have not made one; `collapsed` below
+   * derives from it. With no choice, desktop starts open (a first visitor must find the agent
+   * surface), and a phone over a canvas route starts folded so the dock does not bury the trip's
+   * stop sheet — a LAYOUT default, never written to storage, so it cannot leak into a desktop
+   * visit. A stored fold arrives in an effect; the rail renders nothing until a tool has run, so
+   * that has always landed before there is anything for it to hide. Once the user folds or
+   * unfolds, that choice holds across resize and rotation.
    */
-  const [collapsed, setCollapsed] = useState(false)
+  const [choice, setChoice] = useState<boolean | null>(null)
   /**
    * How much of the record the user has cleared — held HERE, not in the rail, for the same
    * reason `collapsed` is: folding unmounts the rail. State inside it died with the mount and
@@ -148,6 +153,9 @@ export default function WebMcpDock() {
   const [seenThroughId, setSeenThroughId] = useState<number | null>(null)
   const latestIdRef = useRef(0)
   const overCanvas = isCanvasRoute(usePathname() ?? '/app')
+  const phoneOverCanvas = useTripLayout() === 'mobile' && overCanvas
+  const collapsed = choice ?? phoneOverCanvas
+  const sheetObstruction = useSheetObstruction()
 
   const registry = useOptionalWebMcpRegistry()
   const activity = registry?.activity ?? NO_ACTIVITY
@@ -183,12 +191,12 @@ export default function WebMcpDock() {
     // Private windows throw on the read. Remembering a preference is not worth a blank corner,
     // and the direction to fail in is the discoverable one.
     try {
-      if (window.localStorage.getItem(COLLAPSED_KEY) === '1') setCollapsed(true)
+      if (window.localStorage.getItem(COLLAPSED_KEY) === '1') setChoice(true)
     } catch { /* stays open, which is the state a first visitor gets anyway */ }
   }, [])
 
   const changeCollapsed = useCallback((next: boolean) => {
-    setCollapsed(next)
+    setChoice(next)
     // Minimised means the corner goes quiet, with no exceptions to remember: the tool inspector
     // is up to 60dvh of opaque black and would otherwise sit there contradicting the word.
     if (next) setToolsOpen(false)
@@ -203,11 +211,15 @@ export default function WebMcpDock() {
   // a clear is only reachable while unfolded, and the marker is taken at or above its watermark.
   const unread = seenThroughId === null ? NO_ACTIVITY : activity.filter((e) => e.id > seenThroughId)
 
+  // Folded over the phone's trip sheet, the chip rides the sheet's top edge (minus the p-4 the
+  // column pads by). Expanded, the dock is its own overlay and is not offset by the sheet.
+  const chipBottom = collapsed ? dockChipBottom(sheetObstruction, typeof window === 'undefined' ? 0 : window.innerHeight) : null
+
   return (
     <div
       className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col items-end gap-2 p-4
                  pb-[max(1rem,env(safe-area-inset-bottom))] sm:inset-x-auto sm:right-0"
-      style={{ maxHeight: '100dvh' }}
+      style={{ maxHeight: '100dvh', bottom: chipBottom === null ? undefined : `${chipBottom - 16}px` }}
     >
       {/* Order matters: the chip is last so it stays pinned to the bottom-right corner and never
           moves when something above it appears. A control that jumps is a control you cannot hit. */}

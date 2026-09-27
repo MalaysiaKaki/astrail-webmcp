@@ -1579,3 +1579,20 @@ button:focus-visible {
   line-height: 1.4;
   margin-top: 0.55rem;
 }
+
+/* Mobile trip view type floor (plan 2026-09-27, "Minimums on mobile": body >= 14px, labels >= 12px).
+   The phone view reuses desktop children (HotelPanel, RestaurantStrip, AgentDecisionRail, ...) whose
+   captions are 9-11px — fine at a desk, unreadable on a phone. One scoped floor here instead of a
+   mobile variant of every child: `.mobile-trip` exists only on the phone tree, so desktop is
+   untouched. Unlayered, so it outranks the Tailwind utilities it overrides. */
+.mobile-trip .text-xs,
+.mobile-trip .text-\[13px\] {
+  font-size: 14px;
+  line-height: 1.45;
+}
+.mobile-trip .text-\[9px\],
+.mobile-trip .text-\[10px\],
+.mobile-trip .text-\[10\.5px\],
+.mobile-trip .text-\[11px\] {
+  font-size: 12px;
+}
