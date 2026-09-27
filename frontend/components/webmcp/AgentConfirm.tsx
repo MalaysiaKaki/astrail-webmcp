@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { PendingPrompt } from './WebMcpRegistry'
 import { useOptionalWebMcpRegistry } from './WebMcpRegistry'
 
@@ -12,6 +12,36 @@ import { useOptionalWebMcpRegistry } from './WebMcpRegistry'
  * the typing is only so the limit is met while the user can still see what they wrote.
  */
 const MAX_OVERRIDE = 280
+
+/* Shared by both cards. Bounded to the space left above the dock and below the notch, as a
+   column: the request scrolls INSIDE the card (`data-confirm-body`), the actions stay outside
+   that scroll, so a long summary on a 360x640 phone with the keyboard up can never push Approve
+   or Not now off screen. */
+const CARD =
+  'fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 mx-auto flex w-[min(28rem,calc(100%-2rem))] ' +
+  'max-h-[calc(100dvh-6rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col ' +
+  'rounded-xl border border-[#C9974E]/60 bg-black/90 p-4 text-sm text-white/90 shadow-2xl backdrop-blur outline-none'
+const BODY = 'min-h-0 overflow-y-auto overscroll-contain'
+const APPROVE = 'min-h-11 flex-1 rounded-lg bg-[#C9974E] px-3 py-2 font-medium text-black transition hover:bg-[#E8D5B0]'
+const DECLINE = 'min-h-11 flex-1 rounded-lg border border-white/25 px-3 py-2 text-white/80 transition hover:border-white/50'
+
+/**
+ * Focus lands on the card when it opens, so a keyboard or screen-reader user meets the request
+ * rather than whatever they were on; Escape DECLINES. Dismissal is never approval — the only way
+ * to authorize is the approve button itself.
+ */
+function useCardBehaviour(decline: () => void) {
+  const ref = useRef<HTMLDivElement>(null)
+  const declineRef = useRef(decline)
+  declineRef.current = decline
+  useEffect(() => {
+    ref.current?.focus()
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') declineRef.current() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
+  return ref
+}
 
 /**
  * The approval card an agent cannot skip.
@@ -27,33 +57,40 @@ export default function AgentConfirm() {
   if (!pending) return null
   // Its own component, because the field is state and a hook cannot live past the return above.
   if (pending.kind === 'prompt') return <PreferenceCard pending={pending} />
-  const { summary, resolve } = pending
+  return <ConfirmCard summary={pending.summary} resolve={pending.resolve} />
+}
 
+function ConfirmCard({ summary, resolve }: { summary: string; resolve: (ok: boolean) => void }) {
+  const ref = useCardBehaviour(() => resolve(false))
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-label="Astrail wants your approval"
-      className="fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 mx-auto w-[min(28rem,calc(100%-2rem))] rounded-xl border border-[#C9974E]/60 bg-black/90 p-4 text-sm text-white/90 shadow-2xl backdrop-blur"
+      ref={ref}
+      tabIndex={-1}
+      className={CARD}
     >
+      <div data-confirm-body className={BODY}>
       <p className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-wider text-[#E8D5B0]">
         <span aria-hidden className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#C9974E]" />
         Astrail wants to
       </p>
       {/* Deliberately plain text, never innerHTML — this string can carry caption-derived content. */}
       <p className="whitespace-pre-line leading-relaxed text-white/85">{summary}</p>
-      <div className="mt-4 flex gap-2">
+      </div>
+      <div className="mt-4 flex shrink-0 gap-2">
         <button
           type="button"
           onClick={() => resolve(true)}
-          className="flex-1 rounded-lg bg-[#C9974E] px-3 py-2 font-medium text-black transition hover:bg-[#E8D5B0]"
+          className={APPROVE}
         >
           Approve
         </button>
         <button
           type="button"
           onClick={() => resolve(false)}
-          className="flex-1 rounded-lg border border-white/25 px-3 py-2 text-white/80 transition hover:border-white/50"
+          className={DECLINE}
         >
           Not now
         </button>
@@ -90,14 +127,18 @@ function PreferenceCard({ pending }: { pending: PendingPrompt }) {
      gets to break after the user has already spent on it. The typed branch CAN say "use",
      because an explicit preference wins outright and nothing downstream vetoes it. */
   const override = text.trim().slice(0, MAX_OVERRIDE) || null
+  const ref = useCardBehaviour(() => resolve({ approved: false, text: null }))
 
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-label="Astrail wants your approval"
-      className="fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 mx-auto w-[min(28rem,calc(100%-2rem))] rounded-xl border border-[#C9974E]/60 bg-black/90 p-4 text-sm text-white/90 shadow-2xl backdrop-blur"
+      ref={ref}
+      tabIndex={-1}
+      className={CARD}
     >
+      <div data-confirm-body className={BODY}>
       <p className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-wider text-[#E8D5B0]">
         <span aria-hidden className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#C9974E]" />
         Astrail wants to
@@ -115,11 +156,12 @@ function PreferenceCard({ pending }: { pending: PendingPrompt }) {
           className="w-full rounded-lg border border-white/25 bg-white/5 px-3 py-2 text-white/90 outline-none transition placeholder:text-white/35 focus:border-[#C9974E]"
         />
       </label>
-      <div className="mt-4 flex gap-2">
+      </div>
+      <div className="mt-4 flex shrink-0 gap-2">
         <button
           type="button"
           onClick={() => resolve({ approved: true, text: override })}
-          className="flex-1 rounded-lg bg-[#C9974E] px-3 py-2 font-medium text-black transition hover:bg-[#E8D5B0]"
+          className={APPROVE}
         >
           {override ? 'Use this instead' : 'Try what it remembers'}
         </button>
@@ -128,7 +170,7 @@ function PreferenceCard({ pending }: { pending: PendingPrompt }) {
           /* `text: null`, whatever is in the field. Declining is a refusal to start, not a
              preference stated on the way out — and a declined run must carry nothing forward. */
           onClick={() => resolve({ approved: false, text: null })}
-          className="flex-1 rounded-lg border border-white/25 px-3 py-2 text-white/80 transition hover:border-white/50"
+          className={DECLINE}
         >
           Not now
         </button>

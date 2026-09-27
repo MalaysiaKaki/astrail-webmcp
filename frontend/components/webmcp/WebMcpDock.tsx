@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import AgentActivityRail, { NOTHING_CLEARED, type ClearedMark } from './AgentActivityRail'
 import ExamplePrompts from './ExamplePrompts'
 import WebMcpStatus from './WebMcpStatus'
+import PhoneDock from './PhoneDock'
 import { useOptionalWebMcpRegistry, type ActivityEntry } from './WebMcpRegistry'
 import { dockChipBottom, useSheetObstruction } from '@/lib/trip/sheet-obstruction'
 import { useTripLayout } from '@/lib/trip/use-trip-layout'
@@ -133,11 +134,11 @@ export default function WebMcpDock() {
    *
    * `choice` is the user's explicit fold, or null when they have not made one; `collapsed` below
    * derives from it. With no choice, desktop starts open (a first visitor must find the agent
-   * surface), and a phone over a canvas route starts folded so the dock does not bury the trip's
-   * stop sheet — a LAYOUT default, never written to storage, so it cannot leak into a desktop
-   * visit. A stored fold arrives in an effect; the rail renders nothing until a tool has run, so
-   * that has always landed before there is anything for it to hide. Once the user folds or
-   * unfolds, that choice holds across resize and rotation.
+   * surface), and a phone starts folded to its one chip (PhoneDock) so the dock does not bury the
+   * page (on the trip route, its stop sheet). That is a LAYOUT default, never written to storage,
+   * so it cannot leak into a desktop visit. A stored fold arrives in an effect; the rail renders
+   * nothing until a tool has run, so that has always landed before there is anything for it to
+   * hide. Once the user folds or unfolds, that choice holds across resize and rotation.
    */
   const [choice, setChoice] = useState<boolean | null>(null)
   /**
@@ -153,8 +154,8 @@ export default function WebMcpDock() {
   const [seenThroughId, setSeenThroughId] = useState<number | null>(null)
   const latestIdRef = useRef(0)
   const overCanvas = isCanvasRoute(usePathname() ?? '/app')
-  const phoneOverCanvas = useTripLayout() === 'mobile' && overCanvas
-  const collapsed = choice ?? phoneOverCanvas
+  const phone = useTripLayout() === 'mobile'
+  const collapsed = choice ?? phone
   const sheetObstruction = useSheetObstruction()
 
   const registry = useOptionalWebMcpRegistry()
@@ -214,6 +215,26 @@ export default function WebMcpDock() {
   // Folded over the phone's trip sheet, the chip rides the sheet's top edge (minus the p-4 the
   // column pads by). Expanded, the dock is its own overlay and is not offset by the sheet.
   const chipBottom = collapsed ? dockChipBottom(sheetObstruction, typeof window === 'undefined' ? 0 : window.innerHeight) : null
+
+  if (phone) {
+    return (
+      <PhoneDock
+        collapsed={collapsed}
+        chipBottom={chipBottom}
+        overCanvas={overCanvas}
+        supported={registry?.supported ?? false}
+        toolCount={registry?.tools.length ?? 0}
+        unread={unread.length}
+        hasChange={unread.some((e) => e.changes)}
+        onExpand={() => changeCollapsed(false)}
+        onCollapse={() => changeCollapsed(true)}
+        toolsOpen={toolsOpen}
+        onToolsOpenChange={setToolsOpen}
+        cleared={cleared}
+        onClear={setCleared}
+      />
+    )
+  }
 
   return (
     <div

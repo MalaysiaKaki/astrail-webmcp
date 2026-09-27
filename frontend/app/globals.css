@@ -1596,3 +1596,11 @@ button:focus-visible {
 .mobile-trip .text-\[11px\] {
   font-size: 12px;
 }
+
+/* Phone dock overlay hit-target floor (plan acceptance #4: prompt dismiss, tool list, rail
+   controls >= 44x44). Those buttons are shared with the desktop dock, where they stay compact;
+   `.phone-dock` exists only inside PhoneDock's overlay. Unlayered, so it outranks utilities. */
+.phone-dock button {
+  min-height: 44px;
+  min-width: 44px;
+}
