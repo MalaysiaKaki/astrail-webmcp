@@ -146,7 +146,10 @@ describe('TripWorkspace — the phone branch', () => {
     expect(sheet()).toHaveAttribute('inert')
     const lastDay = TOKYO_TRIP.days[TOKYO_TRIP.days.length - 1].day_number
     const other = placesForDay(TOKYO_TRIP, lastDay)[0]
+    const scrolled = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {})
     await act(async () => { h.mapProps!.onSelectPlace(other.place_id) })
+    // The pin's own stop is brought into view in the phone scroller, not just rendered somewhere.
+    expect((scrolled.mock.contexts.at(-1) as Element).querySelector(`[data-place-id="${other.place_id}"]`)).not.toBeNull()
     expect(sheet()).not.toHaveAttribute('inert')
     expect(sheet()!.className).toContain('h-[45dvh]')
     expect(document.querySelector(`[data-place-id="${other.place_id}"]`)).toHaveAttribute('aria-expanded', 'true')

@@ -154,3 +154,26 @@ describe('StopTimeline rail', () => {
     expect(all[0]).toBe('line')     // the cross-day arrival sits on the rail above the dot
   })
 })
+
+/* Codex #2: a selection that arrives from outside the list (a map pin, show_on_map) must bring
+   its stop into view in the phone scroller, as the desktop list already does. */
+describe('StopTimeline selection visibility', () => {
+  it('scrolls the newly selected stop into view', () => {
+    const spy = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {})
+    const { rerender } = renderDay(1)
+    spy.mockClear()
+    rerender(
+      <StopTimeline
+        bundle={TOKYO_TRIP} places={placesForDay(TOKYO_TRIP, 1)} legs={legsForDay(TOKYO_TRIP, 'day_1')}
+        restaurants={restaurantsForDay(TOKYO_TRIP, 'day_1')} placeIndex={index} trailNumbers={numbers}
+        selectedPlaceId="pl_ichiran" onSelectPlace={() => {}}
+        selectedRestaurantPlaceId={null} onSelectRestaurant={() => {}}
+      />,
+    )
+    expect(spy).toHaveBeenCalled()
+    const target = spy.mock.contexts.at(-1) as Element
+    expect(target.querySelector('[data-place-id="pl_ichiran"]')).not.toBeNull()
+    expect(spy.mock.calls.at(-1)![0]).toMatchObject({ block: 'nearest' })
+    spy.mockRestore()
+  })
+})

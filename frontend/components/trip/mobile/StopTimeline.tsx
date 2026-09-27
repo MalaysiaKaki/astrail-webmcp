@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import type {
   Place, RestaurantSuggestion, TransportLeg, TripBundle, TripPlace,
 } from '@/lib/trip/backend-types'
@@ -142,6 +143,19 @@ export default function StopTimeline({
   selectedRestaurantPlaceId: string | null
   onSelectRestaurant: (placeId: string) => void
 }) {
+  const listRef = useRef<HTMLOListElement>(null)
+  // A selection can arrive from outside this list — a map pin, or the agent's show_on_map — and
+  // on a long day its row may be off-screen in the sheet. Bring the whole stop (row plus its
+  // expanded detail) into view, as the desktop ItineraryCards does. 'nearest', so a tap on a row
+  // already on screen does not jolt the list.
+  useEffect(() => {
+    if (!selectedPlaceId) return
+    const row = listRef.current?.querySelector(`[data-place-id="${CSS.escape(selectedPlaceId)}"]`)
+    const reduce = typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    row?.closest('li')?.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' })
+  }, [selectedPlaceId])
+
   if (places.length === 0) {
     return <p className="type-body py-4 text-[14px] text-[var(--muted)]">No stops planned for this day.</p>
   }
@@ -154,7 +168,7 @@ export default function StopTimeline({
 
   return (
     <>
-      <ol aria-label="Stops" className="flex flex-col">
+      <ol ref={listRef} aria-label="Stops" className="flex flex-col">
         {places.map((tp, i) => {
           const selected = tp.place_id === selectedPlaceId
           const pin = trailNumbers.get(tp.id)
