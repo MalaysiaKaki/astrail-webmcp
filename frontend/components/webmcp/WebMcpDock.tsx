@@ -206,7 +206,7 @@ export default function WebMcpDock() {
   return (
     <div
       className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col items-end gap-2 p-4
-                 sm:inset-x-auto sm:right-0"
+                 pb-[max(1rem,env(safe-area-inset-bottom))] sm:inset-x-auto sm:right-0"
       style={{ maxHeight: '100dvh' }}
     >
       {/* Order matters: the chip is last so it stays pinned to the bottom-right corner and never

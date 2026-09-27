@@ -34,7 +34,7 @@ export default function AgentConfirm() {
       role="dialog"
       aria-modal="true"
       aria-label="Astrail wants your approval"
-      className="fixed inset-x-0 bottom-20 z-50 mx-auto w-[min(28rem,calc(100%-2rem))] rounded-xl border border-[#C9974E]/60 bg-black/90 p-4 text-sm text-white/90 shadow-2xl backdrop-blur"
+      className="fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 mx-auto w-[min(28rem,calc(100%-2rem))] rounded-xl border border-[#C9974E]/60 bg-black/90 p-4 text-sm text-white/90 shadow-2xl backdrop-blur"
     >
       <p className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-wider text-[#E8D5B0]">
         <span aria-hidden className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#C9974E]" />
@@ -96,7 +96,7 @@ function PreferenceCard({ pending }: { pending: PendingPrompt }) {
       role="dialog"
       aria-modal="true"
       aria-label="Astrail wants your approval"
-      className="fixed inset-x-0 bottom-20 z-50 mx-auto w-[min(28rem,calc(100%-2rem))] rounded-xl border border-[#C9974E]/60 bg-black/90 p-4 text-sm text-white/90 shadow-2xl backdrop-blur"
+      className="fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 mx-auto w-[min(28rem,calc(100%-2rem))] rounded-xl border border-[#C9974E]/60 bg-black/90 p-4 text-sm text-white/90 shadow-2xl backdrop-blur"
     >
       <p className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-wider text-[#E8D5B0]">
         <span aria-hidden className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#C9974E]" />

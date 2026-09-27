@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import { Fraunces, Figtree, IBM_Plex_Mono } from "next/font/google";
 import { SITE_ORIGIN } from "@/lib/site";
+import { SITE_VIEWPORT } from "@/lib/site-viewport";
 import "./globals.css";
 // Locked paper design system (2026-07-26). Imported AFTER globals so its :root tokens
 // win over the retired Night & Daybreak values by source order — palette.css is
@@ -51,6 +52,8 @@ export const metadata: Metadata = {
     },
   },
 };
+
+export const viewport: Viewport = SITE_VIEWPORT;
 
 export default function RootLayout({
   children,
