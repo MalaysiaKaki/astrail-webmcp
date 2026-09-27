@@ -21,7 +21,24 @@ import { fmtDuration } from '../TransportStrip'
  * row's second line is the stop's category and where it came from, never an invented "9:00".
  */
 
-const RAIL = 'border-l-2 border-dotted border-[var(--paper-line-2,var(--line))]'
+/* The rail: one continuous line from the first stop's dot to the last, with each transport leg
+   sitting ON it between the two stops it joins — the way a ride app draws a multi-stop route.
+   Every row (leg, gap, stop, expanded detail) carries the same fixed-width rail column, so its
+   segments line up into one unbroken line. `data-rail` names each segment for the tests. */
+function RailCol({ children }: { children: React.ReactNode }) {
+  return (
+    <span aria-hidden className="ml-1 flex w-7 shrink-0 flex-col items-center self-stretch">{children}</span>
+  )
+}
+
+function Seg({ line, className = '' }: { line: boolean; className?: string }) {
+  return (
+    <span
+      data-rail={line ? 'line' : 'cap'}
+      className={['w-[2px] shrink-0 rounded-full', line ? 'bg-[var(--paper-line-2)]' : '', className].join(' ')}
+    />
+  )
+}
 
 function humanize(s: string): string {
   const t = s.replace(/_/g, ' ')
@@ -38,9 +55,9 @@ function LegRow({ link }: { link: RouteLink }) {
       ].filter(Boolean).join(', ')
     : ''
   return (
-    <div className="flex gap-3 pl-[13px]">
-      <span aria-hidden className={`w-0 shrink-0 self-stretch ${RAIL}`} />
-      <p className="type-body min-w-0 flex-1 py-2 pl-[18px] text-[13px] leading-snug text-[var(--muted)]">
+    <div className="flex gap-3">
+      <RailCol><Seg line className="flex-1" /></RailCol>
+      <p className="type-body min-w-0 flex-1 py-2.5 text-[13px] leading-snug text-[var(--muted)]">
         {from ? <span>from {from}, </span> : null}
         <span className="text-[var(--starlight)]">{humanize(leg.transport_mode)}</span>
         {timing ? <span className="tabular-nums text-[var(--brass-bright)]"> {timing}</span> : null}
@@ -66,8 +83,10 @@ function ProvenanceLine({ p, full }: { p: StopProvenance; full: boolean }) {
   )
 }
 
-function StopDetail({ tp, restaurants, placeIndex, selectedRestaurantPlaceId, onSelectRestaurant }: {
+function StopDetail({ tp, restaurants, placeIndex, selectedRestaurantPlaceId, onSelectRestaurant, railBelow }: {
   tp: TripPlace
+  /** Whether the rail continues past this stop (it is not the last thing on the list). */
+  railBelow: boolean
   restaurants: RestaurantSuggestion[]
   placeIndex: Map<string, Place>
   selectedRestaurantPlaceId: string | null
@@ -78,7 +97,9 @@ function StopDetail({ tp, restaurants, placeIndex, selectedRestaurantPlaceId, on
   const extraQuotes = ev.quotes.filter((q) => q.trim() && q !== ev.quote)
   const where = [place.area, place.city, place.country].filter(Boolean).join(', ')
   return (
-    <div className="pb-3 pl-[46px] pr-1">
+    <div className="flex gap-3">
+    <RailCol>{railBelow ? <Seg line className="flex-1" /> : null}</RailCol>
+    <div className="min-w-0 flex-1 pb-3 pr-1">
       {extraQuotes.map((q) => (
         <p key={q} className="type-body mt-1 text-[14px] italic leading-snug text-[var(--muted)]">“{q}”</p>
       ))}
@@ -99,6 +120,7 @@ function StopDetail({ tp, restaurants, placeIndex, selectedRestaurantPlaceId, on
           />
         </div>
       ) : null}
+    </div>
     </div>
   )
 }
@@ -138,10 +160,12 @@ export default function StopTimeline({
           const pin = trailNumbers.get(tp.id)
           const p = stopProvenance(tp)
           const link = above[i]
+          // The line runs on past this dot unless it is the last thing on the rail.
+          const railBelow = i < places.length - 1 || trailing.length > 0
           return (
             <li key={tp.id}>
               {link ? <LegRow link={link} /> : i > 0 ? (
-                <div className="flex h-3 pl-[13px]"><span aria-hidden className={`w-0 ${RAIL}`} /></div>
+                <div className="flex h-3"><RailCol><Seg line className="flex-1" /></RailCol></div>
               ) : null}
               <button
                 type="button"
@@ -150,13 +174,16 @@ export default function StopTimeline({
                 aria-current={selected ? 'true' : undefined}
                 onClick={() => onSelectPlace(tp.place_id)}
                 className={[
-                  'flex min-h-11 w-full items-start gap-3 rounded-2xl px-1 py-2 text-left transition-colors',
+                  'flex min-h-11 w-full items-stretch gap-3 rounded-2xl pr-1 text-left transition-colors',
                   selected ? 'bg-[var(--brass-soft)]' : 'active:bg-[var(--chip-bg)]',
                 ].join(' ')}
               >
+                <RailCol>
+                <Seg line={i > 0 || link !== null} className="h-2.5" />
                 <span
+                  data-rail="dot"
                   className={[
-                    'type-label mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] tabular-nums',
+                    'type-label flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] tabular-nums',
                     pin != null
                       ? 'bg-[var(--brass)] text-[var(--ink-900,#1C1710)]'
                       : 'border-2 border-dashed border-[var(--line)]',
@@ -164,10 +191,12 @@ export default function StopTimeline({
                 >
                   {pin != null ? pin : ''}
                 </span>
+                <Seg line={railBelow} className="flex-1" />
+                </RailCol>
                 <span className="sr-only">
                   {pin != null ? `Stop ${pin} of ${trailNumbers.size}` : 'Unnumbered stop'}
                 </span>
-                <span className="min-w-0 flex-1">
+                <span className="min-w-0 flex-1 py-2">
                   <span className="type-display block truncate text-[17px] leading-tight text-[var(--starlight)]">
                     {tp.place.name}
                   </span>
@@ -191,6 +220,7 @@ export default function StopTimeline({
                   placeIndex={placeIndex}
                   selectedRestaurantPlaceId={selectedRestaurantPlaceId}
                   onSelectRestaurant={onSelectRestaurant}
+                  railBelow={railBelow}
                 />
               ) : null}
             </li>

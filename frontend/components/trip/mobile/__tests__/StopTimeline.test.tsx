@@ -122,3 +122,35 @@ describe('StopTimeline', () => {
     expect(within(row(anchored.near_place_id!)).getByText(/to eat nearby/)).toBeInTheDocument()
   })
 })
+
+/* The rail is one continuous line from the first dot to the last (Grab-style). jsdom has no
+   layout, so this pins the STRUCTURE: every segment between the first and last dot draws line,
+   legs sit on it, and only the outer ends are capped. */
+describe('StopTimeline rail', () => {
+  const segs = (el: Element) => [...el.querySelectorAll('[data-rail]')].map((s) => s.getAttribute('data-rail'))
+
+  it('draws line through every segment between the first and last dot, legs included', () => {
+    renderDay(1)
+    const all = segs(screen.getByRole('list', { name: 'Stops' }))
+    const first = all.indexOf('dot')
+    const last = all.lastIndexOf('dot')
+    expect(all.slice(0, first)).toEqual(['cap'])                 // nothing above stop 1
+    expect(all.slice(first + 1, last).every((s) => s === 'line' || s === 'dot')).toBe(true)
+    expect(all.slice(last + 1)).toEqual(['cap'])                  // nothing below the last stop
+    expect(all.filter((s) => s === 'dot')).toHaveLength(placesForDay(TOKYO_TRIP, 1).length)
+  })
+
+  it('keeps the line running through an expanded stop into the next one', () => {
+    renderDay(1, { selectedPlaceId: 'pl_hpcafe' })
+    const all = segs(screen.getByRole('list', { name: 'Stops' }))
+    const first = all.indexOf('dot')
+    const last = all.lastIndexOf('dot')
+    expect(all.slice(first + 1, last).every((s) => s === 'line' || s === 'dot')).toBe(true)
+  })
+
+  it('starts the line above stop 1 when a leg arrives into it from the day before', () => {
+    renderDay(2)
+    const all = segs(screen.getByRole('list', { name: 'Stops' }))
+    expect(all[0]).toBe('line')     // the cross-day arrival sits on the rail above the dot
+  })
+})
