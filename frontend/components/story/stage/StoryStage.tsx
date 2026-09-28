@@ -69,6 +69,10 @@ export default function StoryStage() {
           </div>
           {/* Phones (< 768px) get the kit's pills instead of the story buttons above. */}
           <PhoneHeroActions />
+          {/* Phones only: a framed screenshot of the real trip view, with Aster on its corner.
+              Before the fine print, so the CTAs lead straight into the product (Placify's
+              order); desktop renders nothing here. */}
+          <PhoneHeroDevice />
           <p className="story-sub story-hero__fineprint mt-7 text-[15px] text-[color:var(--ink-600)]">
             The tools live in the app, not on this page, which is just the pitch.
             Open Astrail in ChatGPT&rsquo;s built-in browser and ask what you can do
@@ -76,8 +80,6 @@ export default function StoryStage() {
             is open, and six on the sample trail linked at the top, which needs no
             account.
           </p>
-          {/* Phones only: a framed screenshot of the real trip view, with Aster beside it. */}
-          <PhoneHeroDevice />
         </div>
 
         <div className="story-scroll-hint" style={{ zIndex: 40 }}>

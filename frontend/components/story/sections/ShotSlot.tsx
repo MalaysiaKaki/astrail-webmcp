@@ -2,10 +2,17 @@
 
 import PhoneOnlyPicture from '../PhoneOnlyPicture'
 
-/** A phone-only crop of the same screenshot (public/landing-mobile, made by the harness's
- *  crop-steps.mjs). `width`/`height` are the encoded file's real size; `mapCredit` adds the
- *  Mapbox/OSM line under crops that show a map. */
-export type PhoneCrop = { base: string; width: number; height: number; mapCredit?: boolean }
+/** A phone-only image for this slot (public/landing-mobile, made by the harness's
+ *  crop-steps.mjs or capture-hero.mjs). `width`/`height` are the encoded file's real size;
+ *  `alt` overrides the slot's when the phone image shows something else; `mapCredit` adds the
+ *  Mapbox/OSM line under images that show a map. */
+export type PhoneCrop = {
+  base: string
+  width: number
+  height: number
+  alt?: string
+  mapCredit?: boolean
+}
 
 /* A swap-ready frame for a real app screenshot. Until the capture lands, it
    renders a labeled placeholder panel; drop the file into
@@ -69,7 +76,7 @@ export default function ShotSlot({
             base={phone.base}
             width={phone.width}
             height={phone.height}
-            alt={alt}
+            alt={phone.alt ?? alt}
             className="story-shot__phone-img"
           />
           {phone.mapCredit ? (

@@ -24,7 +24,7 @@ const STEPS = [
     slotLabel: 'real screenshot, saving reels',
     badge: 'Agent',
     note: 'save_reels \u00b7 up to 5 at a time, non-Instagram links refused before any request',
-    phone: { base: '/landing-mobile/step-save-reels', width: 700, height: 875 },
+    phone: { base: '/landing-mobile/step-save-reels', width: 648, height: 1032 },
   },
   {
     eyebrow: 'Step 2',
@@ -35,7 +35,7 @@ const STEPS = [
     slotLabel: 'real screenshot, a generation running',
     badge: 'Agent',
     note: 'plan_trip_from_reels \u2192 get_trip_progress \u00b7 approval on the page before anything is spent',
-    phone: { base: '/landing-mobile/step-generation', width: 700, height: 875, mapCredit: true },
+    phone: { base: '/landing-mobile/step-generation', width: 700, height: 1129 },
   },
   {
     eyebrow: 'Step 3',
@@ -46,7 +46,13 @@ const STEPS = [
     slotLabel: 'real screenshot, changing an itinerary',
     badge: 'Agent',
     note: 'move_place \u00b7 remove_place \u00b7 add_place \u00b7 set_trip_dates, each behind an approval card on the page, each starting the rewrite itself',
-    phone: { base: '/landing-mobile/step-change', width: 700, height: 649, mapCredit: true },
+    // A real phone capture of the sample trail's sheet (capture-hero.mjs), not a desktop crop.
+    phone: {
+      base: '/landing-mobile/step-trip-sheet',
+      width: 700,
+      height: 680,
+      alt: 'The sample trip on a phone: day one\u2019s first stop, quoting the Reel caption it came from',
+    },
   },
 ] as const
 

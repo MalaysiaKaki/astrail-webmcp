@@ -92,11 +92,18 @@ describe('How it works on phones: step cards with phone-only crops', () => {
     }
   })
 
-  it('credits the map on the crops that show one', () => {
+  it('credits the map wherever a crop carries a credit line', () => {
     render(<HowItWorks />)
-    const credits = document.querySelectorAll('.story-shot__credit')
-    expect(credits.length).toBeGreaterThanOrEqual(1)
-    for (const c of credits) expect(c).toHaveTextContent('© Mapbox © OpenStreetMap')
+    for (const c of document.querySelectorAll('.story-shot__credit')) {
+      expect(c).toHaveTextContent('© Mapbox © OpenStreetMap')
+    }
+  })
+
+  it('shows step 3 as a real phone capture of the sample trail, described as such', () => {
+    render(<HowItWorks />)
+    const last = crops().at(-1)!
+    expect(last.querySelector('source')).toHaveAttribute('srcset', '/landing-mobile/step-trip-sheet.avif')
+    expect(last.querySelector('img')!.getAttribute('alt')).toMatch(/sample trip on a phone/i)
   })
 
   it('keeps the desktop browser-frame screenshot untouched', () => {
