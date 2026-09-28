@@ -31,7 +31,7 @@ export default function AsterStory() {
   return (
     <section
       id="story"
-      className="px-6 py-24 md:px-12"
+      className="story-chapters px-6 py-24 md:px-12"
       style={{
         background:
           'linear-gradient(to bottom, var(--story-dusk), var(--night-900))',
@@ -49,15 +49,15 @@ export default function AsterStory() {
           inspiration the way we all do: one glowing save at a time.
         </p>
 
-        <div className="mt-14 flex flex-col gap-20">
+        <div className="story-cards mt-14 flex flex-col gap-20">
           {CHAPTERS.map((chapter, i) => (
             <div
               key={chapter.eyebrow}
-              className={`flex flex-col items-center gap-10 md:gap-14 ${
+              className={`story-chapter flex flex-col items-center gap-10 md:gap-14 ${
                 i % 2 ? 'md:flex-row-reverse' : 'md:flex-row'
               }`}
             >
-              <div className="md:w-2/5">
+              <div className="story-chapter__text md:w-2/5">
                 <p className="story-eyebrow text-[color:var(--brass-bright)]">
                   {chapter.eyebrow}
                 </p>
@@ -68,7 +68,7 @@ export default function AsterStory() {
                   {chapter.body}
                 </p>
               </div>
-              <figure className="overflow-hidden rounded-xl border border-[color:var(--night-line)] shadow-[inset_0_1px_0_rgba(247,243,232,0.07),0_1px_2px_rgba(0,0,0,0.55),0_8px_28px_rgba(0,0,0,0.4)] w-full md:w-3/5">
+              <figure className="story-chapter__art overflow-hidden rounded-xl border border-[color:var(--night-line)] shadow-[inset_0_1px_0_rgba(247,243,232,0.07),0_1px_2px_rgba(0,0,0,0.55),0_8px_28px_rgba(0,0,0,0.4)] w-full md:w-3/5">
                 {/* 1920x1072 keyframe — reserve the ratio so the lazy image
                     never causes a layout jump when it lands. The reserve needs a width to
                     work from: without w-full the centred column shrank this figure to 0 on
@@ -86,11 +86,11 @@ export default function AsterStory() {
 
         {/* Honest hand-off: the chapters are illustrations; the proof is the
             real product right below. */}
-        <p className="story-sub mt-16 max-w-[38em] text-[color:var(--starlight-70)]">
+        <p className="story-chapters__handoff story-sub mt-16 max-w-[38em] text-[color:var(--starlight-70)]">
           The two chapters above are illustrations. Everything past this point is{' '}
           <a
             href="#how-it-works"
-            className="font-semibold text-[color:var(--story-teal-night)] underline underline-offset-4"
+            className="story-chapters__handoff-link font-semibold text-[color:var(--story-teal-night)] underline underline-offset-4"
           >
             the product itself, screenshotted rather than drawn
           </a>

@@ -24,6 +24,7 @@ const STEPS = [
     slotLabel: 'real screenshot, saving reels',
     badge: 'Agent',
     note: 'save_reels \u00b7 up to 5 at a time, non-Instagram links refused before any request',
+    phone: { base: '/landing-mobile/step-save-reels', width: 700, height: 875 },
   },
   {
     eyebrow: 'Step 2',
@@ -34,6 +35,7 @@ const STEPS = [
     slotLabel: 'real screenshot, a generation running',
     badge: 'Agent',
     note: 'plan_trip_from_reels \u2192 get_trip_progress \u00b7 approval on the page before anything is spent',
+    phone: { base: '/landing-mobile/step-generation', width: 700, height: 875, mapCredit: true },
   },
   {
     eyebrow: 'Step 3',
@@ -44,6 +46,7 @@ const STEPS = [
     slotLabel: 'real screenshot, changing an itinerary',
     badge: 'Agent',
     note: 'move_place \u00b7 remove_place \u00b7 add_place \u00b7 set_trip_dates, each behind an approval card on the page, each starting the rewrite itself',
+    phone: { base: '/landing-mobile/step-change', width: 700, height: 649, mapCredit: true },
   },
 ] as const
 
@@ -51,7 +54,7 @@ export default function HowItWorks() {
   return (
     <section
       id="how-it-works"
-      className="bg-[color:var(--paper-1)] px-6 py-24 md:px-12"
+      className="story-how bg-[color:var(--paper-1)] px-6 py-24 md:px-12"
     >
       <div className="mx-auto max-w-6xl">
         <p className="story-eyebrow text-[color:var(--story-teal-ink)]">
@@ -62,15 +65,15 @@ export default function HowItWorks() {
           are both working the same map.
         </h2>
 
-        <div className="mt-14 flex flex-col gap-20">
+        <div className="story-cards mt-14 flex flex-col gap-20">
           {STEPS.map((step, i) => (
             <div
               key={step.eyebrow}
-              className={`flex flex-col items-center gap-10 md:gap-14 ${
+              className={`story-step flex flex-col items-center gap-10 md:gap-14 ${
                 i % 2 ? 'md:flex-row-reverse' : 'md:flex-row'
               }`}
             >
-              <div className="md:w-2/5">
+              <div className="story-step__text md:w-2/5">
                 <p className="story-eyebrow text-[color:var(--brass-deep)]">
                   {step.eyebrow}
                 </p>
@@ -79,8 +82,8 @@ export default function HowItWorks() {
                 </h3>
                 <p className="story-sub text-[color:var(--ink-600)]">{step.body}</p>
                 {'note' in step && step.note ? (
-                  <p className="mt-4 text-[14px] font-medium text-[color:var(--story-teal-ink)]">
-                    <span className="mr-2 rounded-full border border-[color:var(--story-teal-ink)] px-2 py-[2px] text-[11px] uppercase tracking-[0.12em]">
+                  <p className="story-step__note mt-4 text-[14px] font-medium text-[color:var(--story-teal-ink)]">
+                    <span className="story-step__badge mr-2 rounded-full border border-[color:var(--story-teal-ink)] px-2 py-[2px] text-[11px] uppercase tracking-[0.12em]">
                       {'badge' in step && step.badge ? step.badge : 'Soon'}
                     </span>
                     {step.note}
@@ -92,6 +95,7 @@ export default function HowItWorks() {
                 alt={step.alt}
                 label={step.slotLabel}
                 className="md:w-3/5"
+                phone={step.phone}
               />
             </div>
           ))}

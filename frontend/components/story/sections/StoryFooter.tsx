@@ -72,9 +72,9 @@ function FooterItem({ link }: { link: FooterLink }) {
 
 export default function StoryFooter() {
   return (
-    <footer className="bg-[color:var(--night-900)] px-6 py-16 md:px-12">
-      <div className="mx-auto grid max-w-6xl grid-cols-2 gap-10 md:grid-cols-[1.4fr_repeat(3,1fr)]">
-        <div className="col-span-2 md:col-span-1">
+    <footer className="story-footer bg-[color:var(--night-900)] px-6 py-16 md:px-12">
+      <div className="story-footer__grid mx-auto grid max-w-6xl grid-cols-2 gap-10 md:grid-cols-[1.4fr_repeat(3,1fr)]">
+        <div className="story-footer__brand col-span-2 md:col-span-1">
           <AstrailLogo variant="lockup" tone="chrome" height={26} />
           <p className="mt-4 max-w-[30ch] text-sm leading-relaxed text-[color:var(--starlight-70)]">
             Turn the travel reels you saved into a route you&rsquo;ll actually
@@ -86,8 +86,8 @@ export default function StoryFooter() {
         </div>
 
         {COLUMNS.map((col) => (
-          <nav key={col.title} aria-label={col.title}>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--starlight)]">
+          <nav key={col.title} aria-label={col.title} className="story-footer__col">
+            <p className="story-footer__title text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--starlight)]">
               {col.title}
             </p>
             <ul className="story-footer__list mt-4 flex flex-col gap-3">
@@ -101,7 +101,7 @@ export default function StoryFooter() {
         ))}
       </div>
 
-      <div className="mx-auto mt-14 flex max-w-6xl flex-col gap-2 border-t border-[color:var(--night-line)] pt-6 text-xs text-[color:var(--starlight-70)] md:flex-row md:items-center md:justify-between">
+      <div className="story-footer__legal mx-auto mt-14 flex max-w-6xl flex-col gap-2 border-t border-[color:var(--night-line)] pt-6 text-xs text-[color:var(--starlight-70)] md:flex-row md:items-center md:justify-between">
         <p>&copy; 2026 Astrail &middot; Singapore &middot; WebMCP Challenge build</p>
         <p>
           Astrail is a WebMCP Challenge build, not a finished product. It uses AI to

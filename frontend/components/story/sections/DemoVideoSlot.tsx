@@ -20,7 +20,7 @@ export default function DemoVideoSlot() {
   )
 
   return (
-    <section className="bg-[color:var(--paper-1)] px-6 py-24 md:px-12">
+    <section className="story-watch bg-[color:var(--paper-1)] px-6 py-24 md:px-12">
       <div className="mx-auto max-w-5xl">
         <p className="story-eyebrow text-[color:var(--story-teal-ink)]">
           Watch it work
@@ -29,8 +29,8 @@ export default function DemoVideoSlot() {
           Under three minutes, reels to route.
         </h2>
 
-        <div className="mt-10 overflow-hidden rounded-xl border border-[color:var(--paper-line)] bg-[color:var(--paper-0)] shadow-[0_1px_2px_rgba(28,23,16,0.08),0_16px_40px_rgba(28,23,16,0.14)]">
-          <div className="flex items-center gap-1.5 border-b border-[color:var(--paper-line)] bg-[color:var(--paper-2)] px-4 py-2.5">
+        <div className="story-watch__card mt-10 overflow-hidden rounded-xl border border-[color:var(--paper-line)] bg-[color:var(--paper-0)] shadow-[0_1px_2px_rgba(28,23,16,0.08),0_16px_40px_rgba(28,23,16,0.14)]">
+          <div className="story-watch__chrome flex items-center gap-1.5 border-b border-[color:var(--paper-line)] bg-[color:var(--paper-2)] px-4 py-2.5">
             <span className="h-2.5 w-2.5 rounded-full bg-[color:var(--paper-line-2)]" />
             <span className="h-2.5 w-2.5 rounded-full bg-[color:var(--paper-line-2)]" />
             <span className="h-2.5 w-2.5 rounded-full bg-[color:var(--paper-line-2)]" />
@@ -81,13 +81,13 @@ export default function DemoVideoSlot() {
         {/* The rules require this video to stay public for the whole judging period, so the page
             names where it lives rather than only embedding it. A judge whose browser blocks the
             iframe still has a way to watch it. */}
-        <p className="mt-4 text-[14px] text-[color:var(--ink-400)]">
+        <p className="story-watch__yt mt-4 text-[14px] text-[color:var(--ink-400)]">
           Also on YouTube:{' '}
           <a
             href={DEMO_YOUTUBE_URL}
             target="_blank"
             rel="noreferrer"
-            className="story-footer__link font-medium text-[color:var(--story-teal-ink)] underline underline-offset-4"
+            className="story-footer__link story-watch__yt-link font-medium text-[color:var(--story-teal-ink)] underline underline-offset-4"
           >
             {DEMO_YOUTUBE_URL.replace('https://', '')}
           </a>

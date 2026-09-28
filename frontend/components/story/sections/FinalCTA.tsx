@@ -3,6 +3,7 @@
 import Link from 'next/link'
 
 import PlayOnceVideo from '../PlayOnceVideo'
+import { PhoneHeroActions } from '../PhoneHero'
 import { CLIPS, STILLS } from '../story-config'
 
 /* The warm bookend — the mech lands and waves. The message is the challenge build, not a beta:
@@ -31,7 +32,7 @@ export default function FinalCTA() {
         aria-hidden="true"
       />
 
-      <div className="story-copy story-copy--center" style={{ zIndex: 40 }}>
+      <div className="story-cta__copy story-copy story-copy--center" style={{ zIndex: 40 }}>
         <p className="story-eyebrow text-[color:var(--story-teal-ink)]">
           Try it with an agent
         </p>
@@ -49,7 +50,7 @@ export default function FinalCTA() {
           a stop stops for a card on the page first.
         </p>
 
-        <div className="mt-8 flex flex-wrap items-center gap-4">
+        <div className="m-desktop-only mt-8 flex flex-wrap items-center gap-4">
           <Link href="/sign-in" className="story-btn story-btn--primary">
             Sign in to try it
           </Link>
@@ -57,8 +58,10 @@ export default function FinalCTA() {
             See how it works
           </a>
         </div>
+        {/* Phones: the same two actions as the hero, in the kit's pills. */}
+        <PhoneHeroActions />
 
-        <p className="mt-5 text-[13px] text-[color:var(--ink-400)]">
+        <p className="story-cta__fine mt-5 text-[13px] text-[color:var(--ink-400)]">
           A challenge build rather than a finished product. There is nothing to
           sign up for, and there are rough edges.
         </p>

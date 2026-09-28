@@ -15,7 +15,7 @@ export default function LiveMapDemo() {
   const near = useInView(ref, { margin: '600px 0px' })
 
   return (
-    <section className="bg-[color:var(--night-900)] px-6 py-24 md:px-12">
+    <section className="story-live bg-[color:var(--night-900)] px-6 py-24 md:px-12">
       <div className="mx-auto max-w-6xl">
         <p className="story-eyebrow text-[color:var(--story-teal-night)]">
           Live demo &middot; real map
@@ -33,7 +33,7 @@ export default function LiveMapDemo() {
 
         <div
           ref={ref}
-          className="mt-12 h-[70vh] min-h-[420px] overflow-hidden rounded-xl border border-[color:var(--night-line)] shadow-[inset_0_1px_0_rgba(247,243,232,0.07),0_1px_2px_rgba(0,0,0,0.55),0_8px_28px_rgba(0,0,0,0.4)]"
+          className="story-live__map mt-12 h-[70vh] min-h-[420px] overflow-hidden rounded-xl border border-[color:var(--night-line)] shadow-[inset_0_1px_0_rgba(247,243,232,0.07),0_1px_2px_rgba(0,0,0,0.55),0_8px_28px_rgba(0,0,0,0.4)]"
         >
           {near ? (
             <StoryRevealMap className="h-full w-full" />

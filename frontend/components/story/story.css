@@ -613,19 +613,20 @@
 
   .story-phone-device {
     display: flex;
-    align-items: flex-end;
     justify-content: center;
     margin-top: 36px;
   }
+  /* Centred like Placify's device shots. Aster is absolutely placed on the frame's bottom-left
+     corner: his right edge reaches 14px past the frame's left edge (7px bezel + the rounded
+     corner, where the screen is clipped away), so he never covers the sheet's stops. */
   .story-phone-device__aster {
-    order: -1;
-    position: relative;
+    position: absolute;
     z-index: 1;
-    width: min(28vw, 120px);
+    left: calc(14px - min(22vw, 88px));
+    bottom: -10px;
+    width: min(22vw, 88px);
     height: auto;
-    margin-right: -14px;
-    margin-bottom: 44px;         /* stand level with the frame's foot, above the caption */
-    filter: drop-shadow(0 14px 18px rgba(28, 23, 16, 0.18));
+    filter: drop-shadow(0 12px 16px rgba(28, 23, 16, 0.2));
   }
   .story-phone-device__figure { margin: 0; width: min(58vw, 250px); }
   .story-phone-device__frame {
@@ -673,4 +674,359 @@
 
 @media (max-width: 767.98px) and (prefers-reduced-motion: reduce) {
   .story-phone-header__bar { transition: none; }
+}
+
+/* ============================================================
+   Placify-pattern revamp, phase B2: the story sections on phones become cards.
+   White feature cards (20px radius, --m-shadow-1) on the paper sections, dark cards on the night
+   band and footer, 16px page gutters. Every rule is inside max-width: 767.98px and hangs off a
+   class the markup added for this (story-how, story-step, story-shot, story-chapters, story-live,
+   story-watch, story-faq, story-cta__copy, story-panel, story-footer__*), so desktop is untouched.
+   The kit classes are used directly only on phone-only markup (the FAQ toggles, the CTA pills);
+   shared elements reuse the kit's look through its --m-* tokens.
+   ============================================================ */
+
+@media (max-width: 767.98px) {
+  /* ---- Shared rhythm: section padding, centred section heads ---- */
+  .story-chapters,
+  .story-how,
+  .story-live,
+  .story-watch,
+  #faq {
+    padding: 64px 16px;
+  }
+  :is(.story-chapters, .story-how, .story-live, .story-watch, #faq) > div > :is(.story-eyebrow, .story-h, .story-sub) {
+    margin-inline: auto;
+    text-align: center;
+  }
+  :is(.story-chapters, .story-how, .story-live, .story-watch, #faq, .story-cta) .story-eyebrow {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    margin-bottom: 10px;
+  }
+  :is(.story-chapters, .story-how, .story-live, .story-watch, #faq) > div > .story-h {
+    font-size: 30px;
+    line-height: 1.1;
+    text-wrap: balance;
+  }
+  :is(.story-chapters, .story-how, .story-live, .story-watch, #faq) > div > .story-sub {
+    font-size: 16px;
+    text-wrap: pretty;
+  }
+  .story-cards {
+    margin-top: 32px;
+    gap: 16px;
+  }
+
+  /* ---- How it works: one white card per step, the phone crop nested at the bottom ---- */
+  .story-step {
+    align-items: stretch;
+    gap: 0;
+    overflow: hidden;
+    border-radius: var(--m-r-card);
+    background: var(--m-card);
+    box-shadow: var(--m-shadow-1);
+  }
+  .story-step__text { padding: 22px 20px 18px; }
+  .story-step .story-eyebrow { margin-bottom: 6px; }
+  .story-step .story-h { font-size: 23px; line-height: 1.15; margin-bottom: 10px; }
+  .story-step .story-sub { font-size: 16px; line-height: 1.55; }
+  .story-step__note { font-size: 13px; line-height: 1.5; }
+  .story-step__badge { font-size: 12px; }
+
+  .story-shot[data-phone-crop] {
+    margin: 0 12px 12px;
+    border: 0;
+    border-radius: var(--m-r-sub);
+    background: var(--m-subcard);
+    box-shadow: none;
+  }
+  .story-shot[data-phone-crop] .story-shot__chrome,
+  .story-shot[data-phone-crop] .story-shot__desktop { display: none; }
+  .story-shot__phone-img { display: block; width: 100%; height: auto; }
+  .story-shot__credit {
+    padding: 8px 12px 10px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--ink-600);
+  }
+
+  /* ---- The chapters band: dark cards, art on top ---- */
+  .story-chapter {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid var(--night-line);
+    border-radius: var(--m-r-card);
+    background: var(--night-800);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.35);
+  }
+  .story-chapter__art { border: 0; border-radius: 0; box-shadow: none; }
+  .story-chapter__text { padding: 20px 20px 22px; }
+  .story-chapter .story-eyebrow { margin-bottom: 6px; }
+  .story-chapter .story-h { font-size: 23px; line-height: 1.15; margin-bottom: 10px; }
+  .story-chapter .story-sub { font-size: 16px; line-height: 1.55; }
+
+  /* The hand-off sentence becomes a white card link: its link's ::after covers the card, and the
+     card draws the chevron. The sentence and the link text are unchanged. */
+  .story-chapters .story-chapters__handoff {
+    position: relative;
+    margin-top: 24px;
+    padding: 16px 48px 16px 18px;
+    border-radius: var(--m-r-card);
+    background: var(--m-card);
+    color: var(--m-text-muted);
+    font-size: 15px;
+    line-height: 1.5;
+    text-align: left;
+    box-shadow: var(--m-shadow-2);
+    transition: transform var(--m-dur-press) var(--m-ease);
+  }
+  .story-chapters__handoff::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 18px;
+    width: 18px;
+    height: 18px;
+    transform: translateY(-50%);
+    background: var(--m-text-muted);
+    -webkit-mask: var(--story-chevron) center / contain no-repeat;
+    mask: var(--story-chevron) center / contain no-repeat;
+  }
+  .story-chapters__handoff:has(a:active) { transform: scale(0.985); }
+  .story-chapters .story-chapters__handoff-link {
+    color: var(--m-text);
+    text-decoration: none;
+  }
+  .story-chapters__handoff-link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--m-r-card);
+  }
+  .story-chapters__handoff-link:focus-visible { outline: none; }
+  .story-chapters__handoff-link:focus-visible::after { box-shadow: var(--m-focus); }
+
+  /* ---- Live map: a rounded card ---- */
+  .story-live .story-live__map {
+    margin-top: 28px;
+    height: 60vh;
+    min-height: 380px;
+    border-radius: var(--m-r-card);
+  }
+
+  /* ---- Demo video: a plain rounded card, and YouTube as a secondary pill ---- */
+  .story-watch .story-watch__card {
+    margin-top: 28px;
+    border: 0;
+    border-radius: var(--m-r-card);
+    box-shadow: var(--m-shadow-1);
+  }
+  .story-watch__chrome { display: none; }
+  .story-watch .story-watch__yt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    color: var(--m-text-muted);
+  }
+  .story-watch .story-watch__yt-link {
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 20px;
+    border-radius: var(--m-r-pill);
+    background: var(--m-card);
+    color: var(--m-text);
+    font-size: 15px;
+    font-weight: 600;
+    text-decoration: none;
+    box-shadow: var(--m-shadow-1);
+    transition: transform var(--m-dur-press) var(--m-ease);
+  }
+  .story-watch__yt-link:active { transform: scale(0.97); }
+  .story-watch__yt-link:focus-visible { outline: none; box-shadow: var(--m-focus); }
+
+  /* ---- FAQ: each item is a white card; the kit card-link is its header ---- */
+  #faq .story-faq {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 32px;
+    border-top: 0;
+  }
+  #faq .story-faq__item {
+    padding: 0;
+    border-bottom: 0;
+    overflow: hidden;
+    border-radius: var(--m-r-card);
+    background: var(--m-card);
+    box-shadow: var(--m-shadow-1);
+  }
+  #faq .story-faq__item > dt { font-size: inherit; }
+  .story-faq__toggle {
+    min-height: 60px;
+    padding: 16px 18px;
+    background: transparent;
+    box-shadow: none;
+  }
+  .story-faq__q {
+    font-family: var(--font-fraunces), serif;
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--m-text);
+  }
+  .story-faq__chevron { transition: transform var(--m-dur-sheet) var(--m-ease); }
+  .story-faq__item[data-open='true'] .story-faq__chevron { transform: rotate(180deg); }
+  .story-faq__item[data-open='false'] .story-faq__a { display: none; }
+  #faq .story-faq__a {
+    margin: 0;
+    padding: 0 18px 18px;
+    font-size: 16px;
+    line-height: 1.55;
+  }
+
+  /* ---- Closing CTA: the copy in flow as a white card, the mech below it ---- */
+  .story-cta {
+    min-height: 0;
+    padding: 64px 0 300px;
+  }
+  .story-cta .story-cta__copy {
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    margin: 0 16px;
+    padding: 28px 20px 24px;
+    border-radius: var(--m-r-card);
+    background: var(--m-card);
+    box-shadow: var(--m-shadow-1);
+    text-align: center;
+  }
+  .story-cta .story-h { font-size: 30px; line-height: 1.1; text-wrap: balance; }
+  .story-cta .story-sub { font-size: 16px; line-height: 1.55; text-wrap: pretty; }
+  /* --ink-400 is caption-only (3.1:1); on the white card this is body text, so AA ink. */
+  .story-cta .story-cta__fine { color: var(--ink-600); }
+  .story-cta .story-cta-mech-mobile {
+    bottom: 24px;
+    max-height: 250px;
+  }
+
+  /* ---- Challenge panels: white cards, the record link as a secondary pill ---- */
+  .story-panels { padding: 8px 16px 64px; }
+  .story-panels .story-panel {
+    padding: 24px 20px;
+    border: 0;
+    border-radius: var(--m-r-card);
+    background: var(--m-card);
+    box-shadow: var(--m-shadow-1);
+  }
+  /* The setup card keeps its brass edge so a judge can find it, drawn inside the card. */
+  .story-panels .story-panel--judges {
+    box-shadow: inset 0 0 0 1.5px var(--brass-deep), var(--m-shadow-1);
+  }
+  .story-panel h2 { font-size: 26px; }
+  .story-panels .story-panel > p:first-child {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .story-panels .story-panel__record {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 10px 20px;
+    border-radius: var(--m-r-pill);
+    background: var(--m-card);
+    color: var(--m-text);
+    font-size: 15px;
+    line-height: 1.3;
+    text-align: center;
+    text-decoration: none;
+    box-shadow: var(--m-shadow-1);
+    transition: transform var(--m-dur-press) var(--m-ease);
+  }
+  .story-panel__record:active { transform: scale(0.97); }
+  .story-panel__record:focus-visible { outline: none; box-shadow: var(--m-focus); }
+  .story-panels .story-panel__signin {
+    border: 0;
+    border-radius: var(--m-r-sub);
+    background: var(--m-subcard);
+  }
+
+  /* ---- Footer: each column is a dark card of 48px rows with chevrons ---- */
+  .story-footer { padding: 48px 16px 40px; }
+  .story-footer .story-footer__grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  /* col-span-2 on the brand would add an implicit second track; span the one explicit track. */
+  .story-footer .story-footer__brand { grid-column: 1 / -1; margin-bottom: 12px; }
+  .story-footer__brand > p:last-child,
+  .story-footer .story-footer__title {
+    font-size: 13px;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .story-footer .story-footer__title { color: var(--starlight-70); font-weight: 600; }
+  .story-footer__col {
+    overflow: hidden;
+    border: 1px solid var(--night-line);
+    border-radius: var(--m-r-card);
+    background: var(--night-800);
+  }
+  .story-footer .story-footer__title { padding: 16px 18px 6px; }
+  .story-footer .story-footer__list { margin-top: 0; }
+  .story-footer__list > li + li { border-top: 1px solid var(--night-line); }
+  .story-footer .story-footer__list .story-footer__link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 48px;
+    padding: 0 18px;
+    color: var(--starlight);
+    font-size: 15px;
+    text-decoration: none;
+    transition: background-color var(--m-dur-press) var(--m-ease);
+  }
+  .story-footer__list .story-footer__link::after {
+    content: '';
+    flex: none;
+    width: 16px;
+    height: 16px;
+    background: var(--starlight-70);
+    -webkit-mask: var(--story-chevron) center / contain no-repeat;
+    mask: var(--story-chevron) center / contain no-repeat;
+  }
+  .story-footer__list .story-footer__link:active { background: rgba(247, 243, 232, 0.06); }
+  .story-footer__list .story-footer__link:focus-visible {
+    outline: 2px solid var(--brass-bright);
+    outline-offset: -2px;
+  }
+  .story-footer .story-footer__legal { margin-top: 28px; }
+}
+
+/* The right-pointing chevron the CSS-only card links draw (mask image, so it takes currentColor-
+   like tints via background). Declared once, used by the hand-off card and the footer rows. */
+:root {
+  --story-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 3.5 10.5 8 6 12.5'/%3E%3C/svg%3E");
+}
+
+@media (max-width: 767.98px) and (prefers-reduced-motion: reduce) {
+  .story-faq__chevron,
+  .story-chapters__handoff,
+  .story-watch__yt-link,
+  .story-panel__record,
+  .story-footer__list .story-footer__link { transition: none; }
+  .story-chapters__handoff:has(a:active),
+  .story-watch__yt-link:active,
+  .story-panel__record:active { transform: none; }
 }

@@ -16,11 +16,11 @@
  * judges can see. Nothing about them belongs in this repository. */
 export default function ChallengePanels() {
   return (
-    <div className="bg-[color:var(--paper-1)] px-5 py-12 font-[family-name:var(--font-figtree)] text-[color:var(--ink-900)] sm:px-8 lg:py-16">
+    <div className="story-panels bg-[color:var(--paper-1)] px-5 py-12 font-[family-name:var(--font-figtree)] text-[color:var(--ink-900)] sm:px-8 lg:py-16">
       <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-2">
         <section
           aria-labelledby="hackathon-new-heading"
-          className="rounded-2xl border border-[color:var(--paper-line)] bg-[color:var(--paper-0)] p-6 shadow-[0_12px_30px_rgba(28,23,16,0.07)] sm:p-8"
+          className="story-panel rounded-2xl border border-[color:var(--paper-line)] bg-[color:var(--paper-0)] p-6 shadow-[0_12px_30px_rgba(28,23,16,0.07)] sm:p-8"
         >
           <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--spruce-deep)]">
             Challenge work
@@ -78,7 +78,7 @@ export default function ChallengePanels() {
           </ul>
           <a
             href="https://github.com/shaunliew/astrail-webmcp/blob/main/docs/webmcp/WHATS-NEW.md"
-            className="mt-7 inline-flex font-semibold text-[color:var(--spruce-deep)] underline underline-offset-4"
+            className="story-panel__record mt-7 inline-flex font-semibold text-[color:var(--spruce-deep)] underline underline-offset-4"
           >
             Read the full new-vs-pre-existing record
           </a>
@@ -86,7 +86,7 @@ export default function ChallengePanels() {
 
         <section
           aria-labelledby="judges-heading"
-          className="rounded-2xl border border-[color:var(--brass-deep)] bg-[color:var(--paper-2)] p-6 sm:p-8"
+          className="story-panel story-panel--judges rounded-2xl border border-[color:var(--brass-deep)] bg-[color:var(--paper-2)] p-6 sm:p-8"
         >
           <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--brass-deep)]">
             Test setup
@@ -103,7 +103,7 @@ export default function ChallengePanels() {
             <li><b className="text-[color:var(--ink-900)]">3.</b> Turn on <b className="text-[color:var(--ink-900)]">Settings &gt; Browser &gt; Permissions &gt; Enable site tools</b>.</li>
             <li><b className="text-[color:var(--ink-900)]">4.</b> Look for the Site tools arrow in the address bar and the WebMCP chip at the bottom-right of the page.</li>
           </ol>
-          <div className="mt-7 rounded-lg border border-[color:var(--spruce-deep)] bg-[color:var(--paper-0)] px-4 py-4 text-sm leading-6 text-[color:var(--ink-600)]">
+          <div className="story-panel__signin mt-7 rounded-lg border border-[color:var(--spruce-deep)] bg-[color:var(--paper-0)] px-4 py-4 text-sm leading-6 text-[color:var(--ink-600)]">
             <p className="font-semibold text-[color:var(--spruce-deep)]">Signing in</p>
             <p className="mt-2">
               The test account&rsquo;s email and password are in the{' '}
