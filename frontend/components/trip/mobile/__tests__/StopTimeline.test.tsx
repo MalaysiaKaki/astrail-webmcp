@@ -124,35 +124,118 @@ describe('StopTimeline', () => {
   })
 })
 
-/* The rail is one continuous line from the first dot to the last (Grab-style). jsdom has no
-   layout, so this pins the STRUCTURE: every segment between the first and last dot draws line,
-   legs sit on it, and only the outer ends are capped. */
-describe('StopTimeline rail', () => {
-  const segs = (el: Element) => [...el.querySelectorAll('[data-rail]')].map((s) => s.getAttribute('data-rail'))
+/* A2 (Placify revamp): stops are separate cards, joined by a dotted connector that carries the
+   travel leg between them. jsdom has no layout, so this pins the STRUCTURE: one connector per gap
+   between consecutive cards (legs included), one above the first card only when a leg arrives into
+   it from the day before, and none dangling below the last card unless a leg leaves it. This
+   replaces the Phase 3 continuous-rail assertions (data-rail), which described the old list. */
+describe('StopTimeline connectors', () => {
+  const kinds = (el: Element) => [...el.querySelectorAll('[data-stop-card], [data-connector]')]
+    .map((n) => (n.hasAttribute('data-stop-card') ? 'card' : 'link'))
 
-  it('draws line through every segment between the first and last dot, legs included', () => {
+  it('joins every pair of consecutive cards with exactly one connector, legs included', () => {
     renderDay(1)
-    const all = segs(screen.getByRole('list', { name: 'Stops' }))
-    const first = all.indexOf('dot')
-    const last = all.lastIndexOf('dot')
-    expect(all.slice(0, first)).toEqual(['cap'])                 // nothing above stop 1
-    expect(all.slice(first + 1, last).every((s) => s === 'line' || s === 'dot')).toBe(true)
-    expect(all.slice(last + 1)).toEqual(['cap'])                  // nothing below the last stop
-    expect(all.filter((s) => s === 'dot')).toHaveLength(placesForDay(TOKYO_TRIP, 1).length)
+    const seq = kinds(screen.getByRole('list', { name: 'Stops' }))
+    const n = placesForDay(TOKYO_TRIP, 1).length
+    expect(seq.filter((k) => k === 'card')).toHaveLength(n)
+    expect(seq).toEqual(Array.from({ length: 2 * n - 1 }, (_, i) => (i % 2 ? 'link' : 'card')))
   })
 
-  it('keeps the line running through an expanded stop into the next one', () => {
+  it('keeps the connectors when a card is expanded', () => {
     renderDay(1, { selectedPlaceId: 'pl_hpcafe' })
-    const all = segs(screen.getByRole('list', { name: 'Stops' }))
-    const first = all.indexOf('dot')
-    const last = all.lastIndexOf('dot')
-    expect(all.slice(first + 1, last).every((s) => s === 'line' || s === 'dot')).toBe(true)
+    const seq = kinds(screen.getByRole('list', { name: 'Stops' }))
+    expect(seq.join(' ')).not.toMatch(/card card|link link/)
   })
 
-  it('starts the line above stop 1 when a leg arrives into it from the day before', () => {
+  it('puts the arrival leg above the first card when it comes from the day before', () => {
     renderDay(2)
-    const all = segs(screen.getByRole('list', { name: 'Stops' }))
-    expect(all[0]).toBe('line')     // the cross-day arrival sits on the rail above the dot
+    expect(kinds(screen.getByRole('list', { name: 'Stops' }))[0]).toBe('link')
+  })
+
+  it('draws the connector dotted, aligned under the number badge', () => {
+    renderDay(1)
+    const link = document.querySelector('[data-connector]')!
+    expect(link.querySelector('[data-connector-line]')!.className).toMatch(/border-dotted/)
+  })
+})
+
+/* A2: the stop card itself (compare Placify appstore/02). */
+describe('StopTimeline stop card', () => {
+  const card = (placeId: string) => row(placeId).closest<HTMLElement>('[data-stop-card]')!
+
+  it('is a white elevated card: ink number badge, bold title, muted category and provenance, chevron', () => {
+    renderDay(1)
+    expect(card('pl_akasaka').className).toMatch(/\bm-card\b/)
+    const badge = row('pl_akasaka').querySelector('[data-badge]')!
+    expect(badge.className).toMatch(/bg-\[var\(--m-ink\)\]/)
+    expect(badge.textContent).toBe(String(numbers.get('tp_akasaka')))
+    const title = within(row('pl_akasaka')).getByText('Akasaka Station')
+    expect(title.className).toMatch(/font-semibold|font-bold/)
+    expect(within(row('pl_akasaka')).getByText('Station')).toBeInTheDocument()
+    expect(row('pl_akasaka').querySelector('.m-chevron')).not.toBeNull()
+  })
+
+  it('nests the evidence in a sub-card: the Reel thumbnail on the left, then the verbatim quote', () => {
+    renderDay(1)
+    const sub = row('pl_akasaka').querySelector('[data-evidence]')!
+    expect(sub.className).toMatch(/\bm-subcard\b/)
+    const [first, second] = [...sub.children]
+    expect(first.tagName).toBe('IMG')
+    expect(first.className).toMatch(/\bh-14\b/)
+    expect(second.textContent).toBe('“HARRY POTTER TRAIN STATION IN TOKYO!”')
+  })
+
+  it('keeps the honest states: a suggestion shows its rationale unquoted; no quote means no sub-card', () => {
+    const first = renderDay(1)
+    const rationale = row('pl_ichiran').querySelector('[data-evidence]')!
+    expect(rationale.textContent).toMatch(/^Ramen to close the sando day/)
+    expect(rationale.textContent).not.toMatch(/[“”]/)
+    first.unmount()
+    // A Reel stop whose quote is missing: no sub-card (nothing is invented to fill it), and the
+    // meta line says so.
+    const places = placesForDay(TOKYO_TRIP, 1).map((tp): TripPlace =>
+      tp.id === 'tp_akasaka' ? { ...tp, evidence_json: { ...tp.evidence_json, quote: null, quotes: [] } } : tp)
+    renderDay(1, { places: places.filter((tp) => tp.id === 'tp_akasaka') })
+    expect(row('pl_akasaka').querySelector('[data-evidence]')).toBeNull()
+    expect(within(row('pl_akasaka')).getByText('No caption evidence')).toBeInTheDocument()
+  })
+
+  it('rings the selected card in ink and expands it inline, with Source as a secondary button', () => {
+    renderDay(1, { selectedPlaceId: 'pl_ichiran' })
+    expect(card('pl_ichiran').className).toMatch(/outline-\[var\(--m-ink\)\]/)
+    expect(card('pl_akasaka').className).not.toMatch(/outline-\[var\(--m-ink\)\]/)
+    const source = within(card('pl_ichiran')).getByRole('link', { name: /Source/ })
+    expect(source.className).toMatch(/\bm-btn-secondary\b/)
+    expect(source).toHaveAttribute('href', 'https://ichiran.com/')
+    expect(row('pl_ichiran').querySelector('.m-chevron')!.getAttribute('class')).toMatch(/rotate-180/)
+  })
+
+  it('lists nearby places to eat on the expanded card as card links that show them on the map', () => {
+    const onSelectRestaurant = vi.fn()
+    renderDay(1, { selectedPlaceId: 'pl_sandolab', onSelectRestaurant, selectedRestaurantPlaceId: 'pl_popo' })
+    const popo = within(card('pl_sandolab')).getByRole('button', { name: 'Show Popo on the map' })
+    expect(popo.className).toMatch(/\bm-card-link\b/)
+    expect(popo.querySelector('.m-chevron')).not.toBeNull()
+    expect(popo).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(within(card('pl_sandolab')).getByRole('button', { name: 'Show Ichiran Shibuya on the map' }))
+    expect(onSelectRestaurant).toHaveBeenCalledWith('pl_ichiran')
+  })
+
+  it('shows a travel leg as a meta row: mode icon, then "3 min · 0.1 km"', () => {
+    renderDay(1)
+    const legs = [...document.querySelectorAll('[data-leg="routed"]')]
+    expect(legs.map((l) => l.textContent?.replace(/\s+/g, ' ').trim())).toEqual(['Walk 3 min · 0.1 km', 'Drive 27 min · 9.5 km'])
+    expect(legs.map((l) => l.querySelector('svg')!.getAttribute('data-mode'))).toEqual(['walk', 'drive'])
+    // The mode word is for assistive tech; on screen the icon says it.
+    expect(within(legs[0] as HTMLElement).getByText('Walk').className).toMatch(/sr-only/)
+  })
+
+  it('makes the day-level "Where to eat" suggestions card links too', () => {
+    const restaurants = restaurantsForDay(TOKYO_TRIP, 'day_1')
+    renderDay(1, { places: [], restaurants })
+    const links = within(screen.getByRole('heading', { name: 'Where to eat' }).parentElement!).getAllByRole('button')
+    expect(links.length).toBe(restaurants.length)
+    for (const l of links) expect(l.className).toMatch(/\bm-card-link\b/)
   })
 })
 

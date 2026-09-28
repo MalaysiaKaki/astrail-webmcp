@@ -389,6 +389,17 @@ describe('TripWorkspace — the phone branch', () => {
     expect(buttons[0]).not.toHaveAttribute('aria-current')
   })
 
+  it('opens a day from the strip at the top of its list, not at the last scroll position', () => {
+    renderSeeded(TOKYO_TRIP_WITH_HOTELS)
+    const body = document.getElementById('mobile-trip-sheet-body')!
+    body.scrollTop = 480
+    fireEvent.click(screen.getByRole('button', { name: /^Day 2\b/ }))
+    expect(body.scrollTop).toBe(0)
+    body.scrollTop = 300
+    fireEvent.click(screen.getByRole('button', { name: 'Stay' }))
+    expect(body.scrollTop).toBe(0)
+  })
+
   it('falls back to "Day N" for a day with no date', () => {
     const days = TOKYO_TRIP.days.map((d) => ({ ...d, day_date: null }))
     renderSeeded({ ...TOKYO_TRIP, days })

@@ -57,7 +57,7 @@ export type MobileTripViewProps = {
 function SheetHeading({ title, dates, readOnly }: { title: string; dates: string; readOnly: boolean }) {
   return (
     <div data-testid="sheet-heading" className="min-w-0">
-      <h2 className="type-display truncate text-[22px] leading-[1.2] text-[var(--m-text)]">{title}</h2>
+      <h2 className="type-display truncate text-[22px] leading-[1.2] text-[var(--m-text)] [@media(max-height:700px)]:text-[20px]">{title}</h2>
       <p className="type-body mt-0.5 flex items-center gap-2 text-[14px] leading-5 text-[var(--m-text-muted)]">
         {dates ? <span className="truncate tabular-nums">{dates}</span> : null}
         {/* Said in the page, not only in the tool layer, so an agent reading it knows before it
@@ -77,7 +77,7 @@ function SheetHeading({ title, dates, readOnly }: { title: string; dates: string
    with ink text, the rest recede to muted. Short screens (≤700px tall) shrink the cells so the
    first stop card still fits in the compact sheet (plan amendment 5). */
 const CELL = [
-  'flex w-[52px] shrink-0 flex-col items-center justify-center gap-1 rounded-2xl h-[60px] [@media(max-height:700px)]:h-12',
+  'flex w-[52px] shrink-0 flex-col items-center justify-center gap-1 rounded-2xl h-[60px] [@media(max-height:700px)]:h-11',
   'transition-[transform,background-color] duration-[var(--m-dur-press)] active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100',
   'focus-visible:outline-none focus-visible:shadow-[var(--m-focus)]',
 ].join(' ')
@@ -103,16 +103,24 @@ function StripCell({ current, onClick, label, big, small }: {
   )
 }
 
+/* A strip tap opens that day at the top of its list. Done in the handler, not an effect on the
+   day: a pin tap also changes the day, and StopTimeline's scroll-to-the-selected-stop runs first
+   (child effects before parent), so an effect here would scroll the pin's stop straight back out. */
+function toListTop() {
+  const body = document.getElementById('mobile-trip-sheet-body')
+  if (body) body.scrollTop = 0
+}
+
 function DateStrip(p: MobileTripViewProps) {
   return (
-    <div role="group" aria-label="Trip days" className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-2 [scrollbar-width:none]">
+    <div role="group" aria-label="Trip days" className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [@media(max-height:700px)]:pb-1">
       {p.days.map((d) => {
         const label = dayLabel(d)
         return (
           <StripCell
             key={d.id}
             current={p.listView === 'stops' && d.day_number === p.activeDayNumber}
-            onClick={() => p.onSelectDay(d.day_number)}
+            onClick={() => { p.onSelectDay(d.day_number); toListTop() }}
             label={label.name}
             big={label.big}
             small={label.small}
@@ -122,7 +130,7 @@ function DateStrip(p: MobileTripViewProps) {
       {p.hotels.length > 0 ? (
         <StripCell
           current={p.listView === 'stay'}
-          onClick={p.onStay}
+          onClick={() => { p.onStay(); toListTop() }}
           label="Stay"
           small="stay"
           big={(
@@ -153,7 +161,7 @@ function Capsule({ children }: { children: React.ReactNode }) {
 function DaySubHeader({ day }: { day: TripDay }) {
   const label = dayLabel(day)
   return (
-    <div className="flex min-w-0 items-center gap-2 pb-3 pt-1">
+    <div className="flex min-w-0 items-center gap-2 pb-2 pt-1">
       <h3 className="type-display shrink-0 text-[20px] leading-tight text-[var(--m-text)]">
         {label.monthDay ?? `Day ${day.day_number}`}
       </h3>
@@ -167,7 +175,7 @@ function DaySubHeader({ day }: { day: TripDay }) {
 
 function StaySubHeader({ count }: { count: number }) {
   return (
-    <div className="flex items-center gap-2 pb-3 pt-1">
+    <div className="flex items-center gap-2 pb-2 pt-1">
       <h3 className="type-display text-[20px] leading-tight text-[var(--m-text)]">Where to stay</h3>
       <Capsule>{count} {count === 1 ? 'hotel' : 'hotels'}</Capsule>
     </div>

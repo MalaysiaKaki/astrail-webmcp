@@ -70,7 +70,7 @@ export default function MobileTripSheet({
           >
             <span aria-hidden className="h-[5px] w-9 rounded-full bg-[rgba(28,23,16,0.18)]" />
           </button>
-          <div className="pointer-events-none -mt-[14px] flex min-h-12 items-center pb-1 pl-4 pr-[68px]">{heading}</div>
+          <div className="pointer-events-none -mt-[14px] flex min-h-11 items-center pb-1 pl-4 pr-[68px]">{heading}</div>
           <button
             type="button"
             onClick={onHide}
