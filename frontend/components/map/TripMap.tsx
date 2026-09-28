@@ -519,7 +519,11 @@ export default function TripMap({
           onSelectPlace(tp.place_id)
           // Phones: no evidence popup. The selected, expanded, scrolled-to sheet row IS the detail
           // (a popup here doubled it and sat under the agent chip). Desktop is unchanged.
-          if (layoutRef.current === 'mobile') return
+          if (layoutRef.current === 'mobile') {
+            activePopupRef.current?.remove()
+            activePopupRef.current = null
+            return
+          }
           activePopupRef.current?.remove()
           activePopupRef.current = new mapboxgl.Popup({
             className: 'astrail-evidence-popup',
@@ -819,6 +823,19 @@ export default function TripMap({
     return () => { cancelled = true; cancelAnimationFrame(raf) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready])
+
+  // A live breakpoint switch (rotation) must reconcile what the previous layout left on the map:
+  // phones show no popup, and label visibility follows a different rule on each side. Neither
+  // is redrawn on a layout change by itself (padding eases and resizes emit no zoom event).
+  useEffect(() => {
+    if (!ready) return
+    if (layout === 'mobile') {
+      activePopupRef.current?.remove()
+      activePopupRef.current = null
+    }
+    syncMarkerLabelVisibility()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layout])
 
   useEffect(() => {
     if (!ready) return

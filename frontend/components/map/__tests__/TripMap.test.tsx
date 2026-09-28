@@ -1074,3 +1074,57 @@ describe('TripMap framing on a stale canvas size', () => {
     expect(mapInstance.fitBounds).toHaveBeenCalled()
   })
 })
+
+/* Codex p7 #3: a LIVE breakpoint switch (rotation) must reconcile what the previous layout left
+   on the map — an open evidence popup going to phone, and phone-hidden labels going to desktop. */
+describe('TripMap across a live breakpoint switch', () => {
+  let mobile = false
+  const listeners = new Set<() => void>()
+  let mm: { mockRestore: () => void } | null = null
+  const setMobile = (next: boolean) => { mobile = next; act(() => { listeners.forEach((l) => l()) }) }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    markerElements.length = 0
+    popupElements.length = 0
+    listeners.clear()
+    process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN = 'pk.test'
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1 })
+    vi.stubGlobal('cancelAnimationFrame', () => {})
+    mapInstance.getZoom.mockReturnValue(13)                 // above LABEL_ZOOM
+    mm = vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+      get matches() { return mobile }, media: query, onchange: null,
+      addListener: () => {}, removeListener: () => {},
+      addEventListener: (_: string, l: () => void) => { listeners.add(l) },
+      removeEventListener: (_: string, l: () => void) => { listeners.delete(l) },
+      dispatchEvent: () => false,
+    }) as unknown as MediaQueryList)
+  })
+  afterEach(() => {
+    mm?.mockRestore(); mm = null
+    delete process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN
+    vi.unstubAllGlobals()
+  })
+
+  const loaded = async () => { renderMap(); await flush(); fireLoad(); await flush() }
+  const pin = (name: string) => markerElements.find((e) => e.getAttribute('aria-label') === name)!
+
+  it('closes a desktop evidence popup when the layout turns into the phone view', async () => {
+    mobile = false
+    await loaded()
+    act(() => { pin('Akasaka Station').click() })
+    const popup = PopupCtor.mock.results.at(-1)!.value as { remove: ReturnType<typeof vi.fn> }
+    expect(popup.remove).not.toHaveBeenCalled()
+    setMobile(true)
+    expect(popup.remove).toHaveBeenCalled()
+  })
+
+  it('restores the desktop labels when a phone rotates to desktop width', async () => {
+    mobile = true
+    await loaded()
+    const visible = () => markerElements.filter((e) => e.querySelector('.constellation-pin__label--visible')).length
+    expect(visible()).toBe(0)                               // phone: only a selected pin is named
+    setMobile(false)
+    expect(visible()).toBeGreaterThan(1)                    // desktop at this zoom: all named
+  })
+})
