@@ -37,8 +37,9 @@ const SAMPLE_TRAIL_PATH = '/app/trip/demo'
  * fixed offset would either gap on desktop or keep clipping on mobile. A ResizeObserver also covers
  * font loading, which changes the height after first paint.
  *
- * PHONES (< 768px, globals.css) get a different banner: one 44px line, not sticky, and the whole
- * row is the sample-trail link (its ::after covers the row). The long sentence and the fine print
+ * PHONES (< 768px, globals.css, restyled in story.css for the Placify-pattern revamp) get a
+ * different banner: a one-line white pill that sits above the hero headline, not sticky, and the
+ * whole pill is the sample-trail link (its ::after covers it). The long sentence and the fine print
  * stay in the DOM for assistive tech; "no account needed" stays in the link's accessible name. The
  * nav on phones is sticky in normal flow rather than offset by this banner's height, so nothing
  * gaps once the banner scrolls away.
@@ -81,6 +82,8 @@ export default function ChallengeBanner() {
       <div className="challenge-banner__row mx-auto flex max-w-5xl flex-col items-center justify-center gap-x-5 gap-y-2 sm:flex-row sm:flex-wrap">
         {/* Phones only (globals.css): the notice collapses to one line, this lead plus the link. */}
         <span className="challenge-banner__phone">
+          {/* Phone pill only (story.css): a live-status dot, decoration with no words. */}
+          <span aria-hidden="true" className="challenge-banner__dot" />
           <b className="font-semibold text-[color:var(--brass-bright)]">WebMCP Challenge</b> build
           <span aria-hidden> · </span>
         </span>
@@ -100,7 +103,22 @@ export default function ChallengeBanner() {
               this one for assistive tech, so the accessible name never loses "no account". */}
           <span className="challenge-banner__full">See a finished trip, no account needed</span>
           <span aria-hidden className="challenge-banner__short">See a finished trip</span>
-          <span aria-hidden>&rarr;</span>
+          <span aria-hidden className="challenge-banner__arrow">&rarr;</span>
+          {/* Phones swap the arrow for the kit-style chevron that marks the pill as tappable. */}
+          <svg
+            aria-hidden="true"
+            className="challenge-banner__chevron"
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M6 3.5 10.5 8 6 12.5" />
+          </svg>
         </Link>
       </div>
       <p className="challenge-banner__note mt-2 text-xs leading-5 text-[color:var(--muted)]">

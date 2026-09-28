@@ -68,9 +68,11 @@ export default function AsterStory() {
                   {chapter.body}
                 </p>
               </div>
-              <figure className="overflow-hidden rounded-xl border border-[color:var(--night-line)] shadow-[inset_0_1px_0_rgba(247,243,232,0.07),0_1px_2px_rgba(0,0,0,0.55),0_8px_28px_rgba(0,0,0,0.4)] md:w-3/5">
+              <figure className="overflow-hidden rounded-xl border border-[color:var(--night-line)] shadow-[inset_0_1px_0_rgba(247,243,232,0.07),0_1px_2px_rgba(0,0,0,0.55),0_8px_28px_rgba(0,0,0,0.4)] w-full md:w-3/5">
                 {/* 1920x1072 keyframe — reserve the ratio so the lazy image
-                    never causes a layout jump when it lands. */}
+                    never causes a layout jump when it lands. The reserve needs a width to
+                    work from: without w-full the centred column shrank this figure to 0 on
+                    phones, so the image grew 190px mid-scroll and anchor jumps fell short. */}
                 <img
                   src={chapter.src}
                   alt={chapter.alt}

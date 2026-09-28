@@ -5,6 +5,7 @@ import Link from 'next/link'
 import '../story.css'
 
 import StoryNav from '../StoryNav'
+import { PhoneHeroActions, PhoneHeroDevice } from '../PhoneHero'
 import Beat0Layer from './Beat0Layer'
 import AsterStory from '../sections/AsterStory'
 import HowItWorks from '../sections/HowItWorks'
@@ -58,7 +59,7 @@ export default function StoryStage() {
             a map, where every stop says where it came from. This build adds WebMCP,
             so an agent can work on it with you, on the page you are looking at.
           </p>
-          <div className="story-hero__ctas mt-8 flex flex-wrap items-center gap-4">
+          <div className="story-hero__ctas m-desktop-only mt-8 flex flex-wrap items-center gap-4">
             <Link href="/sign-in" className="story-btn story-btn--primary">
               Sign in to try it
             </Link>
@@ -66,13 +67,17 @@ export default function StoryStage() {
               See how it works
             </a>
           </div>
-          <p className="story-sub mt-7 text-[15px] text-[color:var(--ink-600)]">
+          {/* Phones (< 768px) get the kit's pills instead of the story buttons above. */}
+          <PhoneHeroActions />
+          <p className="story-sub story-hero__fineprint mt-7 text-[15px] text-[color:var(--ink-600)]">
             The tools live in the app, not on this page, which is just the pitch.
             Open Astrail in ChatGPT&rsquo;s built-in browser and ask what you can do
             here. Fourteen tools answer once you are signed in, seventeen once a trip
             is open, and six on the sample trail linked at the top, which needs no
             account.
           </p>
+          {/* Phones only: a framed screenshot of the real trip view, with Aster beside it. */}
+          <PhoneHeroDevice />
         </div>
 
         <div className="story-scroll-hint" style={{ zIndex: 40 }}>

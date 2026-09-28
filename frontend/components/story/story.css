@@ -407,43 +407,9 @@
   }
 }
 
-/* ============================================================
-   Phones (< 768px), plan Phase 4. The nav is STICKY in normal flow (StoryStage mounts it first
-   in <main>, straight after the challenge banner), so once the banner scrolls away the nav sits
-   at the very top with no stale --challenge-banner-h gap. The negative margin keeps it overlaying
-   the hero exactly as the fixed nav did. Nav targets and hero CTAs meet 44px; the CTAs stack
-   full-width. Desktop keeps the fixed nav and the measured banner offset.
-   ============================================================ */
-@media (max-width: 767.98px) {
-  .story-nav {
-    position: sticky;
-    top: 0;
-    height: 68px;
-    margin-bottom: -68px;
-  }
-  /* Only the two controls a phone shows (the section links are hidden below 640px). */
-  .story-nav__pill > a[aria-label='Astrail home'] { min-height: 44px; min-width: 44px; justify-content: center; }
-  .story-nav__cta {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-    padding: 0 18px;
-    font-size: 14px;
-    white-space: nowrap;
-  }
-  .story-hero .story-copy--center { top: 4.75rem; }
-  .story-hero__ctas {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-    margin-top: 1.5rem;
-  }
-  .story-hero__ctas .story-btn {
-    width: 100%;
-    min-height: 48px;
-    padding: 12px 24px;
-  }
-}
+/* Phones (< 768px), plan Phase 4: the nav and hero CTA rules that lived here are gone. The
+   Placify-pattern revamp (phase B1, end of this file) replaces both on phones with their own
+   phone-only markup, and m-desktop-only hides the desktop nav and story-btn CTAs there. */
 
 /* Footer on phones: each link is a 44px row (the list's 12px gap folds into that height). */
 @media (max-width: 767.98px) {
@@ -478,4 +444,233 @@
     height: 220px;
     max-height: none;
   }
+}
+
+/* ============================================================
+   Placify-pattern revamp, phase B1 (plan docs/superpowers/plans/2026-09-28-placify-mobile-revamp.md):
+   phone header, the challenge notice as the hero pill, and the hero with a framed screenshot.
+   Everything that can change layout sits under max-width: 767.98px; the only rule outside it
+   hides the pill's chevron, which is new markup desktop never showed.
+   ============================================================ */
+
+.challenge-banner__chevron { display: none; }
+
+@media (max-width: 767.98px) {
+  /* ---- Header: flat at the top, a floating white card after 8px of scroll ----
+     The wrapper keeps a constant 72px in flow (and hands it back with the negative margin, so the
+     hero starts at y=0 underneath it); only the inner bar moves, so floating shifts nothing. */
+  .story-phone-header {
+    position: sticky;
+    top: 0;
+    z-index: 120;
+    height: 72px;
+    margin-bottom: -72px;
+    pointer-events: none;
+  }
+  .story-phone-header__bar {
+    position: absolute;
+    top: 12px;
+    left: 0;
+    right: 0;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 16px;
+    border-radius: var(--m-r-card);
+    background: transparent;
+    box-shadow: none;
+    pointer-events: auto;
+    transition:
+      left var(--m-dur-sheet) var(--m-ease),
+      right var(--m-dur-sheet) var(--m-ease),
+      padding var(--m-dur-sheet) var(--m-ease),
+      background-color var(--m-dur-sheet) var(--m-ease),
+      box-shadow var(--m-dur-sheet) var(--m-ease);
+  }
+  .story-phone-header[data-floating='true'] .story-phone-header__bar {
+    left: 12px;
+    right: 12px;
+    padding: 0 6px 0 14px;
+    background: var(--m-card);
+    box-shadow: var(--m-shadow-2);
+  }
+  .story-phone-header__home {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    border-radius: 12px;
+    color: var(--m-text);
+    text-decoration: none;
+  }
+  .story-phone-header__home:focus-visible { outline: none; box-shadow: var(--m-focus); }
+  .story-phone-header__name {
+    font-family: var(--font-fraunces), serif;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  .story-phone-header__cta {
+    padding: 0 20px;
+    font-size: 15px;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+
+  /* Anchor jumps already land 84px down (globals.css sets html scroll-padding-top), which
+     clears this 72px header with 12px of air; no scroll-margin here, or the two would add up. */
+
+  /* ---- The challenge notice becomes the hero pill ----
+     Out of flow and pinned where the hero reserves room for it, so the header is first on the
+     page and the pill reads as part of the hero. It scrolls with the page (absolute to the
+     document), under the header. Selectors are doubled up to outrank globals.css's phone rules. */
+  aside.challenge-banner {
+    position: absolute;
+    top: 88px;
+    left: 50%;
+    z-index: 60;
+    width: max-content;
+    max-width: calc(100% - 32px);
+    transform: translateX(-50%);
+    padding: 0 16px 0 14px;
+    border: 0;
+    border-radius: var(--m-r-pill);
+    background: var(--m-card);
+    color: var(--m-text);
+    box-shadow: var(--m-shadow-1);
+    font-size: 14px;
+  }
+  .challenge-banner .challenge-banner__row { gap: 0; }
+  .challenge-banner .challenge-banner__phone {
+    display: inline-flex;
+    align-items: center;
+    color: var(--m-text-muted);
+  }
+  .challenge-banner .challenge-banner__phone b { color: var(--m-text); }
+  .challenge-banner__dot {
+    width: 8px;
+    height: 8px;
+    margin-right: 8px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--spruce-bright);
+    box-shadow: 0 0 0 3px rgba(111, 201, 180, 0.28);
+  }
+  .challenge-banner .challenge-banner__link {
+    gap: 4px;
+    color: var(--m-text);
+    text-decoration: none;
+  }
+  .challenge-banner .challenge-banner__link:hover { color: var(--m-text); }
+  .challenge-banner .challenge-banner__link::after { border-radius: var(--m-r-pill); }
+  .challenge-banner .challenge-banner__link:focus-visible { outline: none; }
+  .challenge-banner .challenge-banner__link:focus-visible::after { box-shadow: var(--m-focus); }
+  .challenge-banner .challenge-banner__arrow { display: none; }
+  .challenge-banner .challenge-banner__chevron {
+    display: block;
+    flex: none;
+    width: 16px;
+    height: 16px;
+    color: var(--m-text-muted);
+  }
+
+  /* ---- Hero: centred copy, kit pills, then the framed screenshot ---- */
+  .story-hero .story-copy--center {
+    padding-top: 156px;          /* 72 header + 16 + 44 pill + 24 */
+    padding-bottom: 88px;        /* the scroll hint */
+    text-align: center;
+  }
+  /* The pill directly above already names the Challenge build, so on phones the eyebrow would
+     repeat it as two wrapped caps lines. Kept for assistive tech, hidden visually. */
+  .story-hero .story-eyebrow {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .story-hero .story-h {
+    font-size: 2.35rem;
+    line-height: 1.06;
+    text-wrap: balance;
+    margin-bottom: 16px;
+  }
+  .story-hero .story-sub { margin-inline: auto; font-size: 17px; text-wrap: pretty; }
+  .story-hero .story-hero__fineprint { margin-top: 20px; font-size: 14px; line-height: 1.5; }
+  .story-phone-ctas {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 24px;
+  }
+  .story-phone-ctas > a { width: 100%; text-decoration: none; }
+  /* Beat0Layer's absolutely placed still is replaced by the one beside the frame. */
+  .story-hero .story-hero-aster-mobile { display: none; }
+
+  .story-phone-device {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    margin-top: 36px;
+  }
+  .story-phone-device__aster {
+    order: -1;
+    position: relative;
+    z-index: 1;
+    width: min(28vw, 120px);
+    height: auto;
+    margin-right: -14px;
+    margin-bottom: 44px;         /* stand level with the frame's foot, above the caption */
+    filter: drop-shadow(0 14px 18px rgba(28, 23, 16, 0.18));
+  }
+  .story-phone-device__figure { margin: 0; width: min(58vw, 250px); }
+  .story-phone-device__frame {
+    position: relative;
+    padding: 7px;
+    border-radius: 40px;
+    background: var(--ink-900);
+    box-shadow:
+      inset 0 0 0 1.5px rgba(255, 255, 255, 0.14),
+      var(--m-shadow-2);
+  }
+  /* The screen: a drawn status bar above the capture, so the island never sits on the app. */
+  .story-phone-device__frame picture {
+    display: block;
+    overflow: hidden;
+    padding-top: 26px;
+    border-radius: 33px;
+    background: var(--m-card);
+  }
+  .story-phone-device__shot { display: block; width: 100%; height: auto; }
+  .story-phone-device__island {
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    width: 30%;
+    height: 17px;
+    transform: translateX(-50%);
+    border-radius: 999px;
+    background: var(--ink-900);
+  }
+  .story-phone-device__caption {
+    margin-top: 12px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--ink-600);
+    text-wrap: balance;
+  }
+}
+
+/* Small phones (360px): the one-line pill needs 13px type to fit inside the 16px gutters. */
+@media (max-width: 379.98px) {
+  aside.challenge-banner { padding: 0 12px 0 11px; font-size: 13px; }
+  .challenge-banner__dot { margin-right: 7px; }
+}
+
+@media (max-width: 767.98px) and (prefers-reduced-motion: reduce) {
+  .story-phone-header__bar { transition: none; }
 }
