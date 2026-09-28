@@ -10,6 +10,8 @@ import "./globals.css";
 // kept in globals.css; the marketing landing is pinned under `.landing`.
 import "./palette.css";
 import "./type.css";
+// Phone UI kit (opt-in --m-* tokens and .m-* classes; no effect on desktop unless applied).
+import "./mobile-ui.css";
 
 // Locked type system (DESIGN.md §3, 2026-07-26):
 //   Display   Fraunces      variable serif — opsz + SOFT + WONK axes, ital for the source quote
