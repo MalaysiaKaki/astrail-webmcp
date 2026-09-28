@@ -970,6 +970,43 @@ describe('TripMap on a phone', () => {
     expect(mapInstance.easeTo).toHaveBeenCalledTimes(2)
   })
 
+  /* Codex p7 #1: the first sheet measurement lands ~340ms after framing. A selection, a day
+     switch, or show_on_map in that window must survive it: the corrective re-fit frames what the
+     camera is currently FOR, not always the whole trip. */
+  it('re-fits the selected stop, not the whole trip, when a selection landed before the first measurement', async () => {
+    phone()
+    const view = await loaded()
+    view.rerender(
+      <MapProvider>
+        <TripMap bundle={TOKYO_TRIP} activeDayNumber={1} selectedPlaceId="pl_hpcafe" onSelectPlace={() => {}} />
+      </MapProvider>,
+    )
+    await flush()
+    mapInstance.fitBounds.mockClear(); mapInstance.flyTo.mockClear()
+    act(() => { setSheetObstruction(380) })
+    expect(mapInstance.fitBounds).not.toHaveBeenCalled()
+    const last = mapInstance.flyTo.mock.calls.at(-1)![0]
+    const hp = TOKYO_TRIP.places.find((p) => p.place_id === 'pl_hpcafe')!.place
+    expect(last.center).toEqual([hp.lng, hp.lat])
+    expect(last.padding.bottom).toBe(380 + MOBILE_SHEET_GAP)
+  })
+
+  it('re-fits the active day when the day changed before the first measurement', async () => {
+    phone()
+    const view = await loaded()
+    view.rerender(
+      <MapProvider>
+        <TripMap bundle={TOKYO_TRIP} activeDayNumber={2} selectedPlaceId={null} onSelectPlace={() => {}} />
+      </MapProvider>,
+    )
+    await flush()
+    mapInstance.fitBounds.mockClear(); mapInstance.flyTo.mockClear()
+    act(() => { setSheetObstruction(380) })
+    const disney = TOKYO_TRIP.places.find((p) => p.place_id === 'pl_disney')!.place
+    expect(mapInstance.fitBounds).not.toHaveBeenCalled()          // day 2 is one stop: a flyTo
+    expect(mapInstance.flyTo.mock.calls.at(-1)![0].center).toEqual([disney.lng, disney.lat])
+  })
+
   it('shows a name pill only for the selected pin, so close pins never stack labels', async () => {
     phone()
     const view = await loaded()

@@ -374,6 +374,11 @@ export default function TripMap({
   // usually runs before the sheet has measured itself (it settles after its transition), so the
   // first measurement triggers one proper re-fit; every later height change only eases padding.
   const fitWithSheetRef = useRef(false)
+  // What the camera was last asked to show. The one-time re-fit above must re-frame THIS — a
+  // selection, a day switch, or show_on_map can land between first framing and the sheet's first
+  // measurement, and re-fitting the whole trip then would silently undo it. 'other' (a restaurant
+  // or hotel hub flight) is left alone: only its padding eases.
+  const cameraIntentRef = useRef<'trip' | 'day' | 'place' | 'other'>('trip')
 
   function clearRoutes() {
     const map = getMap()
@@ -808,6 +813,7 @@ export default function TripMap({
       // (generation handoff, direct load) never marks the handoff, so it frames normally.
       const inherited = consumeTripFramed(bundle.trip.id)
       fitWithSheetRef.current = getSheetObstruction() > 0
+      cameraIntentRef.current = 'trip'
       flyToTrip(inherited ? 900 : 2200)
     })
     return () => { cancelled = true; cancelAnimationFrame(raf) }
@@ -836,9 +842,14 @@ export default function TripMap({
       // The sheet's first real measurement: re-fit the trip into the band between the top bar
       // and the sheet, once. Easing padding alone keeps a zoom chosen for the whole canvas.
       fitWithSheetRef.current = true
-      cancelDeferredEaseRef.current?.()
-      flyToTrip(700)
-      return
+      const intent = cameraIntentRef.current
+      if (intent !== 'other') {
+        cancelDeferredEaseRef.current?.()
+        if (intent === 'place') flyToSelected(700)
+        else if (intent === 'day') flyToDay(700)
+        else flyToTrip(700)
+        return
+      }
     }
     const apply = () => {
       cancelDeferredEaseRef.current = null
@@ -860,12 +871,30 @@ export default function TripMap({
   // day only moves the camera — it never relabels pins or redraws the trail. Falls back to
   // the whole trip when a day has no resolved-coordinate places, so the camera is never
   // stranded.
-  useEffect(() => {
-    if (!ready || !framedRef.current) return
+  function flyToDay(duration: number) {
     const pts = pointsForDay(activeDayNumber)
     frame(pts.length ? pts : bundle.places
       .filter((tp) => hasRealCoords(tp.place.lng, tp.place.lat))
-      .map((tp) => [tp.place.lng, tp.place.lat] as [number, number]), 1400)
+      .map((tp) => [tp.place.lng, tp.place.lat] as [number, number]), duration)
+  }
+
+  /** Fly to the selected stop. False when there is nothing locatable to fly to. */
+  function flyToSelected(duration: number): boolean {
+    const map = getMap()
+    if (!map || !selectedPlaceId) return false
+    const place = buildPlaceIndex(bundle).get(selectedPlaceId)
+    if (!place || !hasRealCoords(place.lng, place.lat)) return false
+    map.flyTo({
+      center: [place.lng, place.lat], zoom: 14, pitch: 55,
+      padding: framePadding({ popupRoom: true }), duration, essential: true,
+    })
+    return true
+  }
+
+  useEffect(() => {
+    if (!ready || !framedRef.current) return
+    cameraIntentRef.current = 'day'
+    flyToDay(1400)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDayNumber])
 
@@ -873,15 +902,7 @@ export default function TripMap({
   useEffect(() => {
     if (!ready) return
     drawMarkers()
-    const map = getMap()
-    if (!map || !selectedPlaceId) return
-    const place = buildPlaceIndex(bundle).get(selectedPlaceId)
-    if (place && hasRealCoords(place.lng, place.lat)) {
-      map.flyTo({
-        center: [place.lng, place.lat], zoom: 14, pitch: 55,
-        padding: framePadding({ popupRoom: true }), duration: 1400, essential: true,
-      })
-    }
+    if (flyToSelected(1400)) cameraIntentRef.current = 'place'
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPlaceId, focusNonce])
 
@@ -898,6 +919,7 @@ export default function TripMap({
     const place = bundle.suggestion_places.find((p) => p.id === selectedRestaurantPlaceId)
       ?? buildPlaceIndex(bundle).get(selectedRestaurantPlaceId)
     if (!place || !hasRealCoords(place.lng, place.lat)) return
+    cameraIntentRef.current = 'other'
     map.flyTo({
       center: [place.lng, place.lat], zoom: 15, pitch: 45,
       padding: framePadding({ popupRoom: true }), duration: 1200, essential: true,
@@ -926,6 +948,7 @@ export default function TripMap({
     const hub = selectedHotel(bundle, selectedHotelId)
     if (!hub || hub.geo_status !== 'placed' || hub.lng === null || hub.lat === null) return
     if (!hasRealCoords(hub.lng, hub.lat)) return
+    cameraIntentRef.current = 'other'
     map.flyTo({
       center: [hub.lng, hub.lat], zoom: 14, pitch: 45,
       padding: framePadding({ popupRoom: true }), duration: 1200, essential: true,
