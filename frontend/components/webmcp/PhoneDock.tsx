@@ -84,14 +84,71 @@ export default function PhoneDock({
   )
 }
 
+function triggerLabel(toolCount: number, unread: number, hasChange: boolean): string {
+  const news = unread === 0 ? '' : `, ${unread} new${hasChange ? ', including a change' : ''}`
+  return `${toolCount} tool${toolCount === 1 ? '' : 's'}${news}`
+}
+
+/**
+ * The agent trigger as a map control: a 44px kit circle in the trip view's right-hand stack
+ * (portalled there by WebMcpDock through the agent trigger slot). It stays in the stack while the
+ * overlay is open — pressing it again folds the overlay — so the control never jumps.
+ *
+ * The dot is the unread signal: brass for a change, ink for reads. The count and the
+ * read/change distinction are in the accessible name, never only in the dot's colour.
+ */
+export function StackTrigger({ expanded, toolCount, unread, hasChange, onToggle, buttonRef }: {
+  expanded: boolean
+  toolCount: number
+  unread: number
+  hasChange: boolean
+  onToggle: () => void
+  buttonRef: React.Ref<HTMLButtonElement>
+}) {
+  const label = `${expanded ? 'Hide' : 'Show'} agent activity, ${triggerLabel(toolCount, unread, hasChange)}`
+  return (
+    <button
+      ref={buttonRef}
+      type="button"
+      onClick={onToggle}
+      aria-expanded={expanded}
+      aria-label={label}
+      className={[
+        'm-btn-icon pointer-events-auto relative h-11 w-11',
+        // `!`: .m-btn-icon is unlayered kit CSS and outranks plain utilities.
+        expanded ? 'bg-[var(--m-ink)]! text-[var(--m-on-ink)]!' : '',
+      ].join(' ')}
+    >
+      {/* Three linked points: an agent working across the map, in the page's own constellation
+          vocabulary rather than a generic sparkle. */}
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+        strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M6.5 16.5 11 7.5l6.5 5" />
+        <circle cx="6" cy="17" r="2.2" fill="currentColor" stroke="none" />
+        <circle cx="11" cy="7" r="2.2" fill="currentColor" stroke="none" />
+        <circle cx="18" cy="13" r="2.2" fill="currentColor" stroke="none" />
+      </svg>
+      {unread > 0 && !expanded ? (
+        <span
+          data-unread-dot
+          aria-hidden
+          className={[
+            'absolute right-0.5 top-0.5 h-3 w-3 rounded-full border-2 border-[var(--m-card)]',
+            hasChange ? 'bg-[var(--m-accent)]' : 'bg-[var(--m-ink)]',
+          ].join(' ')}
+        />
+      ) : null}
+    </button>
+  )
+}
+
 function PhoneChip({ toolCount, unread, hasChange, onExpand }: {
   toolCount: number
   unread: number
   hasChange: boolean
   onExpand: () => void
 }) {
-  const news = unread === 0 ? '' : `, ${unread} new${hasChange ? ', including a change' : ''}`
-  const label = `Show agent activity, ${toolCount} tool${toolCount === 1 ? '' : 's'}${news}`
+  const label = `Show agent activity, ${triggerLabel(toolCount, unread, hasChange)}`
   return (
     <button
       type="button"

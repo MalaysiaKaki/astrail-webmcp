@@ -4,7 +4,8 @@ import { TOKYO_TRIP } from '@/lib/trip/fixtures'
 import { TOKYO_TRIP_WITH_HOTELS } from '@/lib/trip/fixtures/tokyo-hotels'
 import { markTripFramed } from '@/lib/trip/map-handoff'
 import { setSheetObstruction } from '@/lib/trip/sheet-obstruction'
-import { MOBILE_SHEET_GAP } from '@/components/map/frame-padding'
+import { hasRealCoords, placesForDay } from '@/lib/trip/selectors'
+import { MOBILE_SHEET_GAP, MOBILE_TOP_CLEARANCE } from '@/components/map/frame-padding'
 import MapProvider from '@/components/map/MapProvider'
 import TripMap from '@/components/map/TripMap'
 
@@ -1007,6 +1008,52 @@ describe('TripMap on a phone', () => {
     expect(mapInstance.flyTo.mock.calls.at(-1)![0].center).toEqual([disney.lng, disney.lat])
   })
 
+  /* Amendment 1: "Fit" is a repeatable request. A second tap after the user panned away must move
+     the camera again — the target is the same, so only a counter can say "again". */
+  it('fits the active day on every Fit request, including a second one after a manual pan', async () => {
+    phone()
+    const at = (fitNonce: number) => (
+      <MapProvider>
+        <TripMap bundle={TOKYO_TRIP} activeDayNumber={1} selectedPlaceId={null} onSelectPlace={() => {}} fitNonce={fitNonce} />
+      </MapProvider>
+    )
+    const view = await loaded({ fitNonce: 0 })
+    mapInstance.fitBounds.mockClear(); mapInstance.flyTo.mockClear()
+    view.rerender(at(0))
+    await flush()
+    expect(mapInstance.fitBounds).not.toHaveBeenCalled()             // a re-render is not a request
+    view.rerender(at(1))
+    await flush()
+    expect(mapInstance.fitBounds).toHaveBeenCalledTimes(1)
+    const day1 = placesForDay(TOKYO_TRIP, 1).filter((tp) => hasRealCoords(tp.place.lng, tp.place.lat)).length
+    const bounds = BoundsCtor.mock.results.at(-1)!.value as { extend: ReturnType<typeof vi.fn> }
+    expect(bounds.extend).toHaveBeenCalledTimes(day1)                // the day, not the whole trip
+    // The user drags the map somewhere else (nothing in the component observes it), then taps again.
+    mapInstance.fitBounds.mockClear()
+    view.rerender(at(2))
+    await flush()
+    expect(mapInstance.fitBounds).toHaveBeenCalledTimes(1)
+  })
+
+  it('fits the hotel hub in the hub layer', async () => {
+    phone()
+    const hub = TOKYO_TRIP_WITH_HOTELS.hotels.find((h) => h.is_recommended)!
+    const at = (fitNonce: number) => (
+      <MapProvider>
+        <TripMap bundle={TOKYO_TRIP_WITH_HOTELS} activeDayNumber={1} selectedPlaceId={null} onSelectPlace={() => {}}
+          layerMode="hub" selectedHotelId={hub.id} fitNonce={fitNonce} />
+      </MapProvider>
+    )
+    const view = render(at(0))
+    await flush(); fireLoad(); await flush()
+    mapInstance.flyTo.mockClear(); mapInstance.fitBounds.mockClear(); PopupCtor.mockClear()
+    view.rerender(at(1))
+    await flush()
+    expect(mapInstance.fitBounds).not.toHaveBeenCalled()
+    expect(mapInstance.flyTo.mock.calls.at(-1)![0].center).toEqual([hub.lng, hub.lat])
+    expect(PopupCtor).not.toHaveBeenCalled()                         // a camera move, not a new card
+  })
+
   it('shows a name pill only for the selected pin, so close pins never stack labels', async () => {
     phone()
     const view = await loaded()
@@ -1059,7 +1106,7 @@ describe('TripMap framing on a stale canvas size', () => {
     expect(order.indexOf('resize')).toBeGreaterThan(-1)
     expect(order.indexOf('resize')).toBeLessThan(order.indexOf('fitBounds'))
     const pad = mapInstance.fitBounds.mock.calls.at(-1)![1].padding
-    expect(pad.top).toBe(88)                       // not scaled down for a 300px canvas
+    expect(pad.top).toBe(MOBILE_TOP_CLEARANCE)     // not scaled down for a 300px canvas
     mapInstance.fitBounds.mockImplementation(() => {})
   })
 

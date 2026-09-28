@@ -7,11 +7,13 @@ import { tripDateRange, tripTitle } from '@/lib/trip/trip-presenters'
 import DayOverview from '../DayOverview'
 import HotelPanel from '../HotelPanel'
 import TradeoffPanel from '../TradeoffPanel'
-import MobileTopBar from './MobileTopBar'
+import MobileMapControls from './MobileMapControls'
 import MobileTripSheet, { type SheetState } from './MobileTripSheet'
 import StopTimeline from './StopTimeline'
 import type { FeedbackComposer } from '../use-feedback-composer'
 import AboutThisTrip from './AboutThisTrip'
+import { dayLabel } from '@/lib/trip/day-labels'
+import type { FitTarget } from '@/lib/trip/fit-target'
 
 export type MobileListView = 'stops' | 'stay'
 
@@ -40,6 +42,9 @@ export type MobileTripViewProps = {
   listView: MobileListView
   onStay: () => void
   sheet: SheetState
+  /** What the map's Fit control frames (null hides it), and the press that asks for it. */
+  fitTarget: FitTarget | null
+  onFit: () => void
   onToggleSheetHeight: () => void
   onHideSheet: () => void
   onReopenSheet: () => void
@@ -48,80 +53,142 @@ export type MobileTripViewProps = {
   feedback: FeedbackComposer
 }
 
-function shortDate(iso: string | null): string {
-  if (!iso) return ''
-  // Pinned locale: see DaySelector — an unpinned one is a hydration mismatch.
-  return new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-function Chip({ active, onClick, children, label }: {
-  active: boolean
-  onClick: () => void
-  children: React.ReactNode
-  label?: string
-}) {
+/** The sheet's title block: serif trip name, then the date range and the Sample tag. */
+function SheetHeading({ title, dates, readOnly }: { title: string; dates: string; readOnly: boolean }) {
   return (
-    <button
-      type="button"
-      aria-pressed={active}
-      aria-label={label}
-      onClick={onClick}
-      className={[
-        'type-label flex h-11 shrink-0 items-center gap-1.5 rounded-full border px-4 text-[14px] transition-colors',
-        active
-          ? 'border-[var(--brass)] bg-[var(--brass-soft)] text-[var(--brass-bright)]'
-          : 'border-[var(--line)] text-[var(--muted)]',
-      ].join(' ')}
-    >
-      {children}
-    </button>
-  )
-}
-
-function SheetHeader(p: MobileTripViewProps) {
-  const { bundle } = p
-  const hasHotels = p.hotels.length > 0
-  return (
-    <div className="pb-2">
-      <div role="group" aria-label="Trip days" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
-        {p.days.map((d) => (
-          <Chip
-            key={d.id}
-            active={p.listView === 'stops' && d.day_number === p.activeDayNumber}
-            onClick={() => p.onSelectDay(d.day_number)}
-          >
-            <span className="font-semibold">Day {d.day_number}</span>
-            {d.day_date ? <span className="text-[12px] opacity-80">{shortDate(d.day_date)}</span> : null}
-          </Chip>
-        ))}
-        {hasHotels ? (
-          <Chip active={p.listView === 'stay'} onClick={p.onStay}>Stay</Chip>
+    <div data-testid="sheet-heading" className="min-w-0">
+      <h2 className="type-display truncate text-[22px] leading-[1.2] text-[var(--m-text)]">{title}</h2>
+      <p className="type-body mt-0.5 flex items-center gap-2 text-[14px] leading-5 text-[var(--m-text-muted)]">
+        {dates ? <span className="truncate tabular-nums">{dates}</span> : null}
+        {/* Said in the page, not only in the tool layer, so an agent reading it knows before it
+            tries that nothing here writes. Short on screen; the full sentence is for AT. */}
+        {readOnly ? (
+          <span className="shrink-0 rounded-full bg-[var(--m-accent-wash)] px-2 text-[12px] font-semibold leading-5 text-[var(--m-accent)]">
+            Sample<span className="sr-only"> trail — read-only</span>
+          </span>
         ) : null}
-      </div>
-      <p className="type-body mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-[var(--muted)]">
-        <span className="tabular-nums">
-          {bundle.places.length} places · {bundle.days.length} days · {bundle.transport_legs.length} legs
-        </span>
       </p>
     </div>
   )
 }
 
-function DayDisclosure({ day, rewriting }: { day: TripDay; rewriting: boolean }) {
-  if (!rewriting && !day.title && !day.summary && !day.weather_summary) return null
+/* One strip cell. A date is the one place the page speaks in its display serif at size, so the
+   strip reads as a calendar at a glance; the selected day is a filled square in the brass wash
+   with ink text, the rest recede to muted. Short screens (≤700px tall) shrink the cells so the
+   first stop card still fits in the compact sheet (plan amendment 5). */
+const CELL = [
+  'flex w-[52px] shrink-0 flex-col items-center justify-center gap-1 rounded-2xl h-[60px] [@media(max-height:700px)]:h-12',
+  'transition-[transform,background-color] duration-[var(--m-dur-press)] active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100',
+  'focus-visible:outline-none focus-visible:shadow-[var(--m-focus)]',
+].join(' ')
+
+function StripCell({ current, onClick, label, big, small }: {
+  current: boolean
+  onClick: () => void
+  label: string
+  big: React.ReactNode
+  small: string
+}) {
   return (
-    <details className="group mt-4 rounded-2xl bg-[var(--chip-bg)] px-3">
-      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 [&::-webkit-details-marker]:hidden">
-        <span className="type-body min-w-0 truncate text-[14px] text-[var(--starlight)]">
-          {day.title ?? `Day ${day.day_number} overview`}
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-current={current ? 'true' : undefined}
+      className={[CELL, current ? 'bg-[var(--m-accent-wash)] text-[var(--m-text)]' : 'text-[var(--m-text-muted)]'].join(' ')}
+    >
+      <span aria-hidden className="type-display text-[22px] leading-none [@media(max-height:700px)]:text-[19px]">{big}</span>
+      <span aria-hidden className="type-body text-[14px] leading-none font-medium [font-variant-caps:all-small-caps]">{small}</span>
+    </button>
+  )
+}
+
+function DateStrip(p: MobileTripViewProps) {
+  return (
+    <div role="group" aria-label="Trip days" className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-2 [scrollbar-width:none]">
+      {p.days.map((d) => {
+        const label = dayLabel(d)
+        return (
+          <StripCell
+            key={d.id}
+            current={p.listView === 'stops' && d.day_number === p.activeDayNumber}
+            onClick={() => p.onSelectDay(d.day_number)}
+            label={label.name}
+            big={label.big}
+            small={label.small}
+          />
+        )
+      })}
+      {p.hotels.length > 0 ? (
+        <StripCell
+          current={p.listView === 'stay'}
+          onClick={p.onStay}
+          label="Stay"
+          small="stay"
+          big={(
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"
+              strokeLinecap="round" strokeLinejoin="round" className="h-[22px] w-[22px]">
+              <path d="M3 18V7M3 14h18v4M21 14v-2.5A2.5 2.5 0 0 0 18.5 9H11v5" />
+              <circle cx="7" cy="11" r="1.8" />
+            </svg>
+          )}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+/** The small "Day 1" capsule beside the date. Not a control: no shadow, no chevron. */
+function Capsule({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="type-body shrink-0 rounded-full bg-[var(--m-subcard)] px-2.5 text-[14px] font-medium leading-7 text-[var(--m-text)]">
+      {children}
+    </span>
+  )
+}
+
+/* Scrolls with the list rather than pinning: at 360x640 a pinned sub-header left no room for a
+   whole first stop card in the compact sheet. At the top of the list it reads as the heading of
+   the day; scrolled, the strip above still says which day this is. */
+function DaySubHeader({ day }: { day: TripDay }) {
+  const label = dayLabel(day)
+  return (
+    <div className="flex min-w-0 items-center gap-2 pb-3 pt-1">
+      <h3 className="type-display shrink-0 text-[20px] leading-tight text-[var(--m-text)]">
+        {label.monthDay ?? `Day ${day.day_number}`}
+      </h3>
+      {label.monthDay ? <Capsule>Day {day.day_number}</Capsule> : null}
+      {day.title ? (
+        <span className="type-body min-w-0 truncate text-[15px] text-[var(--m-text-muted)]">{day.title}</span>
+      ) : null}
+    </div>
+  )
+}
+
+function StaySubHeader({ count }: { count: number }) {
+  return (
+    <div className="flex items-center gap-2 pb-3 pt-1">
+      <h3 className="type-display text-[20px] leading-tight text-[var(--m-text)]">Where to stay</h3>
+      <Capsule>{count} {count === 1 ? 'hotel' : 'hotels'}</Capsule>
+    </div>
+  )
+}
+
+function DayDisclosure({ day, rewriting }: { day: TripDay; rewriting: boolean }) {
+  if (!rewriting && !day.summary && !day.weather_summary) return null
+  return (
+    <details className="group mt-4">
+      <summary className="m-card-link list-none [&::-webkit-details-marker]:hidden">
+        <span className="type-body min-w-0 truncate text-[15px] font-medium text-[var(--m-text)]">
+          Day {day.day_number} overview
         </span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25"
           strokeLinecap="round" strokeLinejoin="round" aria-hidden
-          className="h-4 w-4 shrink-0 text-[var(--muted)] transition-transform group-open:rotate-180 motion-reduce:transition-none">
+          className="m-chevron transition-transform group-open:rotate-180 motion-reduce:transition-none">
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </summary>
-      <div className={['pb-3', rewriting ? 'opacity-70' : ''].join(' ')}>
+      <div className={['px-1 pb-1 pt-3', rewriting ? 'opacity-70' : ''].join(' ')}>
         {rewriting ? (
           <p role="status" data-testid="summary-rewriting" className="type-label mb-1 text-[12px] text-[var(--brass-bright)]">
             Updating this day&apos;s summary
@@ -141,24 +208,26 @@ function DayDisclosure({ day, rewriting }: { day: TripDay; rewriting: boolean })
 export default function MobileTripView(p: MobileTripViewProps) {
   return (
     <div className="paper-scope mobile-trip pointer-events-none absolute inset-0">
-      <MobileTopBar
-        title={tripTitle(p.bundle.trip)}
-        dates={tripDateRange(p.bundle.trip)}
-        readOnly={p.readOnly}
+      <MobileMapControls
+        sheetExpanded={p.sheet === 'expanded'}
+        fitTarget={p.fitTarget}
+        onFit={p.onFit}
         showLayerToggle={p.hotels.length > 0}
         layerMode={p.layerMode}
         canUseHubLayer={p.canUseHubLayer}
-        onLayerMode={p.onLayerMode}
+        onToggleLayer={() => p.onLayerMode(p.layerMode === 'hub' ? 'route' : 'hub')}
       />
       <MobileTripSheet
         state={p.sheet}
         onToggleHeight={p.onToggleSheetHeight}
         onHide={p.onHideSheet}
         onReopen={p.onReopenSheet}
-        header={<SheetHeader {...p} />}
+        heading={<SheetHeading title={tripTitle(p.bundle.trip)} dates={tripDateRange(p.bundle.trip)} readOnly={p.readOnly} />}
+        header={<DateStrip {...p} />}
       >
         {p.listView === 'stay' ? (
           <div className="flex flex-col gap-3">
+            <StaySubHeader count={p.hotels.length} />
             <TradeoffPanel tradeoffs={p.bundle.trip.tradeoffs} variant="comparisons" />
             <HotelPanel
               hotels={p.hotels}
@@ -169,6 +238,7 @@ export default function MobileTripView(p: MobileTripViewProps) {
           </div>
         ) : (
           <>
+            {p.activeDay ? <DaySubHeader day={p.activeDay} /> : null}
             <StopTimeline
               bundle={p.bundle}
               places={p.dayPlaces}
@@ -181,8 +251,8 @@ export default function MobileTripView(p: MobileTripViewProps) {
               selectedRestaurantPlaceId={p.selectedRestaurantPlaceId}
               onSelectRestaurant={p.onSelectRestaurant}
             />
-            {/* After the stops, not above them: the first screen of a compact sheet has room for
-                the chips and two stops, and the day's prose is context, not the route. */}
+            {/* After the stops, not above them: the first screen of a compact sheet is for the
+                route; the day's prose is context. */}
             {p.activeDay ? <DayDisclosure day={p.activeDay} rewriting={p.summaryRewriting} /> : null}
           </>
         )}

@@ -16,14 +16,45 @@
  */
 
 export type FramePadding = { top: number; right: number; bottom: number; left: number }
+export type Rect = { x: number; y: number; w: number; h: number }
 
-/** Room for the floating top bar (back, title pill, layer toggle) plus a breath. */
-export const MOBILE_TOP_CLEARANCE = 88
-/** Space kept above the sheet edge: the agent chip sits there, so pins must clear it. */
-export const MOBILE_SHEET_GAP = 64
+/* The phone map chrome (MobileMapControls): a back button top-left and a vertical stack of up to
+   three circular buttons top-right (agent, fit, layer). Kept here, beside the pads derived from it,
+   so the "no pin under a control" property is one test away from any change to either. */
+/** Distance of every map control from the viewport's top and side edges. */
+export const MOBILE_CONTROL_INSET = 12
+/** Every map control is a 44px circle. */
+export const MOBILE_CONTROL_SIZE = 44
+/** Vertical gap between buttons in the right-hand stack. */
+export const MOBILE_STACK_GAP = 8
+/** Agent, fit, layer. */
+export const MAX_STACK_BUTTONS = 3
+/** Half of a drawn pin (the dot and its ring): the framed POINT is its centre. */
+export const PIN_RADIUS = 18
+
+const CONTROL_EDGE = MOBILE_CONTROL_INSET + MOBILE_CONTROL_SIZE
+/** Below the top row of controls (back, first stack button), pin radius included. */
+export const MOBILE_TOP_CLEARANCE = CONTROL_EDGE + PIN_RADIUS + 2
+/** Left of the right-hand stack column, pin radius included; the stack is taller than the top pad. */
+export const MOBILE_RIGHT_CLEARANCE = CONTROL_EDGE + PIN_RADIUS + 2
+/** Space kept above the sheet edge for the pin itself and its name pill. */
+export const MOBILE_SHEET_GAP = 40
 /** Bottom pad with no sheet at all: the reopen pill and the home indicator. */
 const MOBILE_BARE_BOTTOM = 72
-const MOBILE_SIDE = 48
+const MOBILE_LEFT = 48
+
+/** The phone map controls' rects in canvas pixels: the back button, then each stack button. */
+export function mobileControlRects(width: number, stackButtons: number): Rect[] {
+  const size = MOBILE_CONTROL_SIZE
+  const back: Rect = { x: MOBILE_CONTROL_INSET, y: MOBILE_CONTROL_INSET, w: size, h: size }
+  const stack = Array.from({ length: stackButtons }, (_, i): Rect => ({
+    x: width - MOBILE_CONTROL_INSET - size,
+    y: MOBILE_CONTROL_INSET + i * (size + MOBILE_STACK_GAP),
+    w: size,
+    h: size,
+  }))
+  return [back, ...stack]
+}
 
 const DESKTOP_BREAKPOINT = 768
 
@@ -40,9 +71,9 @@ export function computeFramePadding({ width, height, obstruction, popupRoom = fa
     ? { top: 80, right: 80, bottom: 80, left: 480 }
     : {
         top: MOBILE_TOP_CLEARANCE,
-        right: MOBILE_SIDE,
+        right: MOBILE_RIGHT_CLEARANCE,
         bottom: obstruction > 0 ? obstruction + MOBILE_SHEET_GAP : MOBILE_BARE_BOTTOM,
-        left: MOBILE_SIDE,
+        left: MOBILE_LEFT,
       }
 
   // Solving `0.3H = top + (H - top - bottom)/2` for bottom. Only desktop needs it: on a phone the

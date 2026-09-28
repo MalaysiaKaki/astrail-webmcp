@@ -13,7 +13,7 @@ import type { TripBundle } from '@/lib/trip/backend-types'
 
 const h = vi.hoisted(() => ({
   mapMounts: 0,
-  mapProps: null as null | { onSelectPlace: (id: string) => void; layerMode?: string; focusNonce?: number },
+  mapProps: null as null | { onSelectPlace: (id: string) => void; layerMode?: string; focusNonce?: number; fitNonce?: number },
   mobile: false,
   listeners: new Set<() => void>(),
   registered: [] as string[],
@@ -276,6 +276,124 @@ describe('TripWorkspace — the phone branch', () => {
     details.open = true
     fireEvent(details, new Event('toggle'))
     expect(spy.mock.contexts.at(-1)).toBe(details)
+  })
+
+  /* ---- Phase A1 (Placify revamp): map chrome, sheet header, date strip, day sub-header ---- */
+
+  const stack = () => document.querySelector<HTMLElement>('[data-testid="map-control-stack"]')!
+  const fit = () => screen.queryByRole('button', { name: /^Fit map to/ })
+  const heading = () => document.querySelector<HTMLElement>('[data-testid="sheet-heading"]')!
+
+  it('puts only circular kit controls over the map: back top-left, a stack top-right, no title pill', () => {
+    renderSeeded()
+    const back = screen.getByRole('link', { name: 'All trails' })
+    expect(back.className).toMatch(/\bm-btn-icon\b/)
+    expect(stack()).toBeInTheDocument()
+    for (const b of within(stack()).getAllByRole('button')) expect(b.className).toMatch(/\bm-btn-icon\b/)
+    // The title lives in the sheet as its heading, not in a pill over the map.
+    const title = within(heading()).getByRole('heading', { level: 2, name: TOKYO_TRIP.trip.inferred_destination! })
+    expect(sheet()!.contains(title)).toBe(true)
+    for (const el of screen.getAllByText(TOKYO_TRIP.trip.inferred_destination!)) expect(sheet()!.contains(el)).toBe(true)
+  })
+
+  it('offers the agent a slot at the top of the stack (the dock fills it when WebMCP exists)', () => {
+    renderSeeded()
+    expect(stack().firstElementChild).toHaveAttribute('data-agent-trigger-slot')
+  })
+
+  it('Fit re-frames the active day on every press, and names what it will frame', async () => {
+    renderSeeded()
+    await screen.findByTestId('trip-map')
+    expect(fit()).toHaveAccessibleName('Fit map to the day')
+    const before = h.mapProps!.fitNonce ?? 0
+    fireEvent.click(fit()!)
+    fireEvent.click(fit()!)                                      // again, after the user panned
+    expect(h.mapProps!.fitNonce).toBe(before + 2)
+  })
+
+  it('says Fit frames the whole trip when the active day has no located stop', () => {
+    const places = TOKYO_TRIP.places.map((tp) => (tp.day_number === 2 ? { ...tp, place: { ...tp.place, lat: 0, lng: 0 } } : tp))
+    renderSeeded({ ...TOKYO_TRIP, places })
+    fireEvent.click(screen.getByRole('button', { name: /^Day 2\b/ }))
+    expect(fit()).toHaveAccessibleName('Fit map to the whole trip')
+  })
+
+  it('hides Fit when nothing on the trip has a location', () => {
+    renderSeeded({ ...TOKYO_TRIP, places: TOKYO_TRIP.places.map((tp) => ({ ...tp, place: { ...tp.place, lat: 0, lng: 0 } })) })
+    expect(fit()).toBeNull()
+  })
+
+  it("keeps show_on_map({target:'trip'}) camera-free: it never presses Fit", async () => {
+    renderSeeded()
+    await screen.findByTestId('trip-map')
+    const before = h.mapProps!.fitNonce ?? 0
+    await act(async () => { await h.tools.show_on_map.execute({ target: 'trip' }) })
+    expect(h.mapProps!.fitNonce ?? 0).toBe(before)
+  })
+
+  it('has one hotel-layer toggle in the stack when hotels exist, pressed in the hub layer', async () => {
+    renderSeeded(TOKYO_TRIP_WITH_HOTELS)
+    await screen.findByTestId('trip-map')
+    const layer = within(stack()).getByRole('button', { name: 'Hotel map layer' })
+    expect(layer).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(layer)
+    expect(h.mapProps!.layerMode).toBe('hub')
+    expect(layer).toHaveAttribute('aria-pressed', 'true')
+    expect(fit()).toHaveAccessibleName('Fit map to the hotel')
+    fireEvent.click(layer)
+    expect(h.mapProps!.layerMode).toBe('route')
+  })
+
+  it('keeps only the agent slot in the stack while the sheet is expanded over the map', () => {
+    renderSeeded(TOKYO_TRIP_WITH_HOTELS)
+    fireEvent.click(screen.getByRole('button', { name: /expand trip sheet/i }))
+    expect(within(stack()).queryAllByRole('button')).toHaveLength(0)
+    expect(stack().querySelector('[data-agent-trigger-slot]')).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /collapse trip sheet/i }))
+    expect(fit()).not.toBeNull()
+  })
+
+  it('shows the header: serif title, date range and the Sample tag', () => {
+    renderSeeded()
+    expect(within(heading()).getByRole('heading', { level: 2 }).className).toMatch(/\btype-display\b/)
+    expect(within(heading()).getByText(/Sep 18/)).toBeInTheDocument()
+    expect(within(heading()).getByText('Sample')).toBeInTheDocument()
+  })
+
+  it('names each strip day by its date, marks the current one, and puts Stay last', () => {
+    renderSeeded(TOKYO_TRIP_WITH_HOTELS)
+    const strip = screen.getByRole('group', { name: 'Trip days' })
+    const buttons = within(strip).getAllByRole('button')
+    expect(buttons[0]).toHaveAccessibleName('Day 1, Fri 18 Sep')
+    expect(buttons[0]).toHaveAttribute('aria-current', 'true')
+    expect(buttons[1]).not.toHaveAttribute('aria-current')
+    expect(buttons.at(-1)).toHaveAccessibleName('Stay')
+    fireEvent.click(buttons.at(-1)!)
+    expect(buttons.at(-1)).toHaveAttribute('aria-current', 'true')
+    expect(buttons[0]).not.toHaveAttribute('aria-current')
+  })
+
+  it('falls back to "Day N" for a day with no date', () => {
+    const days = TOKYO_TRIP.days.map((d) => ({ ...d, day_date: null }))
+    renderSeeded({ ...TOKYO_TRIP, days })
+    const strip = screen.getByRole('group', { name: 'Trip days' })
+    expect(within(strip).getAllByRole('button')[0]).toHaveAccessibleName('Day 1')
+    expect(screen.getByRole('heading', { level: 3, name: /^Day 1/ })).toBeInTheDocument()
+  })
+
+  it('opens the day with a sub-header: the date, a "Day N" capsule and the day title', () => {
+    renderSeeded()
+    const sub = screen.getByRole('heading', { level: 3, name: 'Sep 18' })
+    const row = sub.parentElement!
+    expect(within(row).getByText('Day 1')).toBeInTheDocument()
+    expect(within(row).getByText(TOKYO_TRIP.days[0].title!)).toBeInTheDocument()
+  })
+
+  it('makes the day overview a card link that opens inline', () => {
+    renderSeeded()
+    const summary = document.querySelector<HTMLElement>('[data-testid="mobile-trip-sheet"] details summary.m-card-link')
+    expect(summary).not.toBeNull()
+    expect(summary!.querySelector('.m-chevron')).not.toBeNull()
   })
 
   it('has exactly one hide control in the sheet, top-right, not a second chevron beside the handle', () => {

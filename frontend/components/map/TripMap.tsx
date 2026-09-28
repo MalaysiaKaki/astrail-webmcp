@@ -11,6 +11,7 @@ import {
   orderedDays, restaurantsForDay,
 } from '@/lib/trip/selectors'
 import { consumeTripFramed } from '@/lib/trip/map-handoff'
+import { fitTarget } from '@/lib/trip/fit-target'
 import { getSheetObstruction, useSheetObstruction } from '@/lib/trip/sheet-obstruction'
 import { useTripLayout } from '@/lib/trip/use-trip-layout'
 import { computeFramePadding } from './frame-padding'
@@ -334,6 +335,7 @@ export default function TripMap({
   selectedRestaurantPlaceId = null,
   onSelectRestaurant,
   focusNonce = 0,
+  fitNonce = 0,
 }: {
   bundle: TripBundle
   activeDayNumber: number
@@ -353,6 +355,9 @@ export default function TripMap({
   /** Bumped to fly to the SAME selected place again (the phone's re-tap of a selected stop).
    *  Omitted on desktop, where selection alone drives the camera as before. */
   focusNonce?: number
+  /** Bumped by the phone's "Fit" control: frame the fitTarget (day, hub or trip) again, even when
+   *  nothing else changed — the user panned away and wants the route back. 0 means no request. */
+  fitNonce?: number
 }) {
   const { hasToken, ready, getMap, acquire, release, setMarkers } = useSharedMap()
   const routeIdsRef = useRef<string[]>([])
@@ -914,6 +919,29 @@ export default function TripMap({
     flyToDay(1400)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDayNumber])
+
+  // The phone's "Fit" control. Keyed on the counter alone, so every press moves the camera and no
+  // other prop change is mistaken for one. The target comes from the same fitTarget() the button
+  // was labelled from. show_on_map never bumps this: its 'trip' target stays camera-free.
+  useEffect(() => {
+    if (!ready || !framedRef.current || fitNonce === 0) return
+    const map = getMap()
+    const target = fitTarget(bundle, activeDayNumber, layerMode, selectedHotelId)
+    if (!map || !target) return
+    cancelDeferredEaseRef.current?.()
+    if (target === 'hub') {
+      const hub = selectedHotel(bundle, selectedHotelId)!
+      cameraIntentRef.current = 'other'
+      map.flyTo({ center: [hub.lng!, hub.lat!], zoom: 14, pitch: 45, padding: framePadding(), duration: 900, essential: true })
+    } else if (target === 'day') {
+      cameraIntentRef.current = 'day'
+      flyToDay(900)
+    } else {
+      cameraIntentRef.current = 'trip'
+      flyToTrip(900)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitNonce])
 
   // Refresh marker selection and fly to the selected place.
   useEffect(() => {

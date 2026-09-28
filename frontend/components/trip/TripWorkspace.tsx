@@ -29,6 +29,7 @@ import { useFeedbackComposer } from './use-feedback-composer'
 import MobileTripView, { type MobileListView } from './mobile/MobileTripView'
 import type { SheetState } from './mobile/MobileTripSheet'
 import { useTripLayout } from '@/lib/trip/use-trip-layout'
+import { fitTarget } from '@/lib/trip/fit-target'
 
 const TripMap = dynamic(() => import('@/components/map/TripMap'), { ssr: false })
 
@@ -157,6 +158,9 @@ export default function TripWorkspace({
   const [mobileList, setMobileList] = useState<MobileListView>('stops')
   // Bumped when the selected stop is tapped again, so the map re-frames the same place.
   const [focusNonce, setFocusNonce] = useState(0)
+  // Bumped by the phone map's Fit control: a counter, so a second press after a manual pan is a
+  // new request even though the target is the same (plan amendment 1).
+  const [fitNonce, setFitNonce] = useState(0)
   /* Which panel tree to render. null during SSR and hydration: the desktop tree then renders
      behind `max-md:hidden`, so desktop paints its rail straight from the server HTML exactly as
      before, and a phone shows no desktop flash before the client snapshot picks the phone tree.
@@ -385,6 +389,7 @@ export default function TripWorkspace({
           selectedHotelId={selectedHotelId}
           layerMode={layerMode}
           focusNonce={focusNonce}
+          fitNonce={fitNonce}
         />
       </div>
 
@@ -414,6 +419,8 @@ export default function TripWorkspace({
           listView={mobileList}
           onStay={() => { setMobileList('stay'); if (canUseHubLayer) setLayerMode('hub') }}
           sheet={sheetState}
+          fitTarget={fitTarget(bundle, activeDayNumber, layerMode, selectedHotelId)}
+          onFit={() => setFitNonce((n) => n + 1)}
           onToggleSheetHeight={() => setExpanded((v) => !v)}
           onHideSheet={() => setPanelOpen(false)}
           onReopenSheet={() => { setExpanded(false); setPanelOpen(true) }}

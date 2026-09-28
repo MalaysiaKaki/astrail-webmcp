@@ -1,12 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { usePathname } from 'next/navigation'
 
 import AgentActivityRail, { NOTHING_CLEARED, type ClearedMark } from './AgentActivityRail'
 import ExamplePrompts from './ExamplePrompts'
 import WebMcpStatus from './WebMcpStatus'
-import PhoneDock from './PhoneDock'
+import PhoneDock, { StackTrigger } from './PhoneDock'
+import { useAgentTriggerSlot } from '@/lib/webmcp/agent-trigger-slot'
 import { useOptionalWebMcpRegistry, type ActivityEntry } from './WebMcpRegistry'
 import { dockChipBottom, useSheetExpanded, useSheetObstruction } from '@/lib/trip/sheet-obstruction'
 import { useTripLayout } from '@/lib/trip/use-trip-layout'
@@ -208,6 +210,21 @@ export default function WebMcpDock() {
     } catch { /* the collapse still holds for this session, it just will not outlive it */ }
   }, [])
 
+  // Closing the overlay from inside it unmounts the focused control; focus goes back to the
+  // trigger that opened it (the stack trigger stays mounted in both states), not to <body>.
+  const triggerSlot = useAgentTriggerSlot()
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const restoreFocusRef = useRef(false)
+  const closeToTrigger = useCallback(() => {
+    restoreFocusRef.current = true
+    changeCollapsed(true)
+  }, [changeCollapsed])
+  useEffect(() => {
+    if (!collapsed || !restoreFocusRef.current) return
+    restoreFocusRef.current = false
+    triggerRef.current?.focus()
+  }, [collapsed])
+
   // Ids are monotonic in the registry, so "arrived since the fold" is exact rather than a
   // timestamp comparison a clock change could get wrong. Cleared entries need no special case:
   // a clear is only reachable while unfolded, and the marker is taken at or above its watermark.
@@ -222,6 +239,47 @@ export default function WebMcpDock() {
     // so a "No agent" pill was what every normal visitor saw over the map. And nothing while the
     // trip sheet is expanded and folded, where the chip would float over the sheet's own header.
     if (!(registry?.supported ?? false)) return null
+    if (triggerSlot) {
+      // The trip view offers a place in its map control stack: the trigger lives there, above the
+      // sheet in every state, so it never hides. Folded, the rail and its live region are
+      // unmounted, so a visually hidden polite region speaks what arrives.
+      const n = unread.length
+      const changed = unread.some((e) => e.changes)
+      return (
+        <>
+          {createPortal(
+            <StackTrigger
+              buttonRef={triggerRef}
+              expanded={!collapsed}
+              toolCount={registry?.tools.length ?? 0}
+              unread={n}
+              hasChange={changed}
+              onToggle={() => (collapsed ? changeCollapsed(false) : closeToTrigger())}
+            />,
+            triggerSlot,
+          )}
+          <div aria-live="polite" aria-label="Agent activity" className="sr-only">
+            {collapsed && n > 0 ? `Agent activity, ${n} new${changed ? ', including a change' : ''}` : ''}
+          </div>
+          {collapsed ? null : (
+            <PhoneDock
+              collapsed={false}
+              chipBottom={null}
+              overCanvas={overCanvas}
+              toolCount={registry?.tools.length ?? 0}
+              unread={0}
+              hasChange={false}
+              onExpand={() => changeCollapsed(false)}
+              onCollapse={closeToTrigger}
+              toolsOpen={toolsOpen}
+              onToolsOpenChange={setToolsOpen}
+              cleared={cleared}
+              onClear={setCleared}
+            />
+          )}
+        </>
+      )
+    }
     if (collapsed && sheetExpanded) {
       // The chip is hidden, but what the agent does is still spoken: a visually hidden polite
       // region carries the same unread count the chip's name would have.

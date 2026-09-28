@@ -21,13 +21,15 @@ export const SHEET_SETTLE_MS = 340
  * a tap target with keyboard and ARIA parity is the acceptance bar; a drag handle is polish.
  */
 export default function MobileTripSheet({
-  state, onToggleHeight, onHide, onReopen, header, children,
+  state, onToggleHeight, onHide, onReopen, heading, header, children,
 }: {
   state: SheetState
   onToggleHeight: () => void
   onHide: () => void
   onReopen: () => void
-  /** Pinned above the scrolling list: the day/Stay chips and the one-line stats. */
+  /** The trip's title block, beside the hide control. Not interactive: taps fall to the handle. */
+  heading?: React.ReactNode
+  /** Pinned above the scrolling list: the date strip. */
   header: React.ReactNode
   children: React.ReactNode
 }) {
@@ -44,37 +46,39 @@ export default function MobileTripSheet({
         aria-label="Trip itinerary"
         inert={hidden}
         className={[
-          'pointer-events-auto absolute inset-x-0 bottom-0 z-10 flex flex-col',
-          'rounded-t-[22px] border-t border-[var(--line)] bg-[var(--paper-0)]',
-          'shadow-[0_-10px_30px_rgba(10,13,20,0.22)]',
+          'm-frost pointer-events-auto absolute inset-x-0 bottom-0 z-10 flex flex-col',
+          'rounded-t-[var(--m-r-sheet)] shadow-[0_-1px_0_rgba(28,23,16,0.05),0_-12px_32px_rgba(28,23,16,0.14)]',
           'transition-[height,transform] duration-300 ease-out motion-reduce:transition-none',
-          expanded ? 'h-[88dvh]' : 'h-[45dvh]',
+          // Short phones (≤700px tall, e.g. 360x640) get a taller compact detent: at 45dvh the first stop
+          // card did not fit under the heading and date strip (measured, plan amendment 5).
+          expanded ? 'h-[88dvh]' : 'h-[45dvh] [@media(max-height:700px)]:h-[52dvh]',
           hidden ? 'translate-y-full' : 'translate-y-0',
         ].join(' ')}
       >
         <div className="relative shrink-0">
-          {/* Full-width grab row: the handle toggles compact/expanded. The one other control is
-              "show the full map" at the top-right, a map glyph rather than a second chevron that
-              read as the same toggle. The agent chip hides while the sheet is expanded, so the
-              two never meet. */}
+          {/* Full-width grab row: the handle toggles compact/expanded. The heading row tucks 14px
+              up under it and ignores pointers, so a tap on the title still lands on the handle —
+              the sheet's whole top edge is the grip, as in any native sheet. The one other control
+              is "show the full map", a 44px circle at the right of the heading. */}
           <button
             type="button"
             onClick={onToggleHeight}
             aria-expanded={expanded}
             aria-controls="mobile-trip-sheet-body"
             aria-label={expanded ? 'Collapse trip sheet' : 'Expand trip sheet'}
-            className="flex h-11 w-full items-center justify-center rounded-t-[22px] focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-[var(--brass)]"
+            className="flex h-11 w-full items-start justify-center rounded-t-[var(--m-r-sheet)] pt-2 focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-[var(--m-accent)]"
           >
-            <span aria-hidden className="h-[5px] w-10 rounded-full bg-[var(--paper-line-2,var(--line))]" />
+            <span aria-hidden className="h-[5px] w-9 rounded-full bg-[rgba(28,23,16,0.18)]" />
           </button>
+          <div className="pointer-events-none -mt-[14px] flex min-h-12 items-center pb-1 pl-4 pr-[68px]">{heading}</div>
           <button
             type="button"
             onClick={onHide}
             aria-label="Hide trip sheet and show the full map"
-            className="absolute right-1 top-0 flex h-11 w-11 items-center justify-center rounded-full text-[var(--muted)] focus-visible:outline-2 focus-visible:outline-[var(--brass)]"
+            className="m-btn-icon absolute right-3 top-[32px] h-11 w-11"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"
-              strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-5 w-5">
+              strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z" />
               <path d="M9 4v14M15 6v14" />
             </svg>
@@ -95,10 +99,8 @@ export default function MobileTripSheet({
           onClick={onReopen}
           aria-label="Show trip sheet"
           className={[
-            'pointer-events-auto absolute left-1/2 z-20 -translate-x-1/2',
+            'm-btn-primary pointer-events-auto absolute left-1/2 z-20 -translate-x-1/2',
             'bottom-[calc(16px+env(safe-area-inset-bottom))]',
-            'type-label flex h-11 items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--paper-0)] px-5',
-            'text-[14px] text-[var(--starlight)] shadow-[0_4px_18px_rgba(10,13,20,0.28)]',
           ].join(' ')}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25"
