@@ -43,13 +43,23 @@ export const MOBILE_SHEET_GAP = 40
 const MOBILE_BARE_BOTTOM = 72
 const MOBILE_LEFT = 48
 
+/**
+ * The top of the phone map controls: `max(12px, env(safe-area-inset-top))`, exactly as
+ * MobileMapControls positions them. With viewport-fit=cover a notched phone reports ~47px, and a
+ * camera padded for 12px framed pins under the back button (Codex final review #2).
+ */
+export function controlsTop(safeTop = 0): number {
+  return Math.max(MOBILE_CONTROL_INSET, Number.isFinite(safeTop) ? safeTop : 0)
+}
+
 /** The phone map controls' rects in canvas pixels: the back button, then each stack button. */
-export function mobileControlRects(width: number, stackButtons: number): Rect[] {
+export function mobileControlRects(width: number, stackButtons: number, safeTop = 0): Rect[] {
   const size = MOBILE_CONTROL_SIZE
-  const back: Rect = { x: MOBILE_CONTROL_INSET, y: MOBILE_CONTROL_INSET, w: size, h: size }
+  const top = controlsTop(safeTop)
+  const back: Rect = { x: MOBILE_CONTROL_INSET, y: top, w: size, h: size }
   const stack = Array.from({ length: stackButtons }, (_, i): Rect => ({
     x: width - MOBILE_CONTROL_INSET - size,
-    y: MOBILE_CONTROL_INSET + i * (size + MOBILE_STACK_GAP),
+    y: top + i * (size + MOBILE_STACK_GAP),
     w: size,
     h: size,
   }))
@@ -58,11 +68,13 @@ export function mobileControlRects(width: number, stackButtons: number): Rect[] 
 
 const DESKTOP_BREAKPOINT = 768
 
-export function computeFramePadding({ width, height, obstruction, popupRoom = false }: {
+export function computeFramePadding({ width, height, obstruction, popupRoom = false, safeTop = 0 }: {
   width: number
   height: number
   /** Pixels the mobile sheet covers at the bottom; 0 when hidden or absent. */
   obstruction: number
+  /** The resolved top safe-area inset (px); the phone controls sit below it. Ignored on desktop. */
+  safeTop?: number
   /** Bias the pin into the upper third so an evidence popup has somewhere to open (desktop). */
   popupRoom?: boolean
 }): FramePadding {
@@ -70,7 +82,8 @@ export function computeFramePadding({ width, height, obstruction, popupRoom = fa
   const wanted = wide
     ? { top: 80, right: 80, bottom: 80, left: 480 }
     : {
-        top: MOBILE_TOP_CLEARANCE,
+        // Below the top row of controls wherever they really are: the constant is the 12px case.
+        top: MOBILE_TOP_CLEARANCE + (controlsTop(safeTop) - MOBILE_CONTROL_INSET),
         right: MOBILE_RIGHT_CLEARANCE,
         bottom: obstruction > 0 ? obstruction + MOBILE_SHEET_GAP : MOBILE_BARE_BOTTOM,
         left: MOBILE_LEFT,

@@ -78,6 +78,45 @@ describe('computeFramePadding', () => {
     })
   })
 
+  /* Codex final review #2: MobileMapControls sits at max(12px, env(safe-area-inset-top)), and
+     viewport-fit=cover makes a nonzero inset real (47px on a notched iPhone). The pads must be
+     derived from where the controls ACTUALLY are, or a framed pin lands under All trails. */
+  describe('with a top safe-area inset (notched phone)', () => {
+    const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+    const framedRect = (pad: ReturnType<typeof computeFramePadding>, W: number, H: number): Rect => ({
+      x: pad.left - PIN_RADIUS, y: pad.top - PIN_RADIUS,
+      w: W - pad.left - pad.right + 2 * PIN_RADIUS, h: H - pad.top - pad.bottom + 2 * PIN_RADIUS,
+    })
+
+    it('places the controls below the inset, as max(12px, inset) does in CSS', () => {
+      const [back, first] = mobileControlRects(390, 3, 47)
+      expect(back).toEqual({ x: 12, y: 47, w: 44, h: 44 })
+      expect(first.y).toBe(47)
+      expect(mobileControlRects(390, 1, 4)[0].y).toBe(12)          // a small inset stays at 12px
+    })
+
+    for (const [W, H] of [[390, 844], [430, 932], [360, 640]] as const) {
+      for (const obstruction of [0, Math.round(H * 0.45)]) {
+        it(`${W}x${H} with a 47px inset, sheet ${obstruction ? 'compact' : 'hidden'}: no framed pin under a control`, () => {
+          const pad = computeFramePadding({ width: W, height: H, obstruction, safeTop: 47 })
+          const framed = framedRect(pad, W, H)
+          for (const c of mobileControlRects(W, MAX_STACK_BUTTONS, 47)) expect(overlaps(framed, c)).toBe(false)
+        })
+      }
+    }
+
+    it('would have failed before: the old fixed 76px top pad reaches under the 47px-inset back button', () => {
+      const pad = computeFramePadding({ width: 390, height: 844, obstruction: 380 })   // no inset passed
+      const back = mobileControlRects(390, 1, 47)[0]
+      expect(overlaps(framedRect(pad, 390, 844), back)).toBe(true)                    // the reported bug
+    })
+
+    it('ignores the inset on desktop (no phone controls there)', () => {
+      expect(computeFramePadding({ width: 1440, height: 900, obstruction: 0, safeTop: 47 }))
+        .toEqual({ top: 80, right: 80, bottom: 80, left: 480 })
+    })
+  })
+
   it('trusts a zero-sized canvas and yields zero pads', () => {
     expect(computeFramePadding({ width: 0, height: 0, obstruction: 300 }))
       .toEqual({ top: 0, right: 0, bottom: 0, left: 0 })

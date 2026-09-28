@@ -12,6 +12,7 @@ import {
 } from '@/lib/trip/selectors'
 import { consumeTripFramed } from '@/lib/trip/map-handoff'
 import { fitTarget } from '@/lib/trip/fit-target'
+import { readSafeAreaTop } from '@/lib/trip/safe-area'
 import { getSheetObstruction, useSheetObstruction } from '@/lib/trip/sheet-obstruction'
 import { useTripLayout } from '@/lib/trip/use-trip-layout'
 import { computeFramePadding } from './frame-padding'
@@ -786,6 +787,9 @@ export default function TripMap({
       height: canvas?.clientHeight ?? win.h,
       obstruction: getSheetObstruction(),
       popupRoom: opts?.popupRoom,
+      // The phone controls sit below the notch (max(12px, env(safe-area-inset-top))); the camera
+      // clears them where they really are. Desktop has no such controls and never reads it.
+      safeTop: layoutRef.current === 'mobile' ? readSafeAreaTop() : 0,
     })
   }
 

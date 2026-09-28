@@ -62,6 +62,9 @@ vi.mock('mapbox-gl', () => ({
   },
 }))
 vi.mock('mapbox-gl/dist/mapbox-gl.css', () => ({}))
+// The top safe-area inset (a notched phone reports ~47px). 0 unless a test sets it.
+const safeArea = vi.hoisted(() => ({ top: 0, reads: 0 }))
+vi.mock('@/lib/trip/safe-area', () => ({ readSafeAreaTop: () => { safeArea.reads++; return safeArea.top } }))
 
 function fireLoad() {
   const load = mapInstance.on.mock.calls.find((c) => c[0] === 'load')
@@ -1124,6 +1127,27 @@ describe('TripMap on a phone', () => {
     view.unmount()
     expect(style.removeProperty).toHaveBeenCalledWith('--sheet-obstruction')
     mapInstance.getContainer.mockReturnValue({ clientWidth: 1440, clientHeight: 900 })
+  })
+
+  /* Codex final review #2: the camera clears the controls where they REALLY are — below the
+     notch — not at a fixed 12px. */
+  it('pads the camera below the controls on a notched phone (47px top inset)', async () => {
+    phone()
+    safeArea.top = 47
+    try {
+      await loaded()
+      const pad = mapInstance.fitBounds.mock.calls.at(-1)![1].padding
+      expect(pad.top).toBe(MOBILE_TOP_CLEARANCE + (47 - 12))
+    } finally {
+      safeArea.top = 0
+    }
+  })
+
+  it('never reads the safe-area inset for the desktop camera', async () => {
+    safeArea.reads = 0
+    await loaded()                                    // no phone(): jsdom's layout is desktop
+    expect(mapInstance.fitBounds).toHaveBeenCalled()
+    expect(safeArea.reads).toBe(0)
   })
 
   it('gives eat pins a 44px phone hit area without changing their look', async () => {
