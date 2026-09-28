@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { TOKYO_TRIP } from '@/lib/trip/fixtures'
 import type { TripBundle } from '@/lib/trip/backend-types'
 import AboutThisTrip from '@/components/trip/mobile/AboutThisTrip'
@@ -86,5 +86,32 @@ describe('AboutThisTrip', () => {
   it('says honestly when every stop is complete but the trip was still saved with gaps', () => {
     render(<AboutThisTrip bundle={withStatus('saved_with_gaps')} readOnly />)
     expect(within(row('Some stops are missing details')).getByText(/Every stop here has a map location and its evidence/)).toBeInTheDocument()
+  })
+})
+
+/* Codex final review #1: React delivers an inner row's toggle to the outer About handler
+   (currentTarget = About, target = the row), which scrolled About's heading back to the top and
+   pushed the row the user just opened out of view. Only About's own toggle may scroll. */
+describe('AboutThisTrip scrolling', () => {
+  it('scrolls About into view when About itself opens', () => {
+    render(<AboutThisTrip bundle={withStatus('saved_with_gaps')} readOnly={false} />)
+    const spy = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {})
+    about().open = true
+    fireEvent(about(), new Event('toggle'))
+    expect(spy).toHaveBeenCalledTimes(1)
+    spy.mockRestore()
+  })
+
+  it('does not scroll when an inner row opens or closes', () => {
+    render(<AboutThisTrip bundle={withStatus('saved_with_gaps')} readOnly={false} />)
+    about().open = true
+    const spy = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {})
+    const inner = row('How was this trail?')
+    inner.open = true
+    fireEvent(inner, new Event('toggle'))
+    inner.open = false
+    fireEvent(inner, new Event('toggle'))
+    expect(spy).not.toHaveBeenCalled()
+    spy.mockRestore()
   })
 })

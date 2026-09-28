@@ -37,6 +37,10 @@ export default function AboutThisTrip({ bundle, readOnly, feedback }: {
       // on screen changing. Bring it up so opening it visibly does something.
       onToggle={(e) => {
         const el = e.currentTarget
+        // Only About's OWN toggle. React hands the inner rows' toggles to this handler too
+        // (target = the row), and scrolling About's heading up then pushed the row the user had
+        // just opened out of view (Codex final review #1).
+        if (e.target !== el) return
         if (!el.open) return
         const reduce = typeof window.matchMedia === 'function'
           && window.matchMedia('(prefers-reduced-motion: reduce)').matches
