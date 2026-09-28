@@ -209,7 +209,7 @@ describe('ItineraryCards', () => {
       )
       const [li] = screen.getAllByRole('listitem')
       const origin = idx.get(crossDayLeg.from_place_id!)!.name
-      expect(li).toHaveTextContent(/public transit may be preferable/i)
+      expect(li).toHaveTextContent(/public transit is likely the better option/i)
       expect(li).toHaveTextContent(origin)   // names where you set off from
       /* And it is read on the way IN, not as a footnote after you have arrived. Without this the
          test passes on a fold that misses the leg entirely and falls back to trailing it. */

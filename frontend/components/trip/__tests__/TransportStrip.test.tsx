@@ -20,7 +20,7 @@ describe('TransportStrip', () => {
     const noRoute = TOKYO_TRIP.transport_legs.find((l) => l.status === 'no_route')!
     const legs = legsForDay(TOKYO_TRIP, noRoute.trip_day_id!)
     render(<TransportStrip legs={legs} placeIndex={idx} />)
-    expect(screen.getByText(/public transit may be preferable/i)).toBeInTheDocument()
+    expect(screen.getByText(/public transit is likely the better option/i)).toBeInTheDocument()
   })
 
   it('renders the composed empty state when there are no legs', () => {

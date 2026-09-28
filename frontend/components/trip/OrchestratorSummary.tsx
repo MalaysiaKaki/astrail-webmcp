@@ -39,9 +39,13 @@ function whereLine(trip: Trip): string {
    `trip_inspiration_items` populated — the same migration that unblocks the real
    "not planned yet" list. */
 
-export default function OrchestratorSummary({ bundle }: { bundle: TripBundle }) {
+/**
+ * @param hideGapsBadge  The phone's About this trip says the same thing in traveller words
+ *                       ("Some stops are missing details"), so it drops the pipeline-status badge.
+ */
+export default function OrchestratorSummary({ bundle, hideGapsBadge = false }: { bundle: TripBundle; hideGapsBadge?: boolean }) {
   const { trip } = bundle
-  const withGaps = trip.status === 'saved_with_gaps'
+  const withGaps = trip.status === 'saved_with_gaps' && !hideGapsBadge
   const where = whereLine(trip)
   const summary = trip.summary?.trim()
 

@@ -16,7 +16,7 @@ describe('buildRouteLinks', () => {
     const arrival = above[0]!
     expect(arrival.leg.id).toBe('leg_3')
     expect(arrival.leg.status).toBe('no_route')
-    expect(arrival.leg.warning).toMatch(/Long transfer/)
+    expect(arrival.leg.warning).toMatch(/long transfer/)
     // Its origin is on ANOTHER day, so the reader cannot see it above: name it.
     expect(arrival.from).toBe('Ichiran Shibuya')
   })

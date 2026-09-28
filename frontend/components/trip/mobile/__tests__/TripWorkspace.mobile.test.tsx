@@ -260,4 +260,29 @@ describe('TripWorkspace — the phone branch', () => {
     expect(document.querySelector('[data-place-id="pl_hpcafe"]')).toHaveAttribute('aria-expanded', 'true')
     // get_place_evidence is a GlobalTools read; its phone check lives in public-sample-tools.test.
   })
+
+  it('keeps the gaps status out of the sheet header and says it in traveller words in About', () => {
+    renderSeeded()   // TOKYO_TRIP is saved_with_gaps
+    const header = screen.getByRole('group', { name: 'Trip days' }).parentElement!
+    expect(within(header).queryByText(/Saved with gaps/)).toBeNull()
+    expect(within(about()).getByText('Some stops are missing details')).toBeInTheDocument()
+    expect(within(about()).queryByText('Saved with gaps')).toBeNull()
+  })
+
+  it('scrolls About this trip into view when it is opened', () => {
+    renderSeeded()
+    const spy = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {})
+    const details = about()
+    details.open = true
+    fireEvent(details, new Event('toggle'))
+    expect(spy.mock.contexts.at(-1)).toBe(details)
+  })
+
+  it('has exactly one hide control in the sheet, top-right, not a second chevron beside the handle', () => {
+    renderSeeded()
+    const hide = screen.getByRole('button', { name: /hide trip sheet/i })
+    expect(hide.className).toMatch(/\bright-/)
+    expect(hide.className).toMatch(/\bh-11\b/)
+    expect(hide.className).toMatch(/\bw-11\b/)
+  })
 })

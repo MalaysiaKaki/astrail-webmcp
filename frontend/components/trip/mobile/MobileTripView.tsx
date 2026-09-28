@@ -102,9 +102,6 @@ function SheetHeader(p: MobileTripViewProps) {
         <span className="tabular-nums">
           {bundle.places.length} places · {bundle.days.length} days · {bundle.transport_legs.length} legs
         </span>
-        {bundle.trip.status === 'saved_with_gaps' ? (
-          <span className="rounded-full bg-[var(--brass-soft)] px-2 py-0.5 text-[var(--brass-bright)]">Saved with gaps</span>
-        ) : null}
       </p>
     </div>
   )

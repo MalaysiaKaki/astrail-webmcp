@@ -6,6 +6,7 @@ import {
   buildPlaceIndex, buildTrailNumbers, legsForDay, placesForDay, restaurantsForDay,
 } from '@/lib/trip/selectors'
 import StopTimeline from '@/components/trip/mobile/StopTimeline'
+import { thumbnailFor } from '@/components/map/popup-model'
 
 const index = buildPlaceIndex(TOKYO_TRIP)
 const numbers = buildTrailNumbers(TOKYO_TRIP)
@@ -86,7 +87,7 @@ describe('StopTimeline', () => {
 
   it('carries the cross-day no-route warning, with no duration for an unrouted leg', () => {
     renderDay(2)
-    expect(screen.getByText(/Long transfer/)).toBeInTheDocument()
+    expect(screen.getByText(/long transfer/)).toBeInTheDocument()
     expect(screen.getByText(/from Ichiran Shibuya/)).toBeInTheDocument()
   })
 
@@ -192,5 +193,64 @@ describe('StopTimeline on a day with no stops', () => {
         ?? TOKYO_TRIP.suggestion_places.find((p) => p.id === r.restaurant_place_id)?.name
       if (name) expect(screen.getByText(name)).toBeInTheDocument()
     }
+  })
+})
+
+
+/* Phase 7 polish (phones). */
+describe('StopTimeline row polish', () => {
+  it('shows the Reel thumbnail the map pin uses, and no placeholder art when there is none', () => {
+    renderDay(1)
+    const akasaka = TOKYO_TRIP.places.find((p) => p.id === 'tp_akasaka')!
+    const src = thumbnailFor(TOKYO_TRIP, akasaka)
+    expect(src).toBeTruthy()                                  // the fixture must pose the question
+    const img = row('pl_akasaka').querySelector('img')!
+    expect(img.getAttribute('src')).toBe(src)            // the same source the pin's photo uses
+    expect(img).toHaveAttribute('alt', '')
+    const ichiran = TOKYO_TRIP.places.find((p) => p.id === 'tp_ichiran')!
+    expect(thumbnailFor(TOKYO_TRIP, ichiran)).toBeNull()
+    expect(row('pl_ichiran').querySelector('img')).toBeNull()
+    expect(row('pl_ichiran').querySelector('[data-cover="none"]')).toBeNull()
+  })
+
+  it('keeps the quote verbatim but quiet: not italic, not transformed, clamped to two lines', () => {
+    renderDay(1)
+    const quote = within(row('pl_akasaka')).getByText(/HARRY POTTER TRAIN STATION IN TOKYO!/)
+    expect(quote.textContent).toBe('“HARRY POTTER TRAIN STATION IN TOKYO!”')
+    expect(quote.className).not.toMatch(/\bitalic\b/)
+    expect(quote.className).not.toMatch(/uppercase|lowercase|capitalize/)
+    expect(quote.className).toMatch(/line-clamp-2/)
+  })
+
+  it('drops the confidence chip from an expanded stop but keeps its address', () => {
+    renderDay(1, { selectedPlaceId: 'pl_akasaka' })
+    const li = row('pl_akasaka').closest('li')!
+    expect(within(li).queryByText('65%')).toBeNull()
+    expect(within(li).getByText(/Akasaka, Tokyo/)).toBeInTheDocument()
+  })
+
+  it('renders a no-route leg as one compact line with a transit icon', () => {
+    renderDay(2)
+    const leg = document.querySelector('[data-leg="no-route"]')!
+    expect(leg).not.toBeNull()
+    expect(leg.querySelector('svg')).not.toBeNull()
+    expect(leg.querySelector('.truncate')).not.toBeNull()          // one line, ellipsised
+    expect(leg.textContent).toMatch(/from Ichiran Shibuya/)
+    expect(leg.textContent).toMatch(/long transfer/)
+    expect(leg.textContent).not.toMatch(/v1/)
+  })
+})
+
+describe('StopTimeline thumbnail safety', () => {
+  it('refuses a non-http thumbnail (Reel data is untrusted) and shows no image', () => {
+    const hostile = { ...TOKYO_TRIP, inspiration: TOKYO_TRIP.inspiration.map((i) => ({ ...i, thumbnail_url: 'javascript:alert(1)' })) }
+    render(
+      <StopTimeline
+        bundle={hostile} places={placesForDay(TOKYO_TRIP, 1)} legs={[]} restaurants={[]}
+        placeIndex={index} trailNumbers={numbers} selectedPlaceId={null} onSelectPlace={() => {}}
+        selectedRestaurantPlaceId={null} onSelectRestaurant={() => {}}
+      />,
+    )
+    expect(row('pl_akasaka').querySelector('img')).toBeNull()
   })
 })

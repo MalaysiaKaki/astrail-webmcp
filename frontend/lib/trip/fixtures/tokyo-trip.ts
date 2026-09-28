@@ -183,7 +183,7 @@ const transport_legs: TransportLeg[] = [
      first (and only) stop. That combination — a leg that spans days and carries a warning — is
      what `buildRouteLinks` folds for; see the note on `days` above. */
   leg('leg_3', 'day_2', P.ichiran, P.disney, 0, 'no_route', 'transit_hint', null, null, null,
-    'Long transfer. Public transit may be preferable; detailed train routing is not available in v1.'),
+    'No driving route found. Public transit is likely the better option for this long transfer.'),
 ]
 
 /* The eat-marker place. It was 'Koma Sushi' in Asakusa — a name and a coordinate with nothing

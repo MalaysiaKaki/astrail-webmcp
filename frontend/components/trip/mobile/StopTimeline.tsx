@@ -7,7 +7,8 @@ import type {
 import { hasRealCoords } from '@/lib/trip/selectors'
 import { buildRouteLinks, type RouteLink } from '@/lib/trip/route-links'
 import { stopProvenance, type StopProvenance } from '@/lib/trip/stop-provenance'
-import EvidenceChip from '../EvidenceChip'
+import { thumbnailFor } from '@/components/map/popup-model'
+import { safeHref } from '@/lib/safe-href'
 import RestaurantStrip from '../RestaurantStrip'
 import { fmtDuration } from '../TransportStrip'
 
@@ -46,9 +47,41 @@ function humanize(s: string): string {
   return t.charAt(0).toUpperCase() + t.slice(1)
 }
 
+/** A train, for the no-route leg: the fixture's (and the pipeline's) advice is public transit. */
+function TransitIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"
+      strokeLinejoin="round" aria-hidden className="h-4 w-4 shrink-0">
+      <rect x="5" y="3" width="14" height="14" rx="3" />
+      <path d="M5 11h14M9 17l-2 4M15 17l2 4" />
+      <circle cx="9" cy="14" r="0.5" fill="currentColor" />
+      <circle cx="15" cy="14" r="0.5" fill="currentColor" />
+    </svg>
+  )
+}
+
 function LegRow({ link }: { link: RouteLink }) {
   const { leg, from } = link
   const routed = leg.status === 'ok'
+  if (!routed) {
+    // One compact line, not a paragraph: the warning is the traveller's advice, the icon says
+    // what it is about, and the full sentence is still in the DOM for assistive tech.
+    return (
+      <div className="flex gap-3">
+        <RailCol><Seg line className="flex-1" /></RailCol>
+        <p
+          data-leg="no-route"
+          title={leg.warning ?? undefined}
+          className="type-body flex min-w-0 flex-1 items-center gap-2 py-2.5 text-[13px] leading-snug text-[var(--muted)]"
+        >
+          <TransitIcon />
+          <span className="min-w-0 truncate">
+            {from ? `from ${from} · ` : ''}{leg.warning ?? 'No route found for this leg.'}
+          </span>
+        </p>
+      </div>
+    )
+  }
   const timing = routed
     ? [
         fmtDuration(leg.duration_seconds),
@@ -62,11 +95,6 @@ function LegRow({ link }: { link: RouteLink }) {
         {from ? <span>from {from}, </span> : null}
         <span className="text-[var(--starlight)]">{humanize(leg.transport_mode)}</span>
         {timing ? <span className="tabular-nums text-[var(--brass-bright)]"> {timing}</span> : null}
-        {!routed ? (
-          <span className="mt-0.5 block text-[var(--muted)]">
-            No route. {leg.warning ?? 'Routing unavailable for this leg.'}
-          </span>
-        ) : null}
       </p>
     </div>
   )
@@ -74,13 +102,13 @@ function LegRow({ link }: { link: RouteLink }) {
 
 function ProvenanceLine({ p, full }: { p: StopProvenance; full: boolean }) {
   if (!p.text) return null
-  const clamp = full ? '' : 'line-clamp-1'
-  return p.kind === 'reel' || p.kind === 'requested' ? (
-    <p className={`type-body mt-1 text-[14px] italic leading-snug text-[var(--muted)] ${clamp}`}>
-      “{p.text}”
+  // Verbatim, never transformed — but quiet: upright, muted and clamped, so the place name leads.
+  const clamp = full ? '' : 'line-clamp-2'
+  const quoted = p.kind === 'reel' || p.kind === 'requested'
+  return (
+    <p className={`type-body mt-1 text-[14px] leading-snug text-[var(--faint)] ${clamp}`}>
+      {quoted ? `“${p.text}”` : p.text}
     </p>
-  ) : (
-    <p className={`type-body mt-1 text-[14px] leading-snug text-[var(--muted)] ${clamp}`}>{p.text}</p>
   )
 }
 
@@ -102,14 +130,23 @@ function StopDetail({ tp, restaurants, placeIndex, selectedRestaurantPlaceId, on
     <RailCol>{railBelow ? <Seg line className="flex-1" /> : null}</RailCol>
     <div className="min-w-0 flex-1 pb-3 pr-1">
       {extraQuotes.map((q) => (
-        <p key={q} className="type-body mt-1 text-[14px] italic leading-snug text-[var(--muted)]">“{q}”</p>
+        <p key={q} className="type-body mt-1 text-[14px] leading-snug text-[var(--faint)]">“{q}”</p>
       ))}
       <p className="type-body mt-2 text-[14px] text-[var(--muted)]">
         {located ? where || 'On the map' : 'Location unavailable — this stop could not be placed on the map.'}
       </p>
-      <div className="mt-2">
-        <EvidenceChip evidence={ev} />
-      </div>
+      {/* No confidence chip on a phone (it stays on desktop): the provenance line above already
+          says where the stop came from. The research source, when there is one, stays a link. */}
+      {safeHref(ev.source_url) ? (
+        <a
+          href={safeHref(ev.source_url)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="type-body inline-flex min-h-11 items-center text-[14px] text-[var(--brass-bright)] underline decoration-dotted underline-offset-4"
+        >
+          Source
+        </a>
+      ) : null}
       {restaurants.length > 0 ? (
         <div className="mt-3">
           <p className="type-label mb-1.5 text-[12px] text-[var(--faint)]">Places to eat nearby</p>
@@ -126,8 +163,21 @@ function StopDetail({ tp, restaurants, placeIndex, selectedRestaurantPlaceId, on
   )
 }
 
+/** The Reel still behind a stop — the same source its map pin shows — or nothing at all. */
+function Thumb({ url }: { url: string | null }) {
+  const src = url ? safeHref(url) : undefined
+  if (!src) return null
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src} alt="" loading="lazy"
+      className="mt-0.5 h-14 w-14 shrink-0 rounded-xl border border-[var(--line)] object-cover"
+    />
+  )
+}
+
 export default function StopTimeline({
-  places, legs, restaurants, placeIndex, trailNumbers, selectedPlaceId, onSelectPlace,
+  bundle, places, legs, restaurants, placeIndex, trailNumbers, selectedPlaceId, onSelectPlace,
   selectedRestaurantPlaceId, onSelectRestaurant,
 }: {
   bundle: TripBundle
@@ -227,6 +277,9 @@ export default function StopTimeline({
                       {eatCount(tp.place_id)} {eatCount(tp.place_id) === 1 ? 'place' : 'places'} to eat nearby
                     </span>
                   ) : null}
+                </span>
+                <span className="shrink-0 py-2">
+                  <Thumb url={thumbnailFor(bundle, tp)} />
                 </span>
               </button>
               {selected ? (

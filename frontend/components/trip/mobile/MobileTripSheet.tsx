@@ -53,8 +53,10 @@ export default function MobileTripSheet({
         ].join(' ')}
       >
         <div className="relative shrink-0">
-          {/* Full-width grab row. The hide control sits at the LEFT edge so the agent chip, which
-              rides the sheet's top-right edge, never lands on it in the expanded state. */}
+          {/* Full-width grab row: the handle toggles compact/expanded. The one other control is
+              "show the full map" at the top-right, a map glyph rather than a second chevron that
+              read as the same toggle. The agent chip hides while the sheet is expanded, so the
+              two never meet. */}
           <button
             type="button"
             onClick={onToggleHeight}
@@ -69,11 +71,12 @@ export default function MobileTripSheet({
             type="button"
             onClick={onHide}
             aria-label="Hide trip sheet and show the full map"
-            className="absolute left-1 top-0 flex h-11 w-11 items-center justify-center rounded-full text-[var(--muted)] focus-visible:outline-2 focus-visible:outline-[var(--brass)]"
+            className="absolute right-1 top-0 flex h-11 w-11 items-center justify-center rounded-full text-[var(--muted)] focus-visible:outline-2 focus-visible:outline-[var(--brass)]"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25"
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"
               strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-5 w-5">
-              <polyline points="6 9 12 15 18 9" />
+              <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z" />
+              <path d="M9 4v14M15 6v14" />
             </svg>
           </button>
         </div>

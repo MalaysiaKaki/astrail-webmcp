@@ -22,9 +22,21 @@ export default function AboutThisTrip({ bundle, readOnly, feedback }: {
   feedback?: FeedbackComposer
 }) {
   // Same explicit status allowlist as the desktop rail (plan T3), not reachability.
+  const withGaps = bundle.trip.status === 'saved_with_gaps'
   const showFeedback = !readOnly && (bundle.trip.status === 'complete' || bundle.trip.status === 'saved_with_gaps')
   return (
-    <details className="group mt-6 border-t border-[var(--line)]">
+    <details
+      className="group mt-6 scroll-mt-2 border-t border-[var(--line)]"
+      // Opened at the foot of a long list, its content would unfold below the fold with nothing
+      // on screen changing. Bring it up so opening it visibly does something.
+      onToggle={(e) => {
+        const el = e.currentTarget
+        if (!el.open) return
+        const reduce = typeof window.matchMedia === 'function'
+          && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        el.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' })
+      }}
+    >
       <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 py-2 [&::-webkit-details-marker]:hidden">
         <span className="type-display text-[16px] text-[var(--starlight)]">About this trip</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25"
@@ -40,7 +52,13 @@ export default function AboutThisTrip({ bundle, readOnly, feedback }: {
             trail to edit an itinerary.
           </p>
         ) : null}
-        <OrchestratorSummary bundle={bundle} />
+        {withGaps ? (
+          <p className="type-body flex items-center gap-2 text-[14px] text-[var(--brass-bright)]">
+            <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-[var(--brass)]" />
+            Some stops are missing details
+          </p>
+        ) : null}
+        <OrchestratorSummary bundle={bundle} hideGapsBadge />
         <TripPreferenceNote trip={bundle.trip} />
         <TradeoffPanel tradeoffs={bundle.trip.tradeoffs} variant="notes" />
         <section>
