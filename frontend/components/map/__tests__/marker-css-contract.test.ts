@@ -29,9 +29,14 @@ import { resolve } from 'node:path'
 // rule added to palette.css or type.css is just as load-bearing as one in globals.css.
 // Parser limitation (accepted): plain and @media-nested rules only; CSS `&` nesting
 // inside a marker-root rule would not be attributed to it. None is in use today.
-const CSS_FILES = ['globals.css', 'palette.css', 'type.css']
+// Plus the phone marker sheet (components/map/phone-pins.css, imported by TripMap): its roots are
+// positioned by Mapbox exactly the same way.
+const CSS_FILES = [
+  ...['globals.css', 'palette.css', 'type.css'].map((f) => resolve(__dirname, '../../../app', f)),
+  resolve(__dirname, '../phone-pins.css'),
+]
 const css = CSS_FILES
-  .map((f) => readFileSync(resolve(__dirname, '../../../app', f), 'utf8'))
+  .map((f) => readFileSync(f, 'utf8'))
   .join('\n')
   .replace(/\/\*[\s\S]*?\*\//g, '') // strip comments so commented-out rules don't trip it
 
@@ -44,7 +49,9 @@ const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
 // `.constellation-pin-card…` (single hyphen = child element, not a marker root).
 // `.eat-pin` joined this list once it became a real marker rather than an 8px dot: it is
 // positioned by Mapbox through the same inline transform and carries the identical hazard.
-const MARKER_ROOT = /\.(?:constellation-pin(?:--[\w-]+)?|eat-pin(?:--[\w-]+)?|hotel-hub-pin)(?![\w-])/
+// `.phone-pin` (the phone trail pin) and `.phone-hit` (the phone tap floor on eat/hub roots) joined
+// with the A3 phone markers.
+const MARKER_ROOT = /\.(?:constellation-pin(?:--[\w-]+)?|eat-pin(?:--[\w-]+)?|hotel-hub-pin|phone-pin(?:--[\w-]+)?|phone-hit)(?![\w-])/
 
 // Case-insensitive (CSS property names are), vendor-prefix tolerant (-webkit-transform).
 const POSITIONING_PROPS = /(?:^|[;\s])(?:-\w+-)?(transform|scale|translate|rotate)\s*:/i
@@ -58,6 +65,8 @@ describe('marker CSS contract: Mapbox owns marker-root positioning', () => {
     // a vanished rule would otherwise pass every absence-assertion silently.
     // Adding/removing a marker-root rule must update this list consciously.
     const selectors = [...new Set(markerRules.map((r) => r.selector))].sort()
+    // Compared as sorted sets (the received list is sorted) so a new file's rules need not be
+    // interleaved by hand.
     expect(selectors).toEqual([
       '.constellation-pin',
       // The three source-kind rules below are DESCENDANT selectors: they target a CHILD (the
@@ -86,7 +95,20 @@ describe('marker CSS contract: Mapbox owns marker-root positioning', () => {
       // a selector LIST verbatim, so it is asserted as written.
       '.eat-pin__label--visible,\n.eat-pin:hover .eat-pin__label',
       '.hotel-hub-pin',
-    ])
+      // Phone markers (components/map/phone-pins.css), all inside the phone media query.
+      '.eat-pin--selected.phone-hit .eat-pin__chip',
+      '.eat-pin.phone-hit',
+      '.eat-pin.phone-hit,\n  .hotel-hub-pin.phone-hit',
+      '.eat-pin.phone-hit .eat-pin__chip',
+      '.phone-pin',
+      '.phone-pin--agent_suggested .phone-pin__avatar',
+      '.phone-pin--receding .phone-pin__avatar',
+      '.phone-pin--selected',
+      '.phone-pin--selected .phone-pin__avatar',
+      '.phone-pin--user_requested .phone-pin__avatar',
+      '.phone-pin:focus-visible',
+      '.phone-pin:focus-visible .phone-pin__avatar',
+    ].sort())
   })
 
   it.each([
@@ -102,6 +124,19 @@ describe('marker CSS contract: Mapbox owns marker-root positioning', () => {
           + `Grow/shrink via width/height instead.`,
         )
       }
+    }
+  })
+
+  it('phone marker roots never set `position` — Mapbox needs its own `position: absolute`', () => {
+    // phone-pins.css loads after mapbox-gl.css, so at equal specificity a `position: relative` on a
+    // root beat `.mapboxgl-marker { position: absolute }`: every marker fell into normal flow and
+    // stacked below the previous one — pins drawn progressively further from their coordinates
+    // (found in the A3 browser check). Children may position themselves freely.
+    const phoneRoots = markerRules.filter((r) => /\.(?:phone-pin(?:--[\w-]+)?|phone-hit)(?![\w-])/.test(r.selector)
+      && !/\s/.test(r.selector.replace(/,\s*/g, ',')))
+    expect(phoneRoots.length).toBeGreaterThan(0)
+    for (const { selector, body } of phoneRoots) {
+      expect(/(?:^|[;\s])position\s*:/i.test(body), `\`${selector}\` sets position on a marker root`).toBe(false)
     }
   })
 

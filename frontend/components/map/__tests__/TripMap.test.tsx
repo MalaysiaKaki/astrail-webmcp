@@ -4,7 +4,8 @@ import { TOKYO_TRIP } from '@/lib/trip/fixtures'
 import { TOKYO_TRIP_WITH_HOTELS } from '@/lib/trip/fixtures/tokyo-hotels'
 import { markTripFramed } from '@/lib/trip/map-handoff'
 import { setSheetObstruction } from '@/lib/trip/sheet-obstruction'
-import { hasRealCoords, placesForDay } from '@/lib/trip/selectors'
+import { buildTrailNumbers, hasRealCoords, placesForDay } from '@/lib/trip/selectors'
+import { thumbnailFor } from '@/components/map/popup-model'
 import { MOBILE_SHEET_GAP, MOBILE_TOP_CLEARANCE } from '@/components/map/frame-padding'
 import MapProvider from '@/components/map/MapProvider'
 import TripMap from '@/components/map/TripMap'
@@ -1057,8 +1058,9 @@ describe('TripMap on a phone', () => {
   it('shows a name pill only for the selected pin, so close pins never stack labels', async () => {
     phone()
     const view = await loaded()
+    // A3: phone pins carry their pill only when selected (was: a toggled .constellation-pin label).
     const visible = () => markerElements
-      .filter((e) => e.querySelector('.constellation-pin__label--visible'))
+      .filter((e) => e.querySelector('.phone-pin__name'))
       .map((e) => e.getAttribute('aria-label'))
     expect(visible()).toEqual([])
     view.rerender(
@@ -1068,6 +1070,42 @@ describe('TripMap on a phone', () => {
     )
     await flush()
     expect(visible()).toEqual(['Harry Potter Cafe'])
+  })
+  /* A3: phone pins are circular avatars (components/map/phone-pin.ts), centred on the coordinate. */
+  it('draws phone pins, not desktop teardrops: photo avatar or glyph, number badge, centre anchor', async () => {
+    phone()
+    await loaded()
+    // The latest draw (drawMarkers runs on ready and on the selection effect).
+    const latest = (name: string) => markerElements.filter((e) => e.getAttribute('aria-label') === name).at(-1)!
+    const akasaka = latest('Akasaka Station')
+    expect(akasaka.className).toMatch(/^phone-pin\b/)
+    expect(akasaka.querySelector('.constellation-pin__drop')).toBeNull()
+    const src = thumbnailFor(TOKYO_TRIP, TOKYO_TRIP.places.find((p) => p.id === 'tp_akasaka')!)
+    // The same safe-URL gate as the desktop teardrop, which resolves a relative cover path.
+    expect(akasaka.querySelector('img.phone-pin__photo')!.getAttribute('src')).toBe(new URL(src!, window.location.href).href)
+    expect(akasaka.querySelector('.phone-pin__badge')!.textContent).toBe(String(buildTrailNumbers(TOKYO_TRIP).get('tp_akasaka')))
+    const ichiran = latest('Ichiran Shibuya')
+    expect(ichiran.querySelector('img')).toBeNull()
+    expect(ichiran.querySelector('.phone-pin__glyph')!.getAttribute('data-glyph')).toBe('restaurant')
+    const call = MarkerCtor.mock.calls.find((c) => (c[0] as { element: HTMLElement }).element === akasaka)!
+    expect(call[0]).toMatchObject({ anchor: 'center' })
+    expect(markerElements.some((e) => e.classList.contains('constellation-pin'))).toBe(false)
+  })
+
+  it('gives eat pins a 44px phone hit area without changing their look', async () => {
+    phone()
+    await loaded()
+    const eat = markerElements.filter((e) => e.classList.contains('eat-pin'))
+    expect(eat.length).toBeGreaterThan(0)
+    for (const e of eat) expect(e.classList.contains('phone-hit')).toBe(true)
+  })
+
+  it('refuses a hostile thumbnail on a phone pin and draws the glyph instead', async () => {
+    phone()
+    const hostile = { ...TOKYO_TRIP, inspiration: TOKYO_TRIP.inspiration.map((i) => ({ ...i, thumbnail_url: 'javascript:alert(1)' })) }
+    await loaded({ bundle: hostile })
+    expect(pin('Akasaka Station').querySelector('img')).toBeNull()
+    expect(pin('Akasaka Station').querySelector('.phone-pin__glyph')).not.toBeNull()
   })
 })
 
@@ -1164,6 +1202,31 @@ describe('TripMap across a live breakpoint switch', () => {
     expect(popup.remove).not.toHaveBeenCalled()
     setMobile(true)
     expect(popup.remove).toHaveBeenCalled()
+  })
+
+  /* Amendment 6: a live 767↔768 switch rebuilds the marker graphics — and does nothing else. */
+  it('rebuilds markers across a desktop→phone→desktop round trip: no camera move, one live handler', async () => {
+    mobile = false
+    const onSelectPlace = vi.fn()
+    renderMap({ onSelectPlace }); await flush(); fireLoad(); await flush()
+    const desktopFirst = pin('Akasaka Station')
+    expect(desktopFirst.className).toMatch(/\bconstellation-pin\b/)
+    const markersBefore = MarkerCtor.mock.results.map((r) => r.value as { remove: ReturnType<typeof vi.fn> })
+    mapInstance.fitBounds.mockClear(); mapInstance.flyTo.mockClear(); mapInstance.easeTo.mockClear()
+
+    setMobile(true)
+    const live = () => markerElements.filter((e) => e.getAttribute('aria-label') === 'Akasaka Station').at(-1)!
+    expect(live().className).toMatch(/^phone-pin\b/)
+    for (const m of markersBefore) expect(m.remove).toHaveBeenCalled()      // old graphics gone
+
+    setMobile(false)
+    expect(live().className).toMatch(/\bconstellation-pin\b/)
+    expect(live()).not.toBe(desktopFirst)                                   // rebuilt, not reused
+    expect(mapInstance.fitBounds).not.toHaveBeenCalled()                    // no re-frame
+    expect(mapInstance.flyTo).not.toHaveBeenCalled()
+
+    act(() => { live().click() })
+    expect(onSelectPlace).toHaveBeenCalledTimes(1)                          // no duplicate handler
   })
 
   it('restores the desktop labels when a phone rotates to desktop width', async () => {

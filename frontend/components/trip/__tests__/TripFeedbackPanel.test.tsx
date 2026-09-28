@@ -333,3 +333,30 @@ describe('TripFeedbackPanel — composer', () => {
     expect(screen.getByRole('button', { name: /thumbs up/i })).toHaveAttribute('aria-pressed', 'false')
   })
 })
+
+/* A3: on phones (About this trip) the composer's controls use the phone kit. The default variant
+   — the desktop rail and the failed screen — must not change. */
+describe('TripFeedbackPanel — phone variant', () => {
+  const thumbs = () => [screen.getByRole('button', { name: 'Thumbs up' }), screen.getByRole('button', { name: 'Thumbs down' })]
+  const stars = () => screen.getAllByRole('radio')
+  const sendBtn = () => screen.getByRole('button', { name: /send feedback/i })
+
+  it('uses kit buttons: circular thumbs, 44px stars, a primary Send, and a 16px note', () => {
+    render(<TripFeedbackPanel tripId="trip-1" variant="phone" />)
+    for (const t of thumbs()) expect(t.className).toMatch(/\bm-btn-icon\b/)
+    for (const s of stars()) expect(s.className).toMatch(/\bh-11\b.*\bw-11\b|\bw-11\b.*\bh-11\b/)
+    expect(sendBtn().className).toMatch(/\bm-btn-primary\b/)
+    expect(screen.getByRole('textbox', { name: 'Feedback note' }).className).toMatch(/text-\[16px\]/)
+  })
+
+  it('keeps the pressed state on aria-pressed, where the kit draws it', () => {
+    render(<TripFeedbackPanel tripId="trip-1" variant="phone" />)
+    fireEvent.click(thumbs()[0])
+    expect(thumbs()[0]).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('leaves the default (desktop) variant without any phone kit class', () => {
+    const { container } = render(<TripFeedbackPanel tripId="trip-1" />)
+    expect(container.innerHTML).not.toMatch(/\bm-btn-/)
+  })
+})

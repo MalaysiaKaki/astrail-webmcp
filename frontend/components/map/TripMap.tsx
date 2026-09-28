@@ -15,6 +15,8 @@ import { fitTarget } from '@/lib/trip/fit-target'
 import { getSheetObstruction, useSheetObstruction } from '@/lib/trip/sheet-obstruction'
 import { useTripLayout } from '@/lib/trip/use-trip-layout'
 import { computeFramePadding } from './frame-padding'
+import { buildPhonePin } from './phone-pin'
+import './phone-pins.css'
 import { useSharedMap } from '@/components/map/MapProvider'
 
 const DAY_ROUTE_COLORS = [
@@ -484,6 +486,9 @@ export default function TripMap({
     // targets) — reimplementing it risks dropping the base_place_id signal and double-pinning.
     const basePlaceIds = hotelBasePlaceIds(bundle)
     const labels: HTMLElement[] = []
+    // Read at draw time; a live layout change redraws (see the [layout] effect). Null — SSR and the
+    // hydration pass — draws the desktop markers, the layout that has always existed.
+    const phone = layoutRef.current === 'mobile'
     const markers = bundle.places
       .filter((tp) => hasRealCoords(tp.place.lng, tp.place.lat))
       .filter((tp) => layerMode !== 'hub' || !isHotelBasePlace(tp, basePlaceIds))
@@ -508,6 +513,28 @@ export default function TripMap({
         // valid URL, which would render a broken image instead of the placeholder.
         const rawPhoto = thumbnailFor(bundle, tp)
         const photoUrl = rawPhoto ? safeWebUrl(rawPhoto) : null
+        if (phone) {
+          // Placify-style avatar pin, centred on the coordinate (components/map/phone-pin.ts). Its
+          // name pill is drawn only when selected, so it never joins the zoom-toggled labels.
+          const pinEl = buildPhonePin({
+            name: tp.place.name,
+            label: shortPlaceName(tp.place.name),
+            placeType: tp.place.place_type,
+            sourceType: tp.source_type,
+            number,
+            selected: tp.place_id === selectedPlaceId,
+            photoUrl,
+          })
+          pinEl.addEventListener('click', (e) => {
+            e.stopPropagation()
+            onSelectPlace(tp.place_id)
+            // Phones: no evidence popup. The selected, expanded, scrolled-to sheet card IS the detail.
+            activePopupRef.current?.remove()
+            activePopupRef.current = null
+          })
+          return new mapboxgl.Marker({ element: pinEl, anchor: 'center' })
+            .setLngLat([tp.place.lng, tp.place.lat]).addTo(map)
+        }
         el.append(buildPinGraphic(photoUrl, number))
         if (photoUrl && number !== null) el.append(buildPinBadge(number))
         if (number !== null) {
@@ -571,7 +598,7 @@ export default function TripMap({
         const el = document.createElement('button')
         el.type = 'button'
         el.setAttribute('aria-label', hub.name)
-        el.className = 'hotel-hub-pin'
+        el.className = phone ? 'hotel-hub-pin phone-hit' : 'hotel-hub-pin'
         el.textContent = '🏨'
         const at: [number, number] = [hub.lng, hub.lat]
         el.addEventListener('click', (e) => {
@@ -599,6 +626,7 @@ export default function TripMap({
         el.className = [
           'eat-pin',
           place.id === selectedRestaurantPlaceId ? 'eat-pin--selected' : '',
+          phone ? 'phone-hit' : '',
         ].filter(Boolean).join(' ')
         const chip = document.createElement('span')
         chip.className = 'eat-pin__chip'
@@ -838,6 +866,10 @@ export default function TripMap({
       activePopupRef.current?.remove()
       activePopupRef.current = null
     }
+    // The two layouts draw different marker graphics (phone avatars vs desktop teardrops). Redraw
+    // them — only them: no camera move, and setMarkers removes the old elements with their handlers.
+    // Before the first framing there is nothing drawn yet; the [ready] draw reads the layout itself.
+    if (framedRef.current) drawMarkers()
     syncMarkerLabelVisibility()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layout])
