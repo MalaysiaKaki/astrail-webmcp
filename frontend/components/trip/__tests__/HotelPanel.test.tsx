@@ -195,3 +195,45 @@ describe('HotelPanel', () => {
     expect(chosen.className).not.toContain('surface--hoverable')
   })
 })
+
+/* A4: the Stay list on phones uses the kit. The default (desktop) variant must not change. */
+describe('HotelPanel — phone variant', () => {
+  const phone = (props: Partial<Parameters<typeof HotelPanel>[0]> = {}) => render(
+    <HotelPanel hotels={HOTELS} selectedHotelId={placed.id} onSelectHotel={vi.fn()} layerMode="hub" variant="phone" {...props} />,
+  )
+
+  it('draws a selectable hotel as a kit card with an ink outline when it is the chosen hub', () => {
+    phone()
+    const btn = screen.getByRole('button', { pressed: true })
+    const surface = btn.closest('[data-hotel-card]')!
+    expect(surface.className).toMatch(/\bm-card\b/)
+    expect(surface.className).toMatch(/outline-\[var\(--m-ink\)\]/)
+    expect(screen.getByText('Recommended').className).not.toMatch(/uppercase/)
+    expect(screen.getByText('On map')).toBeInTheDocument()
+  })
+
+  it('keeps an unplaced hotel honest and non-interactive, on a sub-card', () => {
+    phone()
+    const note = screen.getByText(/couldn.t place this hotel on the map/)
+    const row = note.closest('[data-hotel-card]')!
+    expect(row.className).toMatch(/\bm-subcard\b/)
+    expect(row.querySelector('button')).toBeNull()
+  })
+
+  it('selects a placed hotel on tap', () => {
+    const onSelectHotel = vi.fn()
+    phone({ onSelectHotel, selectedHotelId: null })
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(placed.name) }))
+    expect(onSelectHotel).toHaveBeenCalledWith(placed.id)
+  })
+
+  it('has no text under 12px and no uppercase labels', () => {
+    const { container } = phone()
+    expect(container.innerHTML).not.toMatch(/text-\[(9|10|11)px\]|\btext-xs\b|\buppercase\b/)
+  })
+
+  it('leaves the default (desktop) variant free of phone kit classes', () => {
+    const { container } = render(<HotelPanel hotels={HOTELS} selectedHotelId={placed.id} onSelectHotel={vi.fn()} layerMode="hub" />)
+    expect(container.innerHTML).not.toMatch(/\bm-(card|subcard)\b/)
+  })
+})

@@ -6,7 +6,7 @@ import type { PlaceType } from '@/lib/trip/backend-types'
  * badge, and, when selected, a larger avatar with the stop's name in a pill beside it.
  *
  * Built as plain DOM for a Mapbox marker, like the desktop teardrop in TripMap. Styles live in
- * ./phone-pins.css, scoped to phones. The ROOT is 44x44 so the tap target clears the phone floor
+ * ./phone-pins.css, scoped to phones. The ROOT is 48x48 so the tap target clears the phone floor
  * even though the avatar draws smaller; it grows with width/height, never a transform (Mapbox
  * owns the root's transform — see marker-css-contract.test.ts).
  *

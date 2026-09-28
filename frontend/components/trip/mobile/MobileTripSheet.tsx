@@ -66,7 +66,7 @@ export default function MobileTripSheet({
             aria-expanded={expanded}
             aria-controls="mobile-trip-sheet-body"
             aria-label={expanded ? 'Collapse trip sheet' : 'Expand trip sheet'}
-            className="flex h-11 w-full items-start justify-center rounded-t-[var(--m-r-sheet)] pt-2 focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-[var(--m-accent)]"
+            className="flex h-11 w-full items-start justify-center rounded-t-[var(--m-r-sheet)] pt-2 transition-colors active:bg-[rgba(28,23,16,0.04)] motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-[var(--m-accent)]"
           >
             <span aria-hidden className="h-[5px] w-9 rounded-full bg-[rgba(28,23,16,0.18)]" />
           </button>

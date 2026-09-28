@@ -945,6 +945,14 @@ describe('TripMap on a phone', () => {
     expect(PopupCtor).not.toHaveBeenCalled()
   })
 
+  it('keeps the desktop eat card class unchanged', async () => {
+    await loaded()
+    PopupCtor.mockClear()
+    const eat = markerElements.filter((e) => e.classList.contains('eat-pin')).at(-1)!
+    act(() => { eat.click() })
+    expect(PopupCtor).toHaveBeenCalledWith(expect.objectContaining({ className: 'astrail-evidence-popup' }))
+  })
+
   it('still opens the evidence popup on desktop', async () => {
     const onSelectPlace = vi.fn()
     await loaded({ onSelectPlace })
@@ -1090,6 +1098,32 @@ describe('TripMap on a phone', () => {
     const call = MarkerCtor.mock.calls.find((c) => (c[0] as { element: HTMLElement }).element === akasaka)!
     expect(call[0]).toMatchObject({ anchor: 'center' })
     expect(markerElements.some((e) => e.classList.contains('constellation-pin'))).toBe(false)
+  })
+
+  /* A4: the eat and hotel-hub cards are light kit cards on phones (phone-map-cards.css). */
+  it('opens the eat card with the phone class on a phone, and the plain one on desktop', async () => {
+    phone()
+    await loaded()
+    PopupCtor.mockClear()
+    const eat = markerElements.filter((e) => e.classList.contains('eat-pin')).at(-1)!
+    act(() => { eat.click() })
+    expect(PopupCtor).toHaveBeenCalledWith(expect.objectContaining({ className: 'astrail-evidence-popup phone-popup' }))
+  })
+
+  /* A4: Mapbox's attribution and logo sat under the compact sheet. The map container carries the
+     sheet's covered height so the bottom controls ride just above it (phone CSS). */
+  it('publishes the sheet obstruction to the map container for the bottom map controls', async () => {
+    phone()
+    const style = { setProperty: vi.fn(), removeProperty: vi.fn() }
+    mapInstance.getContainer.mockReturnValue({ clientWidth: 390, clientHeight: 844, style } as never)
+    const view = await loaded()
+    act(() => { setSheetObstruction(380) })
+    expect(style.setProperty).toHaveBeenLastCalledWith('--sheet-obstruction', '380px')
+    act(() => { setSheetObstruction(0) })
+    expect(style.setProperty).toHaveBeenLastCalledWith('--sheet-obstruction', '0px')
+    view.unmount()
+    expect(style.removeProperty).toHaveBeenCalledWith('--sheet-obstruction')
+    mapInstance.getContainer.mockReturnValue({ clientWidth: 1440, clientHeight: 900 })
   })
 
   it('gives eat pins a 44px phone hit area without changing their look', async () => {

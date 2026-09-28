@@ -17,6 +17,7 @@ import { useTripLayout } from '@/lib/trip/use-trip-layout'
 import { computeFramePadding } from './frame-padding'
 import { buildPhonePin } from './phone-pin'
 import './phone-pins.css'
+import './phone-map-cards.css'
 import { useSharedMap } from '@/components/map/MapProvider'
 
 const DAY_ROUTE_COLORS = [
@@ -418,7 +419,8 @@ export default function TripMap({
     if (!map) return
     activePopupRef.current?.remove()
     activePopupRef.current = new mapboxgl.Popup({
-      className: 'astrail-evidence-popup',
+      // Phones get the light kit card (phone-map-cards.css); desktop keeps the night card.
+      className: layoutRef.current === 'mobile' ? 'astrail-evidence-popup phone-popup' : 'astrail-evidence-popup',
       closeButton: true, closeOnClick: true, offset: 16, maxWidth: '300px',
     }).setLngLat(at).setDOMContent(content).addTo(map)
   }
@@ -919,6 +921,21 @@ export default function TripMap({
     apply()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sheetObstruction, layout])
+
+  // Mapbox's attribution and logo are bottom-corner controls, and the phone sheet covers exactly
+  // that strip. Publish the covered height on the map container; phone-map-cards.css lifts the
+  // bottom controls by it, so the attribution rides just above the sheet in every state.
+  // The container is remembered, not re-read on unmount: the provider may drop the map first.
+  const obstructionHostRef = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    const container = getMap()?.getContainer?.() ?? null
+    if (container) obstructionHostRef.current = container
+    container?.style?.setProperty?.('--sheet-obstruction', `${layout === 'mobile' ? sheetObstruction : 0}px`)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, sheetObstruction, layout])
+  useEffect(() => () => {
+    obstructionHostRef.current?.style?.removeProperty?.('--sheet-obstruction')
+  }, [])
 
   // Fly to the active day's pins when the day changes. Markers and the trail are whole-trip
   // and day-independent now (global numbering, one continuous journey line), so switching a

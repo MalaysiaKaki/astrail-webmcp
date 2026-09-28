@@ -9,11 +9,13 @@
   /* No `position` here: Mapbox's `.mapboxgl-marker { position: absolute }` must win (this sheet
      loads after it, so a `relative` here dropped every marker into flow — see the contract test).
      Absolute is also the containing block the badge and name pill hang off. */
+  /* 48px, not 44: Mapbox v3 shrinks distant markers a little under pitch (a 44px root measured 42px
+     on screen at the far edge of a selection flight), so the on-screen hit area keeps a margin. */
   .phone-pin {
     display: grid;
     place-items: center;
-    width: 44px;
-    height: 44px;
+    width: 48px;
+    height: 48px;
     padding: 0;
     border: 0;
     background: transparent;
@@ -22,8 +24,8 @@
   }
 
   .phone-pin--selected {
-    width: 54px;
-    height: 54px;
+    width: 56px;
+    height: 56px;
     z-index: 3;
   }
 

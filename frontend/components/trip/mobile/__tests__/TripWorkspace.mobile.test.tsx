@@ -48,6 +48,7 @@ vi.mock('@/components/trip/TripFeedbackPanel', () => ({ default: () => <div data
 
 import MapProvider from '@/components/map/MapProvider'
 import TripWorkspace from '@/components/trip/TripWorkspace'
+import { getTrip } from '@/lib/trip/supabase-api'
 
 function setMobile(next: boolean) {
   h.mobile = next
@@ -441,4 +442,64 @@ describe('TripWorkspace — the phone branch', () => {
     expect(hide.className).toMatch(/\bh-11\b/)
     expect(hide.className).toMatch(/\bw-11\b/)
   })
+
+  /* ---- A4: phone state screens use the kit (desktop keeps its own; pinned in TripWorkspace.test) ---- */
+  const stateCard = () => document.querySelector<HTMLElement>('[data-state-card]')
+
+  it('shows the failed screen as a kit card: serif heading, primary action, feedback kept', () => {
+    renderSeeded(withStatus('failed'), false, false)
+    const card = stateCard()!
+    expect(card.className).toMatch(/\bm-card\b/)
+    expect(within(card).getByRole('heading', { name: 'Generation failed' }).className).toMatch(/\btype-display\b/)
+    const plan = within(card).getByRole('link', { name: 'Plan a new trip' })
+    expect(plan.className).toMatch(/\bm-btn-primary\b/)
+    expect(plan).toHaveAttribute('href', '/app')
+    expect(screen.getByTestId('trip-feedback-panel')).toBeInTheDocument()
+  })
+
+  it('keeps the failed screen\'s feedback gate: none for a read-only sample', () => {
+    renderSeeded(withStatus('failed'), false, true)
+    expect(stateCard()).not.toBeNull()
+    expect(screen.queryByTestId('trip-feedback-panel')).toBeNull()
+  })
+
+  it.each(['generating', 'draft'] as const)('shows the %s screen as a kit card with a primary Refresh', (status) => {
+    renderSeeded(withStatus(status))
+    const card = stateCard()!
+    expect(within(card).getByText(/Still generating/)).toBeInTheDocument()
+    expect(within(card).getByRole('button', { name: 'Refresh' }).className).toMatch(/\bm-btn-primary\b/)
+    expect(within(card).getByRole('link', { name: 'All trails' }).className).toMatch(/\bm-btn-secondary\b/)
+  })
+
+  it('shows not-found as a kit card with a way back to the trails', async () => {
+    vi.mocked(getTrip).mockResolvedValue(null)
+    render(<MapProvider><TripWorkspace tripId="nope" /></MapProvider>)
+    const heading = await screen.findByRole('heading', { name: 'Trip not found.' })
+    expect(stateCard()!.contains(heading)).toBe(true)
+    expect(within(stateCard()!).getByRole('link', { name: 'All trails' }).className).toMatch(/\bm-btn-primary\b/)
+  })
+
+  it('shows loading as a quiet kit card', () => {
+    vi.mocked(getTrip).mockReturnValue(new Promise(() => {}))
+    render(<MapProvider><TripWorkspace tripId="pending" /></MapProvider>)
+    expect(within(stateCard()!).getByText('Loading trip…')).toBeInTheDocument()
+  })
+
+  /* ---- A4 edge fixtures ---- */
+  it('keeps a very long trip title on one line, whole for assistive tech', () => {
+    const long = 'Kyoto, Nara, Osaka and the long way round through the Kumano Kodo pilgrimage trails, Japan'
+    renderSeeded({ ...TOKYO_TRIP, trip: { ...TOKYO_TRIP.trip, inferred_destination: long } })
+    const h = within(heading()).getByRole('heading', { level: 2 })
+    expect(h).toHaveAccessibleName(long)
+    expect(h.className).toMatch(/\btruncate\b/)
+  })
+
+  it('opens an empty day with its sub-header and an honest "no stops" line, not a blank list', () => {
+    const days = [...TOKYO_TRIP.days, { ...TOKYO_TRIP.days[0], id: 'day_3', day_number: 3, day_date: '2026-09-20', title: null }]
+    renderSeeded({ ...TOKYO_TRIP, days })
+    fireEvent.click(screen.getByRole('button', { name: /^Day 3\b/ }))
+    expect(screen.getByRole('heading', { level: 3, name: 'Sep 20' })).toBeInTheDocument()
+    expect(within(sheet()!).getByText('No stops planned for this day.')).toBeInTheDocument()
+  })
 })
+

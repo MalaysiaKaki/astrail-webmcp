@@ -63,7 +63,9 @@ function SheetHeading({ title, dates, readOnly }: { title: string; dates: string
         {/* Said in the page, not only in the tool layer, so an agent reading it knows before it
             tries that nothing here writes. Short on screen; the full sentence is for AT. */}
         {readOnly ? (
-          <span className="shrink-0 rounded-full bg-[var(--m-accent-wash)] px-2 text-[12px] font-semibold leading-5 text-[var(--m-accent)]">
+          // White, not the brass wash: brass on the wash over the frosted sheet measured 4.37:1 (fails
+          // AA for 12px); on white it is 5.56:1. The hairline ring keeps it reading as a tag.
+          <span className="shrink-0 rounded-full bg-[var(--m-card)] px-2 text-[12px] font-semibold leading-5 text-[var(--m-accent)] shadow-[inset_0_0_0_1px_rgba(138,96,35,0.28)]">
             Sample<span className="sr-only"> trail — read-only</span>
           </span>
         ) : null}
@@ -236,12 +238,13 @@ export default function MobileTripView(p: MobileTripViewProps) {
         {p.listView === 'stay' ? (
           <div className="flex flex-col gap-3">
             <StaySubHeader count={p.hotels.length} />
-            <TradeoffPanel tradeoffs={p.bundle.trip.tradeoffs} variant="comparisons" />
+            <TradeoffPanel tradeoffs={p.bundle.trip.tradeoffs} variant="comparisons" tone="phone" />
             <HotelPanel
               hotels={p.hotels}
               selectedHotelId={p.selectedHotelId}
               onSelectHotel={p.onSelectHotel}
               layerMode={p.layerMode}
+              variant="phone"
             />
           </div>
         ) : (

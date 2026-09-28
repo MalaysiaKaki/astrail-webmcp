@@ -61,3 +61,18 @@ describe('TradeoffPanel', () => {
     expect(container).toBeEmptyDOMElement()
   })
 })
+
+describe('TradeoffPanel — phone variant (Stay list)', () => {
+  it('draws each comparison as a kit card with sub-card options, 12px floor, sentence case', () => {
+    const { container } = render(<TradeoffPanel tradeoffs={WITH_COMPARISON} variant="comparisons" tone="phone" />)
+    const card = screen.getByTestId('tradeoff-comparison')
+    expect(card.className).toMatch(/\bm-card\b/)
+    expect(card.querySelectorAll('.m-subcard').length).toBe(2)
+    expect(container.innerHTML).not.toMatch(/text-\[(9|10|11)px\]|\btext-xs\b|\buppercase\b/)
+  })
+
+  it('keeps the default tone free of phone kit classes', () => {
+    const { container } = render(<TradeoffPanel tradeoffs={WITH_COMPARISON} variant="comparisons" />)
+    expect(container.innerHTML).not.toMatch(/\bm-(card|subcard)\b/)
+  })
+})

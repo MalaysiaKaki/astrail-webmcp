@@ -30,6 +30,7 @@ import MobileTripView, { type MobileListView } from './mobile/MobileTripView'
 import type { SheetState } from './mobile/MobileTripSheet'
 import { useTripLayout } from '@/lib/trip/use-trip-layout'
 import { fitTarget } from '@/lib/trip/fit-target'
+import { PhoneFailed, PhoneGenerating, PhoneLoading, PhoneNotFound } from './mobile/PhoneStateScreens'
 
 const TripMap = dynamic(() => import('@/components/map/TripMap'), { ssr: false })
 
@@ -240,7 +241,11 @@ export default function TripWorkspace({
     return () => release()
   }, [mapBehind, acquire, release])
 
+  /* Phones get the same states as kit cards (mobile/PhoneStateScreens); a null (SSR/hydration)
+     layout keeps the desktop screens below, as the panel branch does. */
+  const phone = layout === 'mobile'
   if (status === 'loading') {
+    if (phone) return <PhoneLoading arriving={arrivingFromGeneration} />
     return (
       <main className="relative flex h-[100dvh] items-center justify-center p-6">
         {arrivingFromGeneration ? (
@@ -269,10 +274,26 @@ export default function TripWorkspace({
     )
   }
   if (status === 'not_found' || !bundle) {
+    if (phone) return <PhoneNotFound />
     return (
       <main className="flex h-[100dvh] items-center justify-center bg-[var(--void)]">
         <p className="type-body text-sm text-[var(--muted)]">Trip not found.</p>
       </main>
+    )
+  }
+  if (bundle.trip.status === 'failed' && phone) {
+    // Same gate as below: a seeded bundle has no trip row for feedback to reference.
+    return (
+      <PhoneFailed
+        feedback={readOnly ? null : (
+          <>
+            <p className="type-body mb-3 text-[15px] text-[var(--m-text-muted)]">
+              Tell us what went wrong — it&apos;s the most useful feedback we get.
+            </p>
+            <TripFeedbackPanel key={bundle.trip.id} tripId={bundle.trip.id} composer={feedback} variant="phone" />
+          </>
+        )}
+      />
     )
   }
   if (bundle.trip.status === 'failed') {
@@ -306,6 +327,7 @@ export default function TripWorkspace({
     )
   }
   if (bundle.trip.status === 'generating' || bundle.trip.status === 'draft') {
+    if (phone) return <PhoneGenerating />
     return (
       <main className="relative flex h-[100dvh] flex-col items-center justify-center p-6">
         <div className="surface flex flex-col items-center gap-3 px-5 py-4">

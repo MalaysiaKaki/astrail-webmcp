@@ -34,13 +34,18 @@ function priceLabel(snap: Record<string, unknown> | null | undefined): string | 
 // the picked hub is only DRAWN on the map in hub mode, so the "On map" indicator only appears there
 // (in route mode the selection is latent).
 export default function HotelPanel({
-  hotels, selectedHotelId, onSelectHotel, layerMode,
+  hotels, selectedHotelId, onSelectHotel, layerMode, variant = 'default',
 }: {
   hotels: HotelSuggestion[]
   selectedHotelId: string | null
   onSelectHotel: (id: string) => void
   layerMode: 'route' | 'hub'
+  /** 'phone' draws the phone kit's Stay list (same rules, same honesty); default is desktop's. */
+  variant?: 'default' | 'phone'
 }) {
+  if (variant === 'phone') {
+    return <PhoneHotels hotels={hotels} selectedHotelId={selectedHotelId} onSelectHotel={onSelectHotel} layerMode={layerMode} />
+  }
   if (hotels.length === 0) {
     return (
       <div className="rounded-[var(--radius-card)] border border-dashed border-[var(--line)] p-3">
@@ -117,6 +122,99 @@ export default function HotelPanel({
         return (
           <li key={h.id} className={['surface rounded-lg p-2.5', inactive ? 'opacity-60' : ''].join(' ')}>
             {body}
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+/* ---- Phone Stay list (A4) --------------------------------------------------------------------
+   The same selectable-hub rule, labels and honest notes as above, drawn with the phone kit: a
+   selectable hotel is an m-card surface holding one full-width button (ink outline when it is the
+   chosen hub, as a stop card is); anything else is a plain, non-interactive sub-card. Tags are
+   sentence case at 12px+, and an inactive row keeps full-contrast text (its status says why). */
+
+function isSelectableHub(h: HotelSuggestion): boolean {
+  return h.geo_status === 'placed' && h.rank != null && h.lat != null && h.lng != null
+}
+
+function Tag({ tone, children }: { tone: 'accent' | 'plain'; children: React.ReactNode }) {
+  return (
+    <span className={[
+      'type-body rounded-full px-2.5 text-[12px] font-semibold leading-6',
+      tone === 'accent' ? 'bg-[var(--m-accent-wash)] text-[var(--m-accent)]' : 'bg-[var(--m-subcard)] text-[var(--m-text)]',
+    ].join(' ')}>
+      {children}
+    </span>
+  )
+}
+
+function PhoneHotels({ hotels, selectedHotelId, onSelectHotel, layerMode }: {
+  hotels: HotelSuggestion[]
+  selectedHotelId: string | null
+  onSelectHotel: (id: string) => void
+  layerMode: 'route' | 'hub'
+}) {
+  if (hotels.length === 0) {
+    return <p className="type-body m-subcard px-4 py-3 text-[15px] text-[var(--m-text-muted)]">No hotel suggestions for these dates.</p>
+  }
+  return (
+    <ul className="flex flex-col gap-3">
+      {hotels.map((h) => {
+        const selectable = isSelectableHub(h)
+        const selected = selectable && h.id === selectedHotelId
+        const meta = [priceLabel(h.price_snapshot), h.area, h.star_rating ? `${h.star_rating}★` : null]
+          .filter(Boolean).join(' · ')
+        const body = (
+          <span className="flex min-w-0 flex-1 flex-col gap-1 text-left">
+            <span className="flex items-start justify-between gap-2">
+              <span className="type-body min-w-0 text-[17px] font-semibold leading-snug tracking-[-0.01em] text-[var(--m-text)]">{h.name}</span>
+              <span className="type-body shrink-0 pt-0.5 text-[13px] text-[var(--m-text-muted)]">{STATUS_LABEL[h.status]}</span>
+            </span>
+            {h.is_recommended || (selected && layerMode === 'hub') ? (
+              <span className="flex flex-wrap gap-1.5">
+                {h.is_recommended ? <Tag tone="accent">Recommended</Tag> : null}
+                {selected && layerMode === 'hub' ? <Tag tone="plain">On map</Tag> : null}
+              </span>
+            ) : null}
+            {meta ? <span className="type-body text-[14px] text-[var(--m-text-muted)]">{meta}</span> : null}
+            {h.geo_status === 'unresolved' ? (
+              <span className="type-body text-[14px] text-[var(--m-text-muted)]">We couldn&apos;t place this hotel on the map.</span>
+            ) : null}
+          </span>
+        )
+        if (selectable) {
+          return (
+            <li key={h.id}>
+              <div
+                data-hotel-card
+                className={[
+                  'm-card transition-transform duration-[var(--m-dur-press)] motion-reduce:transition-none',
+                  'has-[>button:active]:scale-[0.985] motion-reduce:has-[>button:active]:scale-100',
+                  'has-[>button:focus-visible]:outline-2 has-[>button:focus-visible]:outline-offset-2 has-[>button:focus-visible]:outline-solid has-[>button:focus-visible]:outline-[var(--m-accent)]',
+                  selected ? 'outline-2 outline-solid outline-[var(--m-ink)]' : '',
+                ].join(' ')}
+              >
+                <button
+                  type="button"
+                  onClick={() => onSelectHotel(h.id)}
+                  aria-pressed={selected}
+                  className="flex min-h-14 w-full items-center gap-3 rounded-[var(--m-r-card)] px-4 py-3.5 focus-visible:outline-none"
+                >
+                  {body}
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25"
+                    strokeLinecap="round" strokeLinejoin="round" aria-hidden className="m-chevron">
+                    <polyline points="9 6 15 12 9 18" />
+                  </svg>
+                </button>
+              </div>
+            </li>
+          )
+        }
+        return (
+          <li key={h.id}>
+            <div data-hotel-card className="m-subcard flex px-4 py-3.5">{body}</div>
           </li>
         )
       })}
