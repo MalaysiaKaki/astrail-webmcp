@@ -174,6 +174,28 @@ describe('StopTimeline selection visibility', () => {
     expect(spy).toHaveBeenCalled()
     const target = spy.mock.contexts.at(-1) as Element
     expect(target.querySelector('[data-place-id="pl_ichiran"]')).not.toBeNull()
+    // Aligned to the TOP of the scroller (with a small scroll-margin), not 'nearest', which left
+    // the previous stop half-cut above it.
+    expect(spy.mock.calls.at(-1)![0]).toMatchObject({ block: 'start' })
+    expect(target.className).toMatch(/scroll-mt-/)
+    spy.mockRestore()
+  })
+
+  it('keeps a tapped row where the finger is: nearest, not snapped to the top', () => {
+    const spy = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {})
+    const onSelectPlace = vi.fn()
+    const ui = (sel: string | null) => (
+      <StopTimeline
+        bundle={TOKYO_TRIP} places={placesForDay(TOKYO_TRIP, 1)} legs={legsForDay(TOKYO_TRIP, 'day_1')}
+        restaurants={restaurantsForDay(TOKYO_TRIP, 'day_1')} placeIndex={index} trailNumbers={numbers}
+        selectedPlaceId={sel} onSelectPlace={onSelectPlace}
+        selectedRestaurantPlaceId={null} onSelectRestaurant={() => {}}
+      />
+    )
+    const { rerender } = render(ui(null))
+    fireEvent.click(row('pl_sandolab'))
+    spy.mockClear()
+    rerender(ui('pl_sandolab'))                   // the parent echoes the tap back as a selection
     expect(spy.mock.calls.at(-1)![0]).toMatchObject({ block: 'nearest' })
     spy.mockRestore()
   })

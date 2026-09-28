@@ -194,6 +194,10 @@ export default function StopTimeline({
   onSelectRestaurant: (placeId: string) => void
 }) {
   const listRef = useRef<HTMLOListElement>(null)
+  // The last row the user tapped HERE. A selection echoing that tap keeps 'nearest' (the row is
+  // already under their finger); any other selection — a map pin, show_on_map — is brought to
+  // the top of the list.
+  const tappedRef = useRef<string | null>(null)
   // A selection can arrive from outside this list — a map pin, or the agent's show_on_map — and
   // on a long day its row may be off-screen in the sheet. Bring the whole stop (row plus its
   // expanded detail) into view, as the desktop ItineraryCards does. 'nearest', so a tap on a row
@@ -203,7 +207,11 @@ export default function StopTimeline({
     const row = listRef.current?.querySelector(`[data-place-id="${CSS.escape(selectedPlaceId)}"]`)
     const reduce = typeof window.matchMedia === 'function'
       && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    row?.closest('li')?.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' })
+    const fromTap = tappedRef.current === selectedPlaceId
+    tappedRef.current = null
+    // 'start' + the li's scroll-margin aligns an external selection just below the top edge of
+    // the sheet's scroller, instead of 'nearest' leaving the previous stop half-cut above it.
+    row?.closest('li')?.scrollIntoView({ block: fromTap ? 'nearest' : 'start', behavior: reduce ? 'auto' : 'smooth' })
   }, [selectedPlaceId])
 
   const { above, trailing } = buildRouteLinks(places, legs, placeIndex)
@@ -229,7 +237,7 @@ export default function StopTimeline({
           // The line runs on past this dot unless it is the last thing on the rail.
           const railBelow = i < places.length - 1 || trailing.length > 0
           return (
-            <li key={tp.id}>
+            <li key={tp.id} className="scroll-mt-3">
               {link ? <LegRow link={link} /> : i > 0 ? (
                 <div className="flex h-3"><RailCol><Seg line className="flex-1" /></RailCol></div>
               ) : null}
@@ -238,7 +246,7 @@ export default function StopTimeline({
                 data-place-id={tp.place_id}
                 aria-expanded={selected}
                 aria-current={selected ? 'true' : undefined}
-                onClick={() => onSelectPlace(tp.place_id)}
+                onClick={() => { tappedRef.current = tp.place_id; onSelectPlace(tp.place_id) }}
                 className={[
                   'flex min-h-11 w-full items-stretch gap-3 rounded-2xl pr-1 text-left transition-colors',
                   selected ? 'bg-[var(--brass-soft)]' : 'active:bg-[var(--chip-bg)]',
