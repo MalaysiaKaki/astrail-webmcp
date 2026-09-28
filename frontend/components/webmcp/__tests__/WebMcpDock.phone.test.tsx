@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { useEffect } from 'react'
 import WebMcpDock from '../WebMcpDock'
 import { WebMcpRegistryProvider, useWebMcpRegistry } from '../WebMcpRegistry'
-import { dockChipBottom, setSheetObstruction } from '@/lib/trip/sheet-obstruction'
+import { dockChipBottom, setSheetExpanded, setSheetObstruction } from '@/lib/trip/sheet-obstruction'
 
 /* Phase 3 — the dock on a phone (plan "Dock and approvals on mobile", amendments 7 and 8).
    Folded, it is ONE chip of at least 44px that still carries the unread/change announcement and
@@ -64,7 +64,7 @@ beforeEach(() => {
     dispatchEvent: () => false,
   }) as unknown as MediaQueryList)
 })
-afterEach(() => { act(() => { setSheetObstruction(0) }) })
+afterEach(() => { act(() => { setSheetObstruction(0); setSheetExpanded(false) }) })
 
 describe('WebMcpDock on a phone — one chip', () => {
   it('folds to exactly one button of at least 44px carrying the tool count', () => {
@@ -84,12 +84,23 @@ describe('WebMcpDock on a phone — one chip', () => {
     expect(chip().closest('[aria-live="polite"]')).not.toBeNull()
   })
 
-  it('keeps the unsupported-browser state visible and explained', async () => {
+  /* Phase 7: real phone browsers (Safari, Chrome, Arc) have no WebMCP, so a "No agent" pill was
+     what EVERY normal visitor saw over the map. On a phone the dock renders nothing then; the
+     desktop dock keeps its honest disconnected chip (pinned in WebMcpDock.test.tsx). */
+  it('renders nothing on a phone when the browser has no WebMCP', () => {
     dock({ supported: false, tools: 0 })
-    expect(chip()).toHaveAccessibleName(/unavailable/i)
-    expect(within(chip()).getByText(/No agent/)).toBeInTheDocument()
-    await userEvent.click(chip())
-    expect(within(overlay()!).getByText(/ChatGPT desktop app/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /show agent activity/i })).toBeNull()
+    expect(screen.queryByText(/No agent/)).toBeNull()
+    expect(document.querySelector('.fixed.z-40')).toBeNull()
+  })
+
+  it('hides the folded chip while the trip sheet is expanded, and brings it back after', () => {
+    dock()
+    expect(chip()).toBeInTheDocument()
+    act(() => { setSheetExpanded(true) })
+    expect(screen.queryByRole('button', { name: /show agent activity/i })).toBeNull()
+    act(() => { setSheetExpanded(false) })
+    expect(chip()).toBeInTheDocument()
   })
 })
 

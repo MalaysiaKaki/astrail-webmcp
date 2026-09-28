@@ -4,9 +4,10 @@ import {
   getSheetObstruction, setSheetObstruction, subscribeSheetObstruction, useSheetObstruction,
   measureObstruction, SHEET_OBSTRUCTION_SERVER_SNAPSHOT,
   dockChipBottom, DOCK_CHIP_GAP, DOCK_CHIP_HEIGHT, TOP_BAR_RESERVE,
+  getSheetExpanded, setSheetExpanded, useSheetExpanded,
 } from '@/lib/trip/sheet-obstruction'
 
-afterEach(() => { setSheetObstruction(0) })
+afterEach(() => { setSheetObstruction(0); setSheetExpanded(false) })
 
 describe('sheet obstruction store', () => {
   it('starts at 0 and publishes a primitive number', () => {
@@ -75,5 +76,15 @@ describe('dockChipBottom', () => {
     const bottom = dockChipBottom(Math.round(H * 0.88), H)!
     // The chip's top edge must clear the top bar's reserve.
     expect(H - bottom - DOCK_CHIP_HEIGHT).toBeGreaterThanOrEqual(TOP_BAR_RESERVE)
+  })
+})
+
+describe('sheet expanded signal', () => {
+  it('is a boolean, false by default, readable through a hook', () => {
+    expect(getSheetExpanded()).toBe(false)
+    const { result } = renderHook(() => useSheetExpanded())
+    expect(result.current).toBe(false)
+    act(() => { setSheetExpanded(true) })
+    expect(result.current).toBe(true)
   })
 })

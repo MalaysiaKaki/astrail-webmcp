@@ -82,3 +82,31 @@ export function dockChipBottom(obstruction: number, viewportHeight: number): num
   const ceiling = viewportHeight - TOP_BAR_RESERVE - DOCK_CHIP_HEIGHT
   return Math.max(0, Math.min(obstruction + DOCK_CHIP_GAP, ceiling))
 }
+
+/**
+ * Whether the phone sheet is in its expanded (88dvh) state. A second primitive rather than a
+ * union on the obstruction: the dock only needs to know "is the sheet up over the whole screen",
+ * and there its chip would float over the sheet's own header — so it hides until the sheet goes
+ * back to compact or hidden. False whenever no sheet is mounted.
+ */
+let expanded = false
+const expandedListeners = new Set<() => void>()
+
+export function getSheetExpanded(): boolean {
+  return expanded
+}
+
+export function setSheetExpanded(next: boolean): void {
+  if (next === expanded) return
+  expanded = next
+  expandedListeners.forEach((l) => l())
+}
+
+function subscribeSheetExpanded(listener: () => void): () => void {
+  expandedListeners.add(listener)
+  return () => { expandedListeners.delete(listener) }
+}
+
+export function useSheetExpanded(): boolean {
+  return useSyncExternalStore(subscribeSheetExpanded, getSheetExpanded, () => false)
+}

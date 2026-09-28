@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { measureObstruction, setSheetObstruction } from '@/lib/trip/sheet-obstruction'
+import { measureObstruction, setSheetExpanded, setSheetObstruction } from '@/lib/trip/sheet-obstruction'
 
 export type SheetState = 'compact' | 'expanded' | 'hidden'
 
@@ -143,6 +143,9 @@ function useReportObstruction(ref: React.RefObject<HTMLElement | null>, state: S
     }
   }, [ref, state, hidden])
 
-  // Separate, mount-scoped: the value must not outlive the route that set it.
-  useEffect(() => () => setSheetObstruction(0), [])
+  // Whether the sheet is up over the whole screen (the dock hides its chip then).
+  useEffect(() => { setSheetExpanded(state === 'expanded') }, [state])
+
+  // Separate, mount-scoped: the values must not outlive the route that set them.
+  useEffect(() => () => { setSheetObstruction(0); setSheetExpanded(false) }, [])
 }

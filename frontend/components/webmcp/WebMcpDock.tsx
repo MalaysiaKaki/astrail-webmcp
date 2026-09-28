@@ -8,7 +8,7 @@ import ExamplePrompts from './ExamplePrompts'
 import WebMcpStatus from './WebMcpStatus'
 import PhoneDock from './PhoneDock'
 import { useOptionalWebMcpRegistry, type ActivityEntry } from './WebMcpRegistry'
-import { dockChipBottom, useSheetObstruction } from '@/lib/trip/sheet-obstruction'
+import { dockChipBottom, useSheetExpanded, useSheetObstruction } from '@/lib/trip/sheet-obstruction'
 import { useTripLayout } from '@/lib/trip/use-trip-layout'
 
 /**
@@ -157,6 +157,7 @@ export default function WebMcpDock() {
   const phone = useTripLayout() === 'mobile'
   const collapsed = choice ?? phone
   const sheetObstruction = useSheetObstruction()
+  const sheetExpanded = useSheetExpanded()
 
   const registry = useOptionalWebMcpRegistry()
   const activity = registry?.activity ?? NO_ACTIVITY
@@ -217,12 +218,16 @@ export default function WebMcpDock() {
   const chipBottom = collapsed ? dockChipBottom(sheetObstruction, typeof window === 'undefined' ? 0 : window.innerHeight) : null
 
   if (phone) {
+    // Nothing at all without WebMCP: every ordinary phone browser (Safari, Chrome, Arc) lacks it,
+    // so a "No agent" pill was what every normal visitor saw over the map. And nothing while the
+    // trip sheet is expanded and folded, where the chip would float over the sheet's own header.
+    if (!(registry?.supported ?? false)) return null
+    if (collapsed && sheetExpanded) return null
     return (
       <PhoneDock
         collapsed={collapsed}
         chipBottom={chipBottom}
         overCanvas={overCanvas}
-        supported={registry?.supported ?? false}
         toolCount={registry?.tools.length ?? 0}
         unread={unread.length}
         hasChange={unread.some((e) => e.changes)}

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { StrictMode } from 'react'
 import { act, render, screen, fireEvent } from '@testing-library/react'
-import { getSheetObstruction, setSheetObstruction } from '@/lib/trip/sheet-obstruction'
+import { getSheetExpanded, getSheetObstruction, setSheetExpanded, setSheetObstruction } from '@/lib/trip/sheet-obstruction'
 import MobileTripSheet, { SHEET_SETTLE_MS } from '@/components/trip/mobile/MobileTripSheet'
 
 type SheetState = 'compact' | 'expanded' | 'hidden'
@@ -30,6 +30,19 @@ describe('MobileTripSheet', () => {
     vi.useRealTimers()
     vi.restoreAllMocks()
     setSheetObstruction(0)
+    setSheetExpanded(false)
+  })
+
+  it('publishes whether it is expanded, and clears that on unmount', () => {
+    const { setState, unmount } = renderSheet('compact')
+    expect(getSheetExpanded()).toBe(false)
+    setState('expanded')
+    expect(getSheetExpanded()).toBe(true)
+    setState('hidden')
+    expect(getSheetExpanded()).toBe(false)
+    setState('expanded')
+    unmount()
+    expect(getSheetExpanded()).toBe(false)
   })
 
   const settle = () => act(() => { vi.advanceTimersByTime(SHEET_SETTLE_MS + 10) })
