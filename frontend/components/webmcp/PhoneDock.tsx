@@ -43,8 +43,14 @@ export default function PhoneDock({
 }) {
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col items-end gap-2 p-4
-                 pb-[max(1rem,env(safe-area-inset-bottom))]"
+      className={[
+        'pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col items-end gap-2 p-4',
+        // Folded over a map with no sheet under it (state screens, the trails canvas), the corner
+        // is Mapbox's: its attribution button sits there, and the chip covered it. Lift clear.
+        collapsed && overCanvas && chipBottom === null
+          ? 'pb-[calc(max(1rem,env(safe-area-inset-bottom))+44px)]'
+          : 'pb-[max(1rem,env(safe-area-inset-bottom))]',
+      ].join(' ')}
       style={{ maxHeight: '100dvh', bottom: chipBottom === null ? undefined : `${chipBottom - 16}px` }}
     >
       {collapsed ? (
@@ -76,7 +82,12 @@ export default function PhoneDock({
           <div data-dock-scroll className="phone-dock flex min-h-0 flex-1 flex-col items-end gap-2 overflow-y-auto overscroll-contain p-3">
             {overCanvas && !toolsOpen && <ExamplePrompts tone="paper" />}
             <AgentActivityRail compact={!overCanvas} cleared={cleared} onClear={onClear} tone="paper" />
-            <WebMcpStatus open={toolsOpen} onOpenChange={onToolsOpenChange} tone="paper" />
+            <WebMcpStatus open={toolsOpen} onOpenChange={onToolsOpenChange} tone="paper" part="panel" />
+          </div>
+          {/* The tools chip is a footer, outside the scroll: at the end of the scroll area a long
+              prompts panel or tool list pushed it against the overlay's bottom edge and clipped it. */}
+          <div data-dock-footer className="flex shrink-0 justify-end border-t border-[var(--m-accent-wash)] px-3 py-2.5">
+            <WebMcpStatus open={toolsOpen} onOpenChange={onToolsOpenChange} tone="paper" part="chip" />
           </div>
         </section>
       )}
@@ -148,17 +159,19 @@ function PhoneChip({ toolCount, unread, hasChange, onExpand }: {
       onClick={onExpand}
       aria-expanded={false}
       aria-label={label}
-      className="pointer-events-auto flex h-11 items-center gap-2 rounded-full border border-[#C9974E]/50 bg-black/70 px-4 text-[13px] text-[#E8D5B0] backdrop-blur transition"
+      // The light kit pill (m-pill-badge), like the rest of the phone chrome; phone-only by
+      // construction (only PhoneDock renders it).
+      className="m-pill-badge pointer-events-auto h-11 text-[15px] font-semibold tracking-[-0.01em]"
     >
       <span
         aria-hidden
         className={[
           'inline-block h-2 w-2 shrink-0 rounded-full',
-          hasChange ? 'bg-[#C9974E]' : unread > 0 ? 'bg-white/70' : 'bg-[#C9974E]/60',
+          hasChange ? 'bg-[var(--m-accent)]' : unread > 0 ? 'bg-[var(--m-ink)]' : 'bg-[var(--m-text-muted)]',
         ].join(' ')}
       />
       Agent
-      <span className="tabular-nums text-white/70">{unread > 0 ? `${unread} new` : toolCount}</span>
+      <span className="tabular-nums font-medium text-[var(--m-text-muted)]">{unread > 0 ? `${unread} new` : toolCount}</span>
     </button>
   )
 }
