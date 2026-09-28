@@ -296,6 +296,22 @@ describe('TripWorkspace — the phone branch', () => {
     for (const el of screen.getAllByText(TOKYO_TRIP.trip.inferred_destination!)) expect(sheet()!.contains(el)).toBe(true)
   })
 
+  /* A1 follow-up: the demo has no hotels, and here no dock fills the agent slot — so the stack is
+     Fit and nothing else. Each control draws its own glyph, so no two can be mistaken. */
+  it('shows only Fit in the demo stack: no hotels means no layer toggle', () => {
+    renderSeeded()
+    const buttons = within(stack()).getAllByRole('button')
+    expect(buttons.map((b) => b.getAttribute('aria-label'))).toEqual(['Fit map to the day'])
+    expect(screen.queryByRole('button', { name: 'Hotel map layer' })).toBeNull()
+    expect(buttons[0].querySelector('svg')).toHaveAttribute('data-icon', 'scope')
+  })
+
+  it('draws the hotel layer toggle with its own bed glyph, distinct from Fit', () => {
+    renderSeeded(TOKYO_TRIP_WITH_HOTELS)
+    const icons = within(stack()).getAllByRole('button').map((b) => b.querySelector('svg')!.getAttribute('data-icon'))
+    expect(icons).toEqual(['scope', 'bed'])
+  })
+
   it('offers the agent a slot at the top of the stack (the dock fills it when WebMCP exists)', () => {
     renderSeeded()
     expect(stack().firstElementChild).toHaveAttribute('data-agent-trigger-slot')

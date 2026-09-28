@@ -113,20 +113,13 @@ export function StackTrigger({ expanded, toolCount, unread, hasChange, onToggle,
       onClick={onToggle}
       aria-expanded={expanded}
       aria-label={label}
-      className={[
-        'm-btn-icon pointer-events-auto relative h-11 w-11',
-        // `!`: .m-btn-icon is unlayered kit CSS and outranks plain utilities.
-        expanded ? 'bg-[var(--m-ink)]! text-[var(--m-on-ink)]!' : '',
-      ].join(' ')}
+      className="m-btn-icon pointer-events-auto relative h-11 w-11"
     >
-      {/* Three linked points: an agent working across the map, in the page's own constellation
-          vocabulary rather than a generic sparkle. */}
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+      {/* A sparkle: the assistant, as distinct from every map control in the same stack. */}
+      <svg data-icon="sparkle" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
         strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M6.5 16.5 11 7.5l6.5 5" />
-        <circle cx="6" cy="17" r="2.2" fill="currentColor" stroke="none" />
-        <circle cx="11" cy="7" r="2.2" fill="currentColor" stroke="none" />
-        <circle cx="18" cy="13" r="2.2" fill="currentColor" stroke="none" />
+        <path d="M10 3.5 11.6 8.4 16.5 10l-4.9 1.6L10 16.5l-1.6-4.9L3.5 10l4.9-1.6Z" />
+        <path d="M18 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8Z" />
       </svg>
       {unread > 0 && !expanded ? (
         <span

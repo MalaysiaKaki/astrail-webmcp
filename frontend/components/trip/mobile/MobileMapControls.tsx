@@ -45,11 +45,13 @@ export default function MobileMapControls({
         {!sheetExpanded && fitTarget ? (
           <button type="button" onClick={onFit} aria-label={fitLabel(fitTarget)}
             className="m-btn-icon pointer-events-auto">
-            {/* Viewfinder corners around a point: "bring the route back into frame". */}
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"
+            {/* A scope: "centre the map back on the route". Not a location arrow — this app never
+                reads the device location, and that glyph would promise it. */}
+            <svg data-icon="scope" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"
               strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15" />
-              <circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none" />
+              <circle cx="12" cy="12" r="6.5" />
+              <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" />
+              <circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none" />
             </svg>
           </button>
         ) : null}
@@ -63,12 +65,11 @@ export default function MobileMapControls({
             title={layerDisabled ? 'No hotel could be placed on the map' : undefined}
             className={[
               'm-btn-icon pointer-events-auto',
-              // `!`: .m-btn-icon is unlayered kit CSS and outranks plain utilities.
-              hub ? 'bg-[var(--m-ink)]! text-[var(--m-on-ink)]!' : '',
+              // `!`: the kit's unlayered `cursor: pointer` outranks a plain utility.
               layerDisabled ? 'cursor-not-allowed! opacity-50' : '',
             ].join(' ')}
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"
+            <svg data-icon="bed" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"
               strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M3 18V7M3 14h18v4M21 14v-2.5A2.5 2.5 0 0 0 18.5 9H11v5" />
               <circle cx="7" cy="11" r="1.8" />

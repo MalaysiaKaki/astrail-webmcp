@@ -74,6 +74,7 @@ describe('the agent trigger in the trip map stack', () => {
     expect(stack().contains(trigger())).toBe(true)
     expect(screen.getAllByRole('button', { name: /agent activity/i })).toHaveLength(1)
     expect(trigger().className).toMatch(/\bm-btn-icon\b/)
+    expect(trigger().querySelector('svg')).toHaveAttribute('data-icon', 'sparkle')
     expect(trigger()).toHaveAccessibleName(/2 tools/)
     expect(document.querySelector('.fixed.z-40')).toBeNull()
   })
