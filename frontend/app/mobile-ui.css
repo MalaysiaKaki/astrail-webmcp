@@ -112,6 +112,12 @@
   box-shadow: var(--m-shadow-2);
 }
 .m-btn-icon:active { transform: scale(0.94); }
+/* Toggled or open state (layer on, overlay open). */
+.m-btn-icon[aria-pressed="true"],
+.m-btn-icon[aria-expanded="true"] {
+  background: var(--m-ink);
+  color: var(--m-on-ink);
+}
 .m-btn-icon > svg { width: 20px; height: 20px; }
 
 .m-card {
