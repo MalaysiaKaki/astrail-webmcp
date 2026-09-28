@@ -94,6 +94,19 @@ describe('WebMcpDock on a phone — one chip', () => {
     expect(document.querySelector('.fixed.z-40')).toBeNull()
   })
 
+  /* Codex p7 #2: hiding the chip must not remove the announcement. Activity arriving while the
+     sheet is expanded is still spoken, from a visually hidden polite live region. */
+  it('still announces activity that arrives while the chip is hidden by the expanded sheet', async () => {
+    dock()
+    act(() => { setSheetExpanded(true) })
+    expect(screen.queryByRole('button', { name: /show agent activity/i })).toBeNull()
+    await act(async () => { api!.beginActivity('get_map_view'); api!.beginActivity('save_reels') })
+    const live = [...document.querySelectorAll('[aria-live="polite"]')]
+      .find((el) => /2 new, including a change/.test(el.textContent ?? ''))
+    expect(live).toBeDefined()
+    expect(live!.className).toMatch(/sr-only/)
+  })
+
   it('hides the folded chip while the trip sheet is expanded, and brings it back after', () => {
     dock()
     expect(chip()).toBeInTheDocument()

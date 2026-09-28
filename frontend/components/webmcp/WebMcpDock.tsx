@@ -222,7 +222,17 @@ export default function WebMcpDock() {
     // so a "No agent" pill was what every normal visitor saw over the map. And nothing while the
     // trip sheet is expanded and folded, where the chip would float over the sheet's own header.
     if (!(registry?.supported ?? false)) return null
-    if (collapsed && sheetExpanded) return null
+    if (collapsed && sheetExpanded) {
+      // The chip is hidden, but what the agent does is still spoken: a visually hidden polite
+      // region carries the same unread count the chip's name would have.
+      const n = unread.length
+      const changed = unread.some((e) => e.changes)
+      return (
+        <div aria-live="polite" aria-label="Agent activity" className="sr-only">
+          {n > 0 ? `Agent activity, ${n} new${changed ? ', including a change' : ''}` : ''}
+        </div>
+      )
+    }
     return (
       <PhoneDock
         collapsed={collapsed}
