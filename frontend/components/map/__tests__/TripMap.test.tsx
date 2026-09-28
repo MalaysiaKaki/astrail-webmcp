@@ -894,3 +894,94 @@ describe('TripMap', () => {
     expect(mapInstance.addSource).not.toHaveBeenCalledWith('hotel-spokes', expect.anything())
   })
 })
+
+/* Phase 7 — phone-only map behaviour. The phone layout is chosen by matchMedia (useTripLayout);
+   jsdom's stub says "desktop", so these force a phone. */
+describe('TripMap on a phone', () => {
+  let mm: { mockRestore: () => void } | null = null
+  const phone = () => {
+    mm = vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+      matches: true, media: query, onchange: null,
+      addListener: () => {}, removeListener: () => {},
+      addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+    }) as MediaQueryList)
+  }
+  beforeEach(() => {
+    vi.clearAllMocks()
+    markerElements.length = 0
+    popupElements.length = 0
+    process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN = 'pk.test'
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1 })
+    vi.stubGlobal('cancelAnimationFrame', () => {})
+    mapInstance.getCanvas.mockReturnValue({ clientWidth: 390, clientHeight: 844 })
+    mapInstance.getZoom.mockReturnValue(13)
+  })
+  afterEach(() => {
+    mm?.mockRestore(); mm = null
+    delete process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN
+    vi.unstubAllGlobals()
+    setSheetObstruction(0)
+  })
+
+  const loaded = async (props: Partial<Parameters<typeof TripMap>[0]> = {}) => {
+    const view = renderMap(props)
+    await flush()
+    fireLoad()
+    await flush()
+    return view
+  }
+  const pin = (name: string) => markerElements.find((e) => e.getAttribute('aria-label') === name)!
+
+  it('selects a tapped pin WITHOUT opening the evidence popup — the sheet row is the detail', async () => {
+    phone()
+    const onSelectPlace = vi.fn()
+    await loaded({ onSelectPlace })
+    PopupCtor.mockClear()
+    act(() => { pin('Akasaka Station').click() })
+    expect(onSelectPlace).toHaveBeenCalledWith('pl_akasaka')
+    expect(PopupCtor).not.toHaveBeenCalled()
+  })
+
+  it('still opens the evidence popup on desktop', async () => {
+    const onSelectPlace = vi.fn()
+    await loaded({ onSelectPlace })
+    PopupCtor.mockClear()
+    act(() => { pin('Akasaka Station').click() })
+    expect(PopupCtor).toHaveBeenCalledWith(expect.objectContaining({ className: 'astrail-evidence-popup' }))
+  })
+
+  it('re-fits once to the area above the sheet when its first measurement lands, then only eases', async () => {
+    phone()
+    await loaded()
+    const first = mapInstance.fitBounds.mock.calls.at(-1)![1].padding
+    expect(first.bottom).toBeLessThan(100)                    // framed before the sheet measured
+    mapInstance.fitBounds.mockClear(); mapInstance.easeTo.mockClear(); mapInstance.flyTo.mockClear()
+
+    act(() => { setSheetObstruction(380) })                  // first measurement: a real re-fit
+    expect(mapInstance.fitBounds).toHaveBeenCalledTimes(1)
+    expect(mapInstance.fitBounds.mock.calls[0][1].padding.bottom).toBe(380 + MOBILE_SHEET_GAP)
+    expect(mapInstance.easeTo).not.toHaveBeenCalled()
+
+    mapInstance.fitBounds.mockClear()
+    act(() => { setSheetObstruction(700) })                  // later changes: ease, never re-fit
+    act(() => { setSheetObstruction(380) })
+    expect(mapInstance.fitBounds).not.toHaveBeenCalled()
+    expect(mapInstance.easeTo).toHaveBeenCalledTimes(2)
+  })
+
+  it('shows a name pill only for the selected pin, so close pins never stack labels', async () => {
+    phone()
+    const view = await loaded()
+    const visible = () => markerElements
+      .filter((e) => e.querySelector('.constellation-pin__label--visible'))
+      .map((e) => e.getAttribute('aria-label'))
+    expect(visible()).toEqual([])
+    view.rerender(
+      <MapProvider>
+        <TripMap bundle={TOKYO_TRIP} activeDayNumber={1} selectedPlaceId="pl_hpcafe" onSelectPlace={() => {}} />
+      </MapProvider>,
+    )
+    await flush()
+    expect(visible()).toEqual(['Harry Potter Cafe'])
+  })
+})

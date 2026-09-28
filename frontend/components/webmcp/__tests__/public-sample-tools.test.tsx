@@ -210,3 +210,24 @@ describe('the public sample trail, as a judge with no account sees it', () => {
     expect(await screen.findByLabelText('WebMCP active, 17 tools')).toBeInTheDocument()
   })
 })
+
+/* Phase 7: phones suppress the map's evidence POPUP; the evidence TOOL must answer exactly as
+   before. Forced to the phone layout, it still returns the verbatim caption quote. */
+describe('the sample trail on a phone', () => {
+  it('still answers get_place_evidence with the verbatim quote', async () => {
+    const mm = vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+      matches: true, media: query, onchange: null,
+      addListener: () => {}, removeListener: () => {},
+      addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+    }) as MediaQueryList)
+    try {
+      mountSampleTrail()
+      await waitFor(() => { expect(names()).toContain('get_place_evidence') })
+      const tool = registered.find((t) => t.name === 'get_place_evidence')!
+      const res = (await tool.execute({ place: '2' })) as { content: { text: string }[] }
+      expect(res.content.map((c) => c.text).join('\n')).toMatch(/reservations are required/)
+    } finally {
+      mm.mockRestore()
+    }
+  })
+})

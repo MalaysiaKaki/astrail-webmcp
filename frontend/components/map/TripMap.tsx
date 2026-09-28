@@ -366,6 +366,14 @@ export default function TripMap({
   // Read here only to re-run the padding effect below; framePadding() reads the live value.
   const sheetObstruction = useSheetObstruction()
   const layout = useTripLayout()
+  // Read by marker click handlers and label sync, which are DOM listeners built once per draw and
+  // must see the layout as it is now, not as it was when the markers were drawn.
+  const layoutRef = useRef(layout)
+  layoutRef.current = layout
+  // Phone only: has the trip been framed against the sheet's REAL height yet? The first framing
+  // usually runs before the sheet has measured itself (it settles after its transition), so the
+  // first measurement triggers one proper re-fit; every later height change only eases padding.
+  const fitWithSheetRef = useRef(false)
 
   function clearRoutes() {
     const map = getMap()
@@ -406,12 +414,15 @@ export default function TripMap({
   function syncMarkerLabelVisibility() {
     const map = getMap()
     if (!map) return
-    const visible = map.getZoom() >= LABEL_ZOOM
+    const byZoom = map.getZoom() >= LABEL_ZOOM
+    // On a phone, close pins would stack their name pills into an unreadable pile, and the sheet
+    // already names every stop: only the selected pin (or selected eat suggestion) is labelled.
+    const phone = layoutRef.current === 'mobile'
     for (const label of markerLabelsRef.current) {
       const cls = label.classList.contains('eat-pin__label')
         ? 'eat-pin__label--visible'
         : 'constellation-pin__label--visible'
-      label.classList.toggle(cls, visible)
+      label.classList.toggle(cls, phone ? label.dataset.selected === 'true' : byZoom)
     }
   }
 
@@ -494,12 +505,16 @@ export default function TripMap({
           label.className = 'constellation-pin__label'
           label.textContent = shortPlaceName(tp.place.name)
           label.title = tp.place.name
+          label.dataset.selected = String(tp.place_id === selectedPlaceId)
           labels.push(label)
           el.append(label)
         }
         el.addEventListener('click', (e) => {
           e.stopPropagation()
           onSelectPlace(tp.place_id)
+          // Phones: no evidence popup. The selected, expanded, scrolled-to sheet row IS the detail
+          // (a popup here doubled it and sat under the agent chip). Desktop is unchanged.
+          if (layoutRef.current === 'mobile') return
           activePopupRef.current?.remove()
           activePopupRef.current = new mapboxgl.Popup({
             className: 'astrail-evidence-popup',
@@ -579,6 +594,7 @@ export default function TripMap({
         label.className = 'eat-pin__label'
         label.textContent = shortPlaceName(place.name)
         label.title = place.name
+        label.dataset.selected = String(place.id === selectedRestaurantPlaceId)
         el.append(label)
         // Same zoom rule as the trail labels rather than :hover — a touch device has no hover,
         // so a hover-only name is a name that never appears on a phone.
@@ -781,6 +797,7 @@ export default function TripMap({
       // panel geometry (short) rather than re-fly the whole camera (full). Any other entry
       // (generation handoff, direct load) never marks the handoff, so it frames normally.
       const inherited = consumeTripFramed(bundle.trip.id)
+      fitWithSheetRef.current = getSheetObstruction() > 0
       flyToTrip(inherited ? 900 : 2200)
     })
     return () => { cancelled = true; cancelAnimationFrame(raf) }
@@ -805,6 +822,14 @@ export default function TripMap({
     if (!ready || !framedRef.current) return
     const map = getMap()
     if (!map || typeof map.easeTo !== 'function') return
+    if (layout === 'mobile' && !fitWithSheetRef.current && sheetObstruction > 0) {
+      // The sheet's first real measurement: re-fit the trip into the band between the top bar
+      // and the sheet, once. Easing padding alone keeps a zoom chosen for the whole canvas.
+      fitWithSheetRef.current = true
+      cancelDeferredEaseRef.current?.()
+      flyToTrip(700)
+      return
+    }
     const apply = () => {
       cancelDeferredEaseRef.current = null
       if (tornDownRef.current) return

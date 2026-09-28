@@ -17,6 +17,7 @@ const h = vi.hoisted(() => ({
   mobile: false,
   listeners: new Set<() => void>(),
   registered: [] as string[],
+  tools: {} as Record<string, { execute: (args: Record<string, unknown>) => Promise<unknown> | unknown }>,
   aborted: [] as string[],
 }))
 
@@ -31,7 +32,16 @@ vi.mock('@/components/map/TripMap', async () => {
     },
   }
 })
-vi.mock('mapbox-gl', () => ({ default: { Map: vi.fn(), Marker: vi.fn(), LngLatBounds: vi.fn(), accessToken: '' } }))
+vi.mock('mapbox-gl', () => {
+  const handler = () => ({ enable: () => {}, disable: () => {} })
+  const map = {
+    on: () => {}, off: () => {}, setConfigProperty: () => {}, remove: () => {}, resize: () => {}, stop: () => {},
+    style: { setTransition: () => {} },
+    scrollZoom: handler(), boxZoom: handler(), dragRotate: handler(), dragPan: handler(),
+    keyboard: handler(), doubleClickZoom: handler(), touchZoomRotate: handler(), touchPitch: handler(),
+  }
+  return { default: { Map: vi.fn(() => map), Marker: vi.fn(), LngLatBounds: vi.fn(), accessToken: '' } }
+})
 vi.mock('mapbox-gl/dist/mapbox-gl.css', () => ({}))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/app/trip/demo' }))
 vi.mock('@/components/trip/TripFeedbackPanel', () => ({ default: () => <div data-testid="trip-feedback-panel" /> }))
@@ -75,8 +85,9 @@ beforeEach(() => {
   Object.defineProperty(document, 'modelContext', {
     configurable: true,
     value: {
-      registerTool: (tool: { name: string }, opts?: { signal?: AbortSignal }) => {
+      registerTool: (tool: { name: string; execute: (a: Record<string, unknown>) => unknown }, opts?: { signal?: AbortSignal }) => {
         h.registered.push(tool.name)
+        h.tools[tool.name] = tool
         opts?.signal?.addEventListener('abort', () => h.aborted.push(tool.name))
       },
     },
@@ -235,5 +246,18 @@ describe('TripWorkspace — the phone branch', () => {
     for (const d of days) expect(screen.getByRole('button', { name: new RegExp(`^Day ${d.day_number}\\b`) })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /^Day 6\b/ }))
     expect(within(sheet()!).getByText('Stop on day 6')).toBeInTheDocument()
+  })
+
+  /* Phase 7: phones suppress the map's evidence POPUP, not what the agent tools do. The real
+     registered callbacks are executed here under the phone layout. */
+  it('keeps show_on_map working on a phone: data back, stop selected and expanded', async () => {
+    renderSeeded()
+    await screen.findByTestId('trip-map')
+    const text = (r: unknown) => JSON.stringify(r)
+
+    const shown = await act(async () => h.tools.show_on_map.execute({ target: 'place', place: '2' }))
+    expect(text(shown)).toMatch(/Harry Potter Cafe/)
+    expect(document.querySelector('[data-place-id="pl_hpcafe"]')).toHaveAttribute('aria-expanded', 'true')
+    // get_place_evidence is a GlobalTools read; its phone check lives in public-sample-tools.test.
   })
 })
