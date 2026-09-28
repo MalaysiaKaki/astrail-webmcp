@@ -14,11 +14,11 @@ function Supported({ on }: { on: boolean }) {
   return null
 }
 
-const show = (supported = true) =>
+const show = (supported = true, tone?: 'night' | 'paper') =>
   render(
     <WebMcpRegistryProvider>
       <Supported on={supported} />
-      <ExamplePrompts />
+      <ExamplePrompts tone={tone} />
     </WebMcpRegistryProvider>,
   )
 
@@ -99,5 +99,32 @@ describe('ExamplePrompts', () => {
     } finally {
       spy.mockRestore()
     }
+  })
+})
+
+/* Phone paper-kit restyle (`PhoneDock`'s overlay). `tone` defaults to `'night'`, the original dark
+   glass look, so desktop is byte-identical to before this prop existed; `PhoneDock` alone passes
+   `tone="paper"`. */
+describe('ExamplePrompts tone', () => {
+  it('defaults to night — no kit classes on the panel or the dismiss control', async () => {
+    const { container } = show()
+    await screen.findByText(/What can I do here\?/)
+    const panel = container.firstElementChild as HTMLElement
+    expect(panel.className).not.toMatch(/\bm-/)
+    const dismiss = screen.getByRole('button', { name: /dismiss example prompts/i })
+    expect(dismiss.className).not.toMatch(/\bm-/)
+  })
+
+  it('paper tone paints the panel as a white kit card and the dismiss control as a 44px kit icon button', async () => {
+    const { container } = show(true, 'paper')
+    const heading = await screen.findByText(/Try asking the agent/i)
+    // Sentence case, not an uppercase tracked label — the class drops, the string does not change.
+    expect(heading.className).not.toMatch(/uppercase/)
+    const panel = container.firstElementChild as HTMLElement
+    expect(panel.className).toMatch(/\bm-card\b/)
+    expect(panel.className).not.toMatch(/bg-black/)
+    const dismiss = screen.getByRole('button', { name: /dismiss example prompts/i })
+    expect(dismiss.className).toMatch(/\bm-btn-icon\b/)
+    expect(dismiss.className).toMatch(/\bh-11\b/)
   })
 })

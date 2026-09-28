@@ -1,9 +1,10 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useEffect, useRef } from 'react'
 import AgentConfirm from '../AgentConfirm'
 import { WebMcpRegistryProvider, useWebMcpRegistry } from '../WebMcpRegistry'
+import { MOBILE_QUERY } from '@/lib/trip/use-trip-layout'
 
 function Asker({ summary, onAnswer }: { summary: string; onAnswer: (v: boolean | 'unavailable') => void }) {
   const { requestConfirm } = useWebMcpRegistry()
@@ -120,5 +121,61 @@ describe('AgentConfirm', () => {
     await screen.findByRole('dialog')
     await userEvent.click(screen.getByRole('button', { name: /approve/i }))
     await waitFor(() => expect(first).toHaveBeenCalledWith(true))
+  })
+})
+
+/* Phone paper-kit restyle. `AgentConfirm` has no `tone` prop — it reads `useTripLayout() ===
+   'mobile'` itself (`PhoneDock`'s three siblings take an explicit prop instead because they have
+   no such signal of their own). jsdom's global `matchMedia` stub (vitest.setup.ts) always reports
+   "no match", so every test above this block already exercises desktop/night; these mock it to
+   report a match for `MOBILE_QUERY` to exercise the phone/paper branch. */
+describe('AgentConfirm — phone paper tone', () => {
+  const mockMobile = () =>
+    vi.spyOn(window, 'matchMedia').mockImplementation((query: string) =>
+      ({
+        matches: query === MOBILE_QUERY,
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList,
+    )
+
+  afterEach(() => { vi.restoreAllMocks() })
+
+  it('paints Approve as the kit primary button, Not now as the kit secondary button, and the card as a white kit surface', async () => {
+    mockMobile()
+    ask('Spend the allowance')
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog.className).toMatch(/\bm-card\b/)
+    expect(dialog.className).not.toMatch(/bg-black/)
+    expect(screen.getByRole('button', { name: /^approve$/i }).className).toMatch(/\bm-btn-primary\b/)
+    expect(screen.getByRole('button', { name: /not now/i }).className).toMatch(/\bm-btn-secondary\b/)
+  })
+
+  it('still moves focus onto the card on open, on a phone', async () => {
+    mockMobile()
+    ask('Spend the allowance')
+    const dialog = await screen.findByRole('dialog')
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true))
+  })
+
+  it('still declines on Escape, on a phone', async () => {
+    mockMobile()
+    const onAnswer = ask('Spend the allowance')
+    await screen.findByRole('dialog')
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(onAnswer).toHaveBeenCalledWith(false))
+  })
+
+  it('renders no kit classes on desktop (the default matchMedia stub reports no match)', async () => {
+    ask('Spend the allowance')
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog.className).not.toMatch(/\bm-/)
+    expect(screen.getByRole('button', { name: /^approve$/i }).className).not.toMatch(/\bm-/)
+    expect(screen.getByRole('button', { name: /not now/i }).className).not.toMatch(/\bm-/)
   })
 })

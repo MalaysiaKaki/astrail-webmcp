@@ -55,17 +55,17 @@ export default function PhoneDock({
         <section
           role="region"
           aria-label="Agent"
-          className="pointer-events-auto flex max-h-[80dvh] w-full flex-col overflow-hidden rounded-2xl
-                     border border-[#C9974E]/40 bg-black/85 text-white/90 shadow-2xl backdrop-blur"
+          className="pointer-events-auto m-card flex max-h-[80dvh] w-full flex-col overflow-hidden text-[var(--m-text)]"
+          style={{ boxShadow: 'var(--m-shadow-2)' }}
         >
-          <div className="flex shrink-0 items-center justify-between border-b border-white/10 pl-4">
-            <p className="text-[12px] uppercase tracking-wider text-[#E8D5B0]">Agent</p>
+          <div className="flex shrink-0 items-center justify-between border-b border-[var(--m-accent-wash)] py-2 pl-5 pr-2">
+            <p className="text-[16px] font-semibold tracking-[-0.01em] text-[var(--m-text)]">Agent</p>
             <button
               type="button"
               onClick={onCollapse}
               aria-expanded
               aria-label="Minimise agent activity"
-              className="flex h-11 w-11 items-center justify-center text-white/70 transition hover:text-white"
+              className="m-btn-icon h-11 w-11"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25"
                 strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-5 w-5">
@@ -74,9 +74,9 @@ export default function PhoneDock({
             </button>
           </div>
           <div data-dock-scroll className="phone-dock flex min-h-0 flex-1 flex-col items-end gap-2 overflow-y-auto overscroll-contain p-3">
-            {overCanvas && !toolsOpen && <ExamplePrompts />}
-            <AgentActivityRail compact={!overCanvas} cleared={cleared} onClear={onClear} />
-            <WebMcpStatus open={toolsOpen} onOpenChange={onToolsOpenChange} />
+            {overCanvas && !toolsOpen && <ExamplePrompts tone="paper" />}
+            <AgentActivityRail compact={!overCanvas} cleared={cleared} onClear={onClear} tone="paper" />
+            <WebMcpStatus open={toolsOpen} onOpenChange={onToolsOpenChange} tone="paper" />
           </div>
         </section>
       )}

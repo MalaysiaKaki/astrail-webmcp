@@ -81,20 +81,26 @@ function headline(entry: ActivityEntry): string {
 }
 
 /** One receipt. The card the rail has always drawn, plus the two things it never said. */
-function Entry({ entry, now }: { entry: ActivityEntry; now: number }) {
+function Entry({ entry, now, paper }: { entry: ActivityEntry; now: number; paper: boolean }) {
   const age = ageLabel(entry.at, now)
   return (
-    <div className="rounded-lg border border-[#C9974E]/40 bg-black/80 px-3 py-2 text-xs backdrop-blur">
+    <div
+      className={
+        paper
+          ? 'm-subcard px-3 py-2 text-xs'
+          : 'rounded-lg border border-[#C9974E]/40 bg-black/80 px-3 py-2 text-xs backdrop-blur'
+      }
+    >
       <div className="flex items-center gap-2">
         <span
           aria-hidden
           className={[
             'inline-block h-1.5 w-1.5 shrink-0 rounded-full',
-            entry.status === 'running' ? 'animate-pulse bg-[#C9974E]'
+            entry.status === 'running' ? (paper ? 'animate-pulse bg-[var(--m-accent)]' : 'animate-pulse bg-[#C9974E]')
               : entry.status === 'failed' ? 'bg-red-400'
               // Declined is not an error — the gate did its job — so it is neither alarming red
               // nor the brass the rail uses for a change that landed.
-              : entry.status === 'declined' ? 'bg-white/40'
+              : entry.status === 'declined' ? (paper ? 'bg-[var(--m-text-muted)]' : 'bg-white/40')
               // An ask is not an error either. Red here was the rail telling the user the app had
               // fallen over at the exact moment it was asking them a question, so it takes the
               // same brass as every other ending that is not a fault. Solid rather than pulsing:
@@ -104,11 +110,13 @@ function Entry({ entry, now }: { entry: ActivityEntry; now: number }) {
               // a default with `done` is not agreement, it is silence: the next status added here
               // would inherit whatever this arm happens to be, which is exactly how `asked` came
               // to render as a completed change in `headline` before it was given a branch there.
-              : entry.status === 'asked' ? 'bg-[#C9974E]/60'
-              : 'bg-[#C9974E]/60',
+              : entry.status === 'asked' ? (paper ? 'bg-[var(--m-accent)]/60' : 'bg-[#C9974E]/60')
+              : (paper ? 'bg-[var(--m-accent)]/60' : 'bg-[#C9974E]/60'),
           ].join(' ')}
         />
-        <span className="text-[10px] uppercase tracking-wider text-[#E8D5B0]">{headline(entry)}</span>
+        <span className={paper ? 'text-[11px] font-medium text-[var(--m-text)]' : 'text-[10px] uppercase tracking-wider text-[#E8D5B0]'}>
+          {headline(entry)}
+        </span>
         {/* "By whom", in the same two words the evidence chips already use. Right-aligned so a
             column of entries reads down as one who-column rather than a ragged second label. */}
         {/* `title`, not `aria-label`: a bare span has the `generic` role, which prohibits an
@@ -118,7 +126,7 @@ function Entry({ entry, now }: { entry: ActivityEntry; now: number }) {
         {/* Age sits beside the actor rather than inside the detail line, which is `line-clamp-2`
             and would swallow it on a long caption-derived summary. Costs no height. */}
         <span className="ml-auto flex shrink-0 items-center gap-1.5">
-          {age && <span className="text-[10px] text-white/35">{age}</span>}
+          {age && <span className={paper ? 'text-[10px] text-[var(--m-text-muted)]' : 'text-[10px] text-white/35'}>{age}</span>}
           {/* Drawn whenever the entry HAS an actor, which the call itself decides — see
               `ActivityEntry.actor`. This was briefly keyed on `status !== 'failed'` instead, which
               is too coarse in both directions: it correctly hid the chip on a validation error
@@ -131,7 +139,9 @@ function Entry({ entry, now }: { entry: ActivityEntry; now: number }) {
               title={`${entry.actor} decided this`}
               className={[
                 'rounded px-1.5 py-0.5 text-[10px]',
-                entry.actor === 'You' ? 'bg-[#C9974E]/20 text-[#E8D5B0]' : 'bg-white/10 text-white/60',
+                paper
+                  ? (entry.actor === 'You' ? 'bg-[var(--m-accent-wash)] text-[var(--m-accent)]' : 'bg-[var(--m-page)] text-[var(--m-text-muted)]')
+                  : (entry.actor === 'You' ? 'bg-[#C9974E]/20 text-[#E8D5B0]' : 'bg-white/10 text-white/60'),
               ].join(' ')}
             >
               {entry.actor}
@@ -141,12 +151,16 @@ function Entry({ entry, now }: { entry: ActivityEntry; now: number }) {
       </div>
       {entry.detail && (
         /* Tool output can carry Reel-caption text, so it renders as text and is clipped. */
-        <p className="mt-0.5 line-clamp-2 pl-3.5 text-white/70">{entry.detail}</p>
+        <p className={paper ? 'mt-0.5 line-clamp-2 pl-3.5 text-[var(--m-text-muted)]' : 'mt-0.5 line-clamp-2 pl-3.5 text-white/70'}>
+          {entry.detail}
+        </p>
       )}
       {/* Only once it has actually landed — a running or failed call has nothing to take back yet.
           True of every write the app has, so it never has to guess which ones qualify. */}
       {entry.changes && entry.status === 'done' && (
-        <p className="mt-1 pl-3.5 text-[10px] text-white/45">Astrail can&apos;t undo this</p>
+        <p className={paper ? 'mt-1 pl-3.5 text-[10px] text-[var(--m-text-muted)]' : 'mt-1 pl-3.5 text-[10px] text-white/45'}>
+          Astrail can&apos;t undo this
+        </p>
       )}
     </div>
   )
@@ -179,11 +193,16 @@ export default function AgentActivityRail({
   compact = false,
   cleared,
   onClear,
+  tone = 'night',
 }: {
   compact?: boolean
   cleared: ClearedMark
   onClear: (mark: ClearedMark) => void
+  /** `'paper'` is the light phone UI kit `PhoneDock` uses for its overlay; default `'night'` is
+   *  today's dark glass look, byte-identical to before this prop existed (desktop never passes it). */
+  tone?: 'night' | 'paper'
 }) {
+  const paper = tone === 'paper'
   const registry = useOptionalWebMcpRegistry()
   const [showEarlier, setShowEarlier] = useState(false)
   const [now, setNow] = useState(() => Date.now())
@@ -256,12 +275,12 @@ export default function AgentActivityRail({
           ].join(' ')}
         >
           {earlier.map((e) => (
-            <Entry key={e.id} entry={e} now={now} />
+            <Entry key={e.id} entry={e} now={now} paper={paper} />
           ))}
         </div>
       )}
 
-      <Entry entry={latest} now={now} />
+      <Entry entry={latest} now={now} paper={paper} />
 
       {/* Last, so it keeps its place: the dock is bottom-anchored and grows upward, which makes
           the bottom-most control the only one that never moves under the user's finger. Both
@@ -273,8 +292,12 @@ export default function AgentActivityRail({
             onClick={() => setShowEarlier((open) => !open)}
             aria-expanded={showEarlier}
             aria-label={showEarlier ? 'Hide earlier agent activity' : 'Show earlier agent activity'}
-            className="pointer-events-auto rounded-full border border-[#C9974E]/40 bg-black/60 px-3 py-1
-                       text-[10px] uppercase tracking-wider text-[#E8D5B0] backdrop-blur transition hover:border-[#C9974E]"
+            className={
+              paper
+                ? 'm-btn-secondary pointer-events-auto'
+                : 'pointer-events-auto rounded-full border border-[#C9974E]/40 bg-black/60 px-3 py-1 ' +
+                  'text-[10px] uppercase tracking-wider text-[#E8D5B0] backdrop-blur transition hover:border-[#C9974E]'
+            }
           >
             {showEarlier ? 'Hide earlier' : `${earlier.length} earlier`}
           </button>
@@ -288,8 +311,12 @@ export default function AgentActivityRail({
             })
           }
           aria-label="Clear agent activity"
-          className="pointer-events-auto rounded-full border border-white/20 bg-black/60 px-3 py-1
-                     text-[10px] uppercase tracking-wider text-white/70 backdrop-blur transition hover:border-white/50"
+          className={
+            paper
+              ? 'm-btn-secondary pointer-events-auto'
+              : 'pointer-events-auto rounded-full border border-white/20 bg-black/60 px-3 py-1 ' +
+                'text-[10px] uppercase tracking-wider text-white/70 backdrop-blur transition hover:border-white/50'
+          }
         >
           Clear
         </button>

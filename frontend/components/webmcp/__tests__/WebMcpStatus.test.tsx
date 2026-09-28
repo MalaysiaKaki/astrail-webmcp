@@ -6,9 +6,9 @@ import { useState } from 'react'
 import WebMcpStatusBase from '../WebMcpStatus'
 
 /** The dock owns the open state in the app; this mirrors that for the component under test. */
-function WebMcpStatus() {
+function WebMcpStatus({ tone }: { tone?: 'night' | 'paper' } = {}) {
   const [open, setOpen] = useState(false)
-  return <WebMcpStatusBase open={open} onOpenChange={setOpen} />
+  return <WebMcpStatusBase open={open} onOpenChange={setOpen} tone={tone} />
 }
 import { WebMcpRegistryProvider, useWebMcpRegistry } from '../WebMcpRegistry'
 
@@ -21,11 +21,14 @@ function Seed({ tools }: { tools: { name: string; description: string; readOnly:
   return null
 }
 
-const withRegistry = (tools: { name: string; description: string; readOnly: boolean }[]) =>
+const withRegistry = (
+  tools: { name: string; description: string; readOnly: boolean }[],
+  tone?: 'night' | 'paper',
+) =>
   render(
     <WebMcpRegistryProvider>
       <Seed tools={tools} />
-      <WebMcpStatus />
+      <WebMcpStatus tone={tone} />
     </WebMcpRegistryProvider>,
   )
 
@@ -129,5 +132,32 @@ describe('WebMcpStatus', () => {
     await userEvent.click(await screen.findByRole('button'))
     expect(screen.getByText('reads')).toBeInTheDocument()
     expect(screen.getByText('changes')).toBeInTheDocument()
+  })
+})
+
+/* Phone paper-kit restyle (`PhoneDock`'s overlay). `tone` defaults to `'night'`, the original dark
+   glass look, so desktop is byte-identical to before this prop existed; `PhoneDock` alone passes
+   `tone="paper"`. */
+describe('WebMcpStatus tone', () => {
+  it('defaults to night — no kit classes on the chip or the panel', async () => {
+    withRegistry([{ name: 'get_app_state', description: 'Where you are', readOnly: true }])
+    const chip = await screen.findByRole('button', { name: /WebMCP active/ })
+    expect(chip.className).not.toMatch(/\bm-/)
+    await userEvent.click(chip)
+    const close = screen.getByRole('button', { name: /close tool list/i })
+    expect(close.className).not.toMatch(/\bm-/)
+  })
+
+  it('paper tone paints the chip as a kit pill and the panel as a white kit card with a kit close button', async () => {
+    withRegistry([{ name: 'get_app_state', description: 'Where you are', readOnly: true }], 'paper')
+    const chip = await screen.findByRole('button', { name: /WebMCP active/ })
+    expect(chip.className).toMatch(/\bm-pill-badge\b/)
+    await userEvent.click(chip)
+    const close = screen.getByRole('button', { name: /close tool list/i })
+    expect(close.className).toMatch(/\bm-btn-icon\b/)
+    expect(close.className).toMatch(/\bh-11\b/)
+    const panel = close.closest('div.w-full')!
+    expect(panel.className).toMatch(/\bm-card\b/)
+    expect(panel.className).not.toMatch(/bg-black/)
   })
 })

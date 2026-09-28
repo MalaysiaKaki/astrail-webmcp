@@ -21,16 +21,16 @@ function Runner({ run }: { run: (r: ReturnType<typeof useWebMcpRegistry>) => voi
  * and it is deliberately NOT a default inside the component: the mount that survives a fold is
  * the behaviour, so it is proven where it lives (`WebMcpDock.test.tsx`), not simulated here.
  */
-function Rail({ compact }: { compact?: boolean }) {
+function Rail({ compact, tone }: { compact?: boolean; tone?: 'night' | 'paper' }) {
   const [cleared, setCleared] = useState<ClearedMark>(NOTHING_CLEARED)
-  return <AgentActivityRail compact={compact} cleared={cleared} onClear={setCleared} />
+  return <AgentActivityRail compact={compact} cleared={cleared} onClear={setCleared} tone={tone} />
 }
 
-const withRail = (run: (r: ReturnType<typeof useWebMcpRegistry>) => void) =>
+const withRail = (run: (r: ReturnType<typeof useWebMcpRegistry>) => void, tone?: 'night' | 'paper') =>
   render(
     <WebMcpRegistryProvider>
       <Runner run={run} />
-      <Rail />
+      <Rail tone={tone} />
     </WebMcpRegistryProvider>,
   )
 
@@ -519,5 +519,35 @@ describe('an entry says how old it is', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+/* Phone paper-kit restyle (`PhoneDock`'s overlay). `tone` defaults to `'night'`, the original dark
+   glass look, so desktop is byte-identical to before this prop existed; `PhoneDock` alone passes
+   `tone="paper"`. */
+describe('AgentActivityRail tone', () => {
+  it('defaults to night — no kit classes on the entry card or the earlier/clear controls', async () => {
+    const { container } = withRail((r) => { r.endActivity(r.beginActivity('move_place'), 'done') })
+    await screen.findByText('MOVED')
+    const card = container.querySelector('.rounded-lg')
+    expect(card).toBeTruthy()
+    expect(card!.className).not.toMatch(/\bm-/)
+    expect(screen.getByRole('button', { name: /clear agent activity/i }).className).not.toMatch(/\bm-/)
+  })
+
+  it('paper tone paints the entry as a kit subcard and the controls as kit secondary buttons', async () => {
+    const { container } = withRail((r) => {
+      // An earlier entry first, so it stays hidden behind "N earlier" and `move_place` — done
+      // last — is the one always-visible "latest" card the test can find without expanding it.
+      r.endActivity(r.beginActivity('get_itinerary'), 'done', 'Kyoto · 3 days')
+      r.endActivity(r.beginActivity('move_place'), 'done')
+    }, 'paper')
+    await screen.findByText('MOVED')
+    const card = container.querySelector('.m-subcard')
+    expect(card).toBeTruthy()
+    const clear = screen.getByRole('button', { name: /clear agent activity/i })
+    expect(clear.className).toMatch(/\bm-btn-secondary\b/)
+    const earlier = screen.getByRole('button', { name: /earlier/i })
+    expect(earlier.className).toMatch(/\bm-btn-secondary\b/)
   })
 })

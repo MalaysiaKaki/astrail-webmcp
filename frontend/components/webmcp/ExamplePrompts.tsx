@@ -47,10 +47,17 @@ function promptsFor(pathname: string): Prompt[] {
   ]
 }
 
-export default function ExamplePrompts() {
+/**
+ * `tone` picks the surface this panel paints itself with. Default `'night'` is the original dark
+ * glass look used on desktop (byte-identical to before this prop existed). `'paper'` is the light
+ * phone UI kit (see `app/mobile-ui.css`) — passed by `PhoneDock` for the overlay opened from the
+ * sparkle button. Desktop never passes it, so desktop output is untouched.
+ */
+export default function ExamplePrompts({ tone = 'night' }: { tone?: 'night' | 'paper' } = {}) {
   const registry = useOptionalWebMcpRegistry()
   const pathname = usePathname() ?? '/app'
   const [dismissed, setDismissed] = useState(true) // assume dismissed until storage is read
+  const paper = tone === 'paper'
 
   useEffect(() => {
     // localStorage throws in some privacy modes; a remembered dismissal is not worth a crash.
@@ -70,14 +77,32 @@ export default function ExamplePrompts() {
   }
 
   return (
-    <div className="pointer-events-auto w-[min(22rem,100%)] rounded-xl border border-white/15 bg-black/85 p-3 text-xs text-white/85 shadow-xl backdrop-blur">
+    <div
+      className={
+        paper
+          ? 'pointer-events-auto w-[min(22rem,100%)] m-card p-3 text-[13px] text-[var(--m-text)]'
+          : 'pointer-events-auto w-[min(22rem,100%)] rounded-xl border border-white/15 bg-black/85 p-3 text-xs text-white/85 shadow-xl backdrop-blur'
+      }
+    >
       <div className="mb-2 flex items-start justify-between gap-2">
-        <p className="text-[11px] uppercase tracking-wider text-[#E8D5B0]">Try asking the agent</p>
+        <p
+          className={
+            paper
+              ? 'text-[13px] font-medium text-[var(--m-text)]'
+              : 'text-[11px] uppercase tracking-wider text-[#E8D5B0]'
+          }
+        >
+          Try asking the agent
+        </p>
         <button
           type="button"
           onClick={dismiss}
           aria-label="Dismiss example prompts"
-          className="-mr-1 -mt-1 rounded px-1.5 text-white/50 transition hover:text-white/90"
+          className={
+            paper
+              ? 'm-btn-icon -mr-1 -mt-1 h-11 w-11'
+              : '-mr-1 -mt-1 rounded px-1.5 text-white/50 transition hover:text-white/90'
+          }
         >
           ✕
         </button>
@@ -85,8 +110,8 @@ export default function ExamplePrompts() {
       <ul className="space-y-1.5">
         {promptsFor(pathname).map((p) => (
           <li key={p.text}>
-            <span className="text-white/90">&ldquo;{p.text}&rdquo;</span>
-            <span className="ml-1 text-white/45">— {p.why}</span>
+            <span className={paper ? 'text-[var(--m-text)]' : 'text-white/90'}>&ldquo;{p.text}&rdquo;</span>
+            <span className={paper ? 'ml-1 text-[var(--m-text-muted)]' : 'ml-1 text-white/45'}>— {p.why}</span>
           </li>
         ))}
       </ul>
@@ -99,7 +124,13 @@ export default function ExamplePrompts() {
 
           The hint now lives in SUBMISSION.md's state-of-each-path table, where someone looks AFTER
           something has not worked. Do not move it back up here. */}
-      <p className="mt-2 border-t border-white/10 pt-2 text-[11px] text-white/45">
+      <p
+        className={
+          paper
+            ? 'mt-2 border-t border-[var(--m-accent-wash)] pt-2 text-[12px] text-[var(--m-text-muted)]'
+            : 'mt-2 border-t border-white/10 pt-2 text-[11px] text-white/45'
+        }
+      >
         Type these in ChatGPT while this page is open.
       </p>
     </div>
