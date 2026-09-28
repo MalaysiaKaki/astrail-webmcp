@@ -22,6 +22,7 @@ const {
     removeLayer: vi.fn(), removeSource: vi.fn(),
     flyTo: vi.fn(), fitBounds: vi.fn(), setConfigProperty: vi.fn(),
     easeTo: vi.fn(), isMoving: vi.fn(() => false), once: vi.fn(), setPadding: vi.fn(),
+    getContainer: vi.fn(() => ({ clientWidth: 1440, clientHeight: 900 })),
     remove: vi.fn(), resize: vi.fn(), stop: vi.fn(),
     style: { setTransition: vi.fn() },
     scrollZoom: handler(), boxZoom: handler(), dragRotate: handler(), dragPan: handler(),
@@ -983,5 +984,56 @@ describe('TripMap on a phone', () => {
     )
     await flush()
     expect(visible()).toEqual(['Harry Potter Cafe'])
+  })
+})
+
+
+/* Phase 7 #4: the shared map is constructed while its container is still hidden (height 0), so
+   Mapbox sizes the canvas at its 300px default. Framing then measured a 300px canvas under an
+   844px container, and Mapbox's own late resize cut the fly short — the camera stayed at the
+   globe or framed the route low. The fit must first bring the canvas to its container's size. */
+describe('TripMap framing on a stale canvas size', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    markerElements.length = 0
+    process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN = 'pk.test'
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1 })
+    vi.stubGlobal('cancelAnimationFrame', () => {})
+  })
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN
+    vi.unstubAllGlobals()
+    mapInstance.getContainer.mockReturnValue({ clientWidth: 1440, clientHeight: 900 })
+    mapInstance.getCanvas.mockReturnValue({ clientWidth: 1440, clientHeight: 900 })
+    mapInstance.resize.mockImplementation(() => {})
+  })
+
+  it('resizes the map to its container before the first fit, and fits at the real size', async () => {
+    let canvas = { clientWidth: 390, clientHeight: 300 }
+    mapInstance.getCanvas.mockImplementation(() => canvas)
+    mapInstance.getContainer.mockReturnValue({ clientWidth: 390, clientHeight: 844 })
+    const order: string[] = []
+    mapInstance.resize.mockImplementation(() => { order.push('resize'); canvas = { clientWidth: 390, clientHeight: 844 } })
+    mapInstance.fitBounds.mockImplementation(() => { order.push('fitBounds') })
+    renderMap()
+    await flush()
+    fireLoad()
+    await flush()
+    expect(order.indexOf('resize')).toBeGreaterThan(-1)
+    expect(order.indexOf('resize')).toBeLessThan(order.indexOf('fitBounds'))
+    const pad = mapInstance.fitBounds.mock.calls.at(-1)![1].padding
+    expect(pad.top).toBe(88)                       // not scaled down for a 300px canvas
+    mapInstance.fitBounds.mockImplementation(() => {})
+  })
+
+  it('does not resize when the canvas already matches its container', async () => {
+    mapInstance.getCanvas.mockReturnValue({ clientWidth: 1440, clientHeight: 900 })
+    mapInstance.getContainer.mockReturnValue({ clientWidth: 1440, clientHeight: 900 })
+    renderMap()
+    await flush()
+    fireLoad()
+    await flush()
+    expect(mapInstance.resize).not.toHaveBeenCalled()
+    expect(mapInstance.fitBounds).toHaveBeenCalled()
   })
 })

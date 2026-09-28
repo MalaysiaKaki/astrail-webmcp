@@ -750,6 +750,16 @@ export default function TripMap({
   function frame(pts: [number, number][], duration: number) {
     const map = getMap()
     if (!map || pts.length === 0) return
+    // The shared map is built while its container is still hidden (height 0), so Mapbox sizes the
+    // canvas at its 300px default and corrects it later from its own ResizeObserver. Framing
+    // before that correction measures the wrong canvas, and the late resize then cuts the fly
+    // short: the camera stayed on the globe, or framed the route low (phones, and the flaky 1024
+    // desktop capture). Bring the canvas to its container's size first; synchronous and cheap.
+    const canvas = typeof map.getCanvas === 'function' ? map.getCanvas() : null
+    const container = typeof map.getContainer === 'function' ? map.getContainer() : null
+    if (canvas && container && (canvas.clientWidth !== container.clientWidth || canvas.clientHeight !== container.clientHeight)) {
+      map.resize()
+    }
     if (pts.length === 1) {
       map.flyTo({ center: pts[0], zoom: 13.5, pitch: 45, padding: framePadding(), duration, essential: true })
       return
