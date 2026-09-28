@@ -377,7 +377,10 @@ export default function TripWorkspace({
         tall) that far down the page. The visible symptom was a strip of map above the details
         panel and 48px of the panel hanging below the fold. Invisible as text only because it
         is dark-on-dark. */}
-    <main className="pointer-events-none relative h-[100dvh] w-full overflow-hidden">
+    {/* overflow-CLIP, not hidden: hidden is still a script-scroll container, so a stop card's
+        scrollIntoView({block:'start'}) scrolled THIS element too and slid the phone sheet up over
+        the map. clip clips identically and leaves the scroll to the sheet's own list. */}
+    <main className="pointer-events-none relative h-[100dvh] w-full overflow-clip">
       <div className="pointer-events-none absolute inset-0">
         <TripMap
           bundle={bundle}

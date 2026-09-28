@@ -423,6 +423,17 @@ describe('TripWorkspace — the phone branch', () => {
     expect(summary!.querySelector('.m-chevron')).not.toBeNull()
   })
 
+  /* A3 browser finding: an external selection's scrollIntoView({block:'start'}) aligned the card
+     to the top of EVERY scrollable ancestor, and <main> (overflow:hidden is still scrollable by
+     script) scrolled 466px, sliding the sheet over the top of the screen. overflow:clip clips the
+     same but is not a scroll container. jsdom has no layout, so this pins the property. */
+  it('keeps the route <main> out of the scroll chain: overflow clip, not hidden', () => {
+    renderSeeded()
+    const main = sheet()!.closest('main')!
+    expect(main.className).toMatch(/\boverflow-clip\b/)
+    expect(main.className).not.toMatch(/\boverflow-hidden\b/)
+  })
+
   it('has exactly one hide control in the sheet, top-right, not a second chevron beside the handle', () => {
     renderSeeded()
     const hide = screen.getByRole('button', { name: /hide trip sheet/i })

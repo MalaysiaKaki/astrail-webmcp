@@ -214,7 +214,7 @@ describe('StopTimeline stop card', () => {
     const onSelectRestaurant = vi.fn()
     renderDay(1, { selectedPlaceId: 'pl_sandolab', onSelectRestaurant, selectedRestaurantPlaceId: 'pl_popo' })
     const popo = within(card('pl_sandolab')).getByRole('button', { name: 'Show Popo on the map' })
-    expect(popo.className).toMatch(/\bm-card-link\b/)
+    expect(popo.closest('[data-eat-card]')!.className).toMatch(/\bm-card\b/)
     expect(popo.querySelector('.m-chevron')).not.toBeNull()
     expect(popo).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(within(card('pl_sandolab')).getByRole('button', { name: 'Show Ichiran Shibuya on the map' }))
@@ -235,7 +235,20 @@ describe('StopTimeline stop card', () => {
     renderDay(1, { places: [], restaurants })
     const links = within(screen.getByRole('heading', { name: 'Where to eat' }).parentElement!).getAllByRole('button')
     expect(links.length).toBe(restaurants.length)
-    for (const l of links) expect(l.className).toMatch(/\bm-card-link\b/)
+    for (const l of links) expect(l.closest('[data-eat-card]')!.className).toMatch(/\bm-card\b/)
+  })
+
+  /* A2 follow-up: a suggestion's Evidence action belongs to ITS card, not floating below the list. */
+  it('keeps each suggestion\'s Evidence link inside that suggestion\'s own card, outside its button', () => {
+    renderDay(1, { selectedPlaceId: 'pl_sandolab' })
+    const ichiran = within(card('pl_sandolab')).getByRole('button', { name: 'Show Ichiran Shibuya on the map' })
+    const eatCard = ichiran.closest('[data-eat-card]')!
+    const evidence = within(eatCard as HTMLElement).getByRole('link', { name: /Evidence/ })
+    expect(evidence).toHaveAttribute('href', 'https://ichiran.com/')
+    expect(evidence.className).toMatch(/\bm-btn-secondary\b/)
+    expect(ichiran.contains(evidence)).toBe(false)                 // never interactive-in-button
+    const popo = within(card('pl_sandolab')).getByRole('button', { name: 'Show Popo on the map' })
+    expect(within(popo.closest('[data-eat-card]') as HTMLElement).queryByRole('link')).toBeNull()
   })
 })
 

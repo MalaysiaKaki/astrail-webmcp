@@ -4,7 +4,7 @@ import type { Place, RestaurantSuggestion } from '@/lib/trip/backend-types'
 import { safeHref } from '@/lib/safe-href'
 
 /**
- * Restaurant suggestions on a phone, as card links: tap to show that place on the map.
+ * Restaurant suggestions on a phone, as tappable cards: tap to show that place on the map.
  *
  * The phone's own list rather than the shared RestaurantStrip, whose desktop look must not change.
  * Same rules as that strip: only a suggestion with a place behind it becomes a control (a button
@@ -37,33 +37,52 @@ export default function EatCardLinks({ restaurants, placeIndex, selectedPlaceId,
             ) : null}
           </span>
         )
+        const chosen = Boolean(place && place.id === selectedPlaceId)
         return (
-          <li key={r.id} className="flex flex-col gap-1.5">
-            {place ? (
-              <button
-                type="button"
-                onClick={() => onSelect(place.id)}
-                aria-pressed={place.id === selectedPlaceId}
-                aria-label={`Show ${place.name} on the map`}
-                className={[
-                  'm-card-link',
-                  place.id === selectedPlaceId ? 'outline-2 outline-solid outline-[var(--m-ink)]' : '',
-                ].join(' ')}
-              >
-                {body}
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25"
-                  strokeLinecap="round" strokeLinejoin="round" aria-hidden className="m-chevron">
-                  <polyline points="9 6 15 12 9 18" />
-                </svg>
-              </button>
-            ) : (
-              <div className="m-subcard flex px-4 py-3">{body}</div>
-            )}
-            {evidence ? (
-              <a href={evidence} target="_blank" rel="noopener noreferrer" className="m-btn-secondary self-start">
-                Evidence<span className="sr-only"> for {place?.name ?? 'this suggestion'} (opens in a new tab)</span>
-              </a>
-            ) : null}
+          <li key={r.id}>
+            {/* One card per suggestion: the select button fills it, and the Evidence pill, when
+                there is one, is a second row INSIDE the same card — so it reads as belonging to
+                this suggestion — but outside the button (no link inside a button). Same surface
+                pattern as StopCard. */}
+            <div
+              data-eat-card
+              className={[
+                place ? 'm-card' : 'm-subcard',
+                'transition-transform duration-[var(--m-dur-press)] motion-reduce:transition-none',
+                'has-[>button:active]:scale-[0.985] motion-reduce:has-[>button:active]:scale-100',
+                'has-[>button:focus-visible]:outline-2 has-[>button:focus-visible]:outline-offset-2 has-[>button:focus-visible]:outline-solid has-[>button:focus-visible]:outline-[var(--m-accent)]',
+                chosen ? 'outline-2 outline-solid outline-[var(--m-ink)]' : '',
+              ].join(' ')}
+            >
+              {place ? (
+                <button
+                  type="button"
+                  onClick={() => onSelect(place.id)}
+                  aria-pressed={chosen}
+                  aria-label={`Show ${place.name} on the map`}
+                  className="flex min-h-14 w-full items-center gap-3 rounded-[var(--m-r-card)] px-4 py-3 text-left focus-visible:outline-none"
+                >
+                  {body}
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25"
+                    strokeLinecap="round" strokeLinejoin="round" aria-hidden className="m-chevron">
+                    <polyline points="9 6 15 12 9 18" />
+                  </svg>
+                </button>
+              ) : (
+                <div className="flex px-4 py-3">{body}</div>
+              )}
+              {evidence ? (
+                <div className="px-4 pb-3">
+                  <a href={evidence} target="_blank" rel="noopener noreferrer" className="m-btn-secondary">
+                    Evidence<span className="sr-only"> for {place?.name ?? 'this suggestion'} (opens in a new tab)</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+                      strokeLinejoin="round" aria-hidden className="h-4 w-4">
+                      <path d="M14 5h5v5M19 5l-8 8M18 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4" />
+                    </svg>
+                  </a>
+                </div>
+              ) : null}
+            </div>
           </li>
         )
       })}
