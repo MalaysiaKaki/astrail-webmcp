@@ -4,6 +4,8 @@ import type { Place, RestaurantSuggestion, TripPlace } from '@/lib/trip/backend-
 import { hasRealCoords } from '@/lib/trip/selectors'
 import type { StopProvenance } from '@/lib/trip/stop-provenance'
 import { safeHref } from '@/lib/safe-href'
+import type { PopupModel } from '@/components/map/popup-model'
+import { evidenceKindLabel } from '@/lib/trip/evidence-kind'
 import EatCardLinks from './EatCardLinks'
 
 function humanize(s: string): string {
@@ -27,6 +29,7 @@ function humanize(s: string): string {
 export default function StopCard({
   tp, pin, total, provenance: p, thumbnail, selected, eatCount, onTap,
   restaurants, placeIndex, selectedRestaurantPlaceId, onSelectRestaurant,
+  detail = null, showConfidence = false, onShow3d,
 }: {
   tp: TripPlace
   /** The trail number the map pin paints, or undefined for an unnumbered (unplaced) stop. */
@@ -41,6 +44,12 @@ export default function StopCard({
   placeIndex: Map<string, Place>
   selectedRestaurantPlaceId: string | null
   onSelectRestaurant: (placeId: string) => void
+  /** The open card's trip-relative detail (Reel link, local-script name, confidence). */
+  detail?: PopupModel | null
+  /** Desktop only: the confidence chip. The phone's provenance line already says the source. */
+  showConfidence?: boolean
+  /** "Show in 3D": turns the map's 3D mode on and flies to this stop at street level. */
+  onShow3d?: () => void
 }) {
   return (
     <div
@@ -99,6 +108,10 @@ export default function StopCard({
       {selected ? (
         <StopDetail
           tp={tp}
+          provenance={p}
+          detail={detail}
+          showConfidence={showConfidence}
+          onShow3d={onShow3d}
           restaurants={restaurants}
           placeIndex={placeIndex}
           selectedRestaurantPlaceId={selectedRestaurantPlaceId}
@@ -133,8 +146,14 @@ function Evidence({ p, thumbnail, full }: { p: StopProvenance; thumbnail: string
   )
 }
 
-function StopDetail({ tp, restaurants, placeIndex, selectedRestaurantPlaceId, onSelectRestaurant }: {
+function StopDetail({
+  tp, provenance, detail, showConfidence, onShow3d, restaurants, placeIndex, selectedRestaurantPlaceId, onSelectRestaurant,
+}: {
   tp: TripPlace
+  provenance: StopProvenance
+  detail: PopupModel | null
+  showConfidence: boolean
+  onShow3d?: () => void
   restaurants: RestaurantSuggestion[]
   placeIndex: Map<string, Place>
   selectedRestaurantPlaceId: string | null
@@ -144,9 +163,17 @@ function StopDetail({ tp, restaurants, placeIndex, selectedRestaurantPlaceId, on
   const located = hasRealCoords(place.lng, place.lat)
   const extraQuotes = ev.quotes.filter((q) => q.trim() && q !== ev.quote)
   const where = [place.area, place.city, place.country].filter(Boolean).join(', ')
+  const reel = detail?.reel ? safeHref(detail.reel.url) : undefined
   const source = safeHref(ev.source_url)
+  // Quote AND rationale together (plan A6, amendment 5): the quote says what the Reel said, the
+  // rationale why Astrail kept the stop. Skipped only when it is the text the card already shows.
+  const rationale = ev.rationale?.trim() && ev.rationale.trim() !== provenance.text ? ev.rationale.trim() : null
+  const confidence = showConfidence && detail?.confidence != null ? detail.confidence : null
   return (
     <div className="flex flex-col gap-3 px-4 pb-4">
+      {detail?.subtitle ? (
+        <p className="type-body -mt-1 pl-10 text-[14px] text-[var(--m-text-muted)]">{detail.subtitle}</p>
+      ) : null}
       {extraQuotes.map((q) => (
         <p key={q} className="type-body m-subcard p-3 text-[15px] leading-snug text-[rgba(28,23,16,0.78)]">“{q}”</p>
       ))}
@@ -158,10 +185,34 @@ function StopDetail({ tp, restaurants, placeIndex, selectedRestaurantPlaceId, on
         </svg>
         <span>{located ? where || 'On the map' : 'Location unavailable — this stop could not be placed on the map.'}</span>
       </p>
+      {rationale ? (
+        <p data-rationale className="type-body text-[15px] leading-snug text-[var(--m-text)]">
+          <span className="font-semibold">Why it is here: </span>{rationale}
+        </p>
+      ) : null}
+      {confidence !== null ? (
+        <p data-evidence-chip className="type-body self-start rounded-full bg-[var(--m-subcard)] px-3 py-1 text-[13px] text-[var(--m-text-muted)]">
+          <span className="font-semibold text-[var(--m-accent)]">{evidenceKindLabel(ev.evidence_kind)}</span>
+          <span aria-hidden> · </span>
+          {confidence}% confidence
+        </p>
+      ) : null}
       {/* No confidence chip on a phone (it stays on desktop): the provenance line already says
-          where the stop came from. The research source, when there is one, is a real button. */}
-      {source ? (
-        <a href={source} target="_blank" rel="noopener noreferrer" className="m-btn-secondary self-start">
+          where the stop came from. The Reel, the research source and 3D are real buttons. */}
+      {reel || source || (onShow3d && located) ? (
+      <div className="flex flex-wrap gap-2">
+      {reel ? (
+        <a href={reel} target="_blank" rel="noopener noreferrer" className="m-btn-secondary">
+          Watch the Reel
+          <span className="sr-only"> (opens in a new tab)</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+            strokeLinejoin="round" aria-hidden className="h-4 w-4">
+            <path d="M14 5h5v5M19 5l-8 8M18 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4" />
+          </svg>
+        </a>
+      ) : null}
+      {source && source !== reel ? (
+        <a href={source} target="_blank" rel="noopener noreferrer" className="m-btn-secondary">
           Source
           <span className="sr-only"> (opens in a new tab)</span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
@@ -169,6 +220,14 @@ function StopDetail({ tp, restaurants, placeIndex, selectedRestaurantPlaceId, on
             <path d="M14 5h5v5M19 5l-8 8M18 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4" />
           </svg>
         </a>
+      ) : null}
+      {onShow3d && located ? (
+        <button type="button" onClick={onShow3d} className="m-btn-secondary">
+          <span aria-hidden className="text-[13px] font-bold tracking-[0.02em]">3D</span>
+          Show in 3D
+        </button>
+      ) : null}
+      </div>
       ) : null}
       {restaurants.length > 0 ? (
         <div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import mapboxgl from 'mapbox-gl'
-import { buildPopupModel, thumbnailFor, type PopupModel } from './popup-model'
+import { thumbnailFor } from './popup-model'
 import { buildEatPopup, buildStayPopup } from './suggestion-popup'
 import type { Place, RestaurantSuggestion, TripBundle, TripPlace } from '@/lib/trip/backend-types'
 import {
@@ -14,6 +14,7 @@ import { consumeTripFramed } from '@/lib/trip/map-handoff'
 import { fitTarget } from '@/lib/trip/fit-target'
 import { readSafeAreaTop } from '@/lib/trip/safe-area'
 import { getSheetObstruction, useSheetObstruction } from '@/lib/trip/sheet-obstruction'
+import { getPanelObstruction, usePanelObstruction } from '@/lib/trip/panel-obstruction'
 import { useTripLayout } from '@/lib/trip/use-trip-layout'
 import { computeFramePadding } from './frame-padding'
 import { cameraPitch, createTerrainController, nativeBuildings, PITCH_3D, type TerrainController } from './camera-mode'
@@ -33,7 +34,6 @@ const DAY_ROUTE_COLORS = [
 ] as const
 
 const BUILDING_LAYER_ID = 'astrail-3d-buildings'
-const LABEL_ZOOM = 11
 const LABEL_MAX_CHARS = 24
 
 function shortPlaceName(name: string): string {
@@ -56,74 +56,6 @@ function safeWebUrl(raw: string): string | null {
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
-let pinClipSeq = 0
-
-/**
- * A teardrop pin whose head holds the Reel's own still.
- *
- * Built as SVG rather than the usual rotated-square CSS teardrop, for a specific reason: the
- * classic trick is `border-radius: 50% 50% 50% 0; transform: rotate(-45deg)`, and
- * marker-css-contract.test.ts forbids `transform` on a marker ROOT — Mapbox positions the root
- * with its own inline transform, and a second one drags the pin off its coordinate. SVG needs no
- * transform anywhere, and stays crisp at any density.
- *
- * The stop NUMBER survives as a badge even when there is a photo. It is not decoration: the
- * WebMCP tools address stops by it ("move stop 7"), and `buildTrailNumbers` is the shared
- * vocabulary between what the agent says and what the user can see.
- */
-function buildPinGraphic(photoUrl: string | null, number: number | null): SVGSVGElement {
-  const svg = document.createElementNS(SVG_NS, 'svg')
-  svg.setAttribute('viewBox', '0 0 40 52')
-  svg.setAttribute('class', 'constellation-pin__drop')
-  svg.setAttribute('aria-hidden', 'true')
-
-  const clipId = `pin-clip-${++pinClipSeq}`
-  const defs = document.createElementNS(SVG_NS, 'defs')
-  const clip = document.createElementNS(SVG_NS, 'clipPath')
-  clip.setAttribute('id', clipId)
-  const clipCircle = document.createElementNS(SVG_NS, 'circle')
-  clipCircle.setAttribute('cx', '20'); clipCircle.setAttribute('cy', '19'); clipCircle.setAttribute('r', '14')
-  clip.append(clipCircle); defs.append(clip); svg.append(defs)
-
-  // Teardrop: a circular head over a tapered tip that lands exactly on the coordinate.
-  const body = document.createElementNS(SVG_NS, 'path')
-  body.setAttribute('d', 'M20 51C20 51 37 30.5 37 19A17 17 0 1 0 3 19C3 30.5 20 51 20 51Z')
-  body.setAttribute('class', 'constellation-pin__drop-body')
-  svg.append(body)
-
-  if (photoUrl) {
-    const img = document.createElementNS(SVG_NS, 'image')
-    img.setAttribute('href', photoUrl)
-    img.setAttribute('x', '6'); img.setAttribute('y', '5')
-    img.setAttribute('width', '28'); img.setAttribute('height', '28')
-    img.setAttribute('preserveAspectRatio', 'xMidYMid slice')
-    img.setAttribute('clip-path', `url(#${clipId})`)
-    // A dead Instagram CDN link must fall back to the number, not leave a hole in the pin.
-    img.addEventListener('error', () => {
-      img.remove()
-      if (number !== null) svg.append(numberText(number))
-    })
-    svg.append(img)
-    // Marks the frame as coming FROM a Reel. One Reel yields one cover, so stops from the same
-    // Reel share it; the badge is what keeps that honest — the image is the source, not a
-    // portrait of the venue.
-    const ring = document.createElementNS(SVG_NS, 'circle')
-    ring.setAttribute('cx', '20'); ring.setAttribute('cy', '19'); ring.setAttribute('r', '14')
-    ring.setAttribute('class', 'constellation-pin__reel-ring')
-    svg.append(ring)
-  } else {
-    // One universal placeholder for every stop with no Reel behind it — typed by the user, or
-    // surfaced by Astrail's own research. Deliberately not a photograph: borrowing an image for
-    // a place we have no picture of would be a claim we cannot support.
-    const disc = document.createElementNS(SVG_NS, 'circle')
-    disc.setAttribute('cx', '20'); disc.setAttribute('cy', '19'); disc.setAttribute('r', '13')
-    disc.setAttribute('class', 'constellation-pin__placeholder')
-    svg.append(disc)
-    if (number !== null) svg.append(numberText(number))
-  }
-  return svg
-}
-
 /** Fork and knife, so an eat pin reads as "somewhere to eat" and not as an unexplained dot.
  *  Stroked rather than filled: at this size a filled cutlery shape turns to mud, while two
  *  strokes stay legible down to ~10px. */
@@ -137,158 +69,6 @@ function buildEatGlyph(): SVGSVGElement {
   path.setAttribute('d', 'M4 3v3M6 3v3M8 3v3M6 6v7M11.5 3c1.2 0 1.8 1.4 1.8 2.6S12.7 8 11.5 8M11.5 8v5')
   svg.append(path)
   return svg
-}
-
-function numberText(number: number): SVGTextElement {
-  const text = document.createElementNS(SVG_NS, 'text')
-  text.setAttribute('x', '20'); text.setAttribute('y', '19')
-  text.setAttribute('text-anchor', 'middle'); text.setAttribute('dominant-baseline', 'central')
-  text.setAttribute('class', 'constellation-pin__drop-number')
-  text.textContent = String(number)
-  return text
-}
-
-/** Small badge so the stop number stays visible even when the head shows a photo. */
-function buildPinBadge(number: number): HTMLElement {
-  const badge = document.createElement('span')
-  badge.className = 'constellation-pin__badge'
-  badge.textContent = String(number)
-  return badge
-}
-
-/**
- * Build popup DOM without parsing attacker-controlled caption text as markup.
- *
- * Every string goes in via textContent. Reel captions are written by strangers, so a popup that
- * used innerHTML here would be a stored-XSS hole on the one surface that promises provenance.
- */
-function evidencePopupContent(
-  model: PopupModel,
-  onZoom: () => void,
-): HTMLElement {
-  const content = document.createElement('article')
-  content.className = 'evidence-popup'
-
-  if (model.imageUrl) {
-    const safeImg = safeWebUrl(model.imageUrl)
-    if (safeImg) {
-      const img = document.createElement('img')
-      img.className = 'evidence-popup__image'
-      img.src = safeImg
-      img.alt = ''            // decorative: the name is already the heading
-      img.loading = 'lazy'
-      // A dead Instagram CDN link must not leave a broken-image glyph in the card.
-      img.addEventListener('error', () => img.remove())
-      content.append(img)
-    }
-  }
-
-  const eyebrow = document.createElement('p')
-  eyebrow.className = 'evidence-popup__eyebrow'
-  eyebrow.textContent = model.eyebrow
-
-  const title = document.createElement('h3')
-  title.className = 'evidence-popup__title'
-  title.textContent = model.title
-
-  content.append(eyebrow, title)
-
-  if (model.subtitle) {
-    const sub = document.createElement('p')
-    sub.className = 'evidence-popup__subtitle'
-    sub.textContent = model.subtitle
-    content.append(sub)
-  }
-
-  if (model.where) {
-    const where = document.createElement('p')
-    where.className = 'evidence-popup__where'
-    where.textContent = model.where
-    content.append(where)
-  }
-
-  // The trip-relative block: what a generic place card cannot tell you.
-  if (model.context.length) {
-    const label = document.createElement('p')
-    label.className = 'evidence-popup__label'
-    label.textContent = 'On this trip'
-    const list = document.createElement('ul')
-    list.className = 'evidence-popup__context'
-    for (const line of model.context) {
-      const li = document.createElement('li')
-      li.textContent = line
-      list.append(li)
-    }
-    content.append(label, list)
-  }
-
-  if (model.eats.length) {
-    const eatsLabel = document.createElement('p')
-    eatsLabel.className = 'evidence-popup__label'
-    eatsLabel.textContent = 'Where to eat'
-    const list = document.createElement('ul')
-    list.className = 'evidence-popup__context'
-    for (const eat of model.eats) {
-      const li = document.createElement('li')
-      li.textContent = eat.note ? `${eat.name} · ${eat.note}` : eat.name
-      list.append(li)
-    }
-    content.append(eatsLabel, list)
-  }
-
-  const evidenceLabel = document.createElement('p')
-  evidenceLabel.className = 'evidence-popup__label'
-  evidenceLabel.textContent = model.evidenceLabel
-
-  const evidence = document.createElement('blockquote')
-  evidence.className = 'evidence-popup__quote'
-  evidence.textContent = model.evidence
-
-  content.append(evidenceLabel, evidence)
-
-  if (model.confidence !== null) {
-    const confidence = document.createElement('p')
-    confidence.className = 'evidence-popup__confidence'
-    confidence.textContent = `Confidence ${model.confidence}%`
-    content.append(confidence)
-  }
-
-  const actions = document.createElement('div')
-  actions.className = 'evidence-popup__actions'
-
-  const zoom = document.createElement('button')
-  zoom.type = 'button'
-  zoom.className = 'evidence-popup__zoom'
-  zoom.textContent = 'Zoom in for 3D'
-  zoom.addEventListener('click', onZoom)
-  actions.append(zoom)
-
-  // The Reel first and prominently: it is what the traveller actually saved.
-  for (const link of [model.reel, model.reference]) {
-    if (!link) continue
-    const safeUrl = safeWebUrl(link.url)
-    if (safeUrl) {
-      const a = document.createElement('a')
-      a.className =
-        link === model.reel
-          ? 'evidence-popup__source'
-          : 'evidence-popup__source evidence-popup__source--secondary'
-      a.href = safeUrl
-      a.target = '_blank'
-      a.rel = 'noopener noreferrer'
-      a.textContent = link.label
-      actions.append(a)
-    } else {
-      // A javascript: or data: URL lifted from a caption renders as inert text, never a link.
-      const inert = document.createElement('p')
-      inert.className = 'evidence-popup__source evidence-popup__source--invalid'
-      inert.textContent = link.url
-      actions.append(inert)
-    }
-  }
-
-  content.append(actions)
-  return content
 }
 
 /**
@@ -343,7 +123,7 @@ export default function TripMap({
   focusNonce = 0,
   fitNonce = 0,
   mode3d = false,
-  onRequest3d,
+  show3dNonce = 0,
 }: {
   bundle: TripBundle
   activeDayNumber: number
@@ -369,13 +149,14 @@ export default function TripMap({
   /** The trip camera's 3D mode (components/map/camera-mode). Every camera command below takes its
    *  pitch from it, and terrain + fog exist on the shared map only while it is on. */
   mode3d?: boolean
-  /** The evidence popup's "Zoom in for 3D": asks the owner to turn the mode on; the fly to the stop
-   *  follows once it is. Absent, the popup still flies there tilted. */
-  onRequest3d?: () => void
+  /** Bumped by a stop card's "Show in 3D" (the old popup's "Zoom in for 3D"): fly to the selected
+   *  stop at street level. The owner turns the mode on in the same update. */
+  show3dNonce?: number
 }) {
   const { hasToken, ready, getMap, acquire, release, setMarkers } = useSharedMap()
   const routeIdsRef = useRef<string[]>([])
   const markerLabelsRef = useRef<HTMLElement[]>([])
+  const panelObstruction = usePanelObstruction()
   const activePopupRef = useRef<mapboxgl.Popup | null>(null)
   const buildingLayerAddedRef = useRef(false)
   const framedRef = useRef(false)
@@ -406,7 +187,7 @@ export default function TripMap({
   const terrainMapRef = useRef<mapboxgl.Map | null>(null)
   // The mode the camera was last moved for; only a real change eases the pitch.
   const appliedModeRef = useRef(false)
-  // A popup's "Zoom in for 3D" waiting for the mode to turn on.
+  // A card's "Show in 3D" waiting for the mode to turn on.
   const pending3dFlyRef = useRef<[number, number] | null>(null)
   const controlRects = useControlRects()
 
@@ -441,24 +222,17 @@ export default function TripMap({
     if (!map) return
     activePopupRef.current?.remove()
     activePopupRef.current = new mapboxgl.Popup({
-      // Phones get the light kit card (phone-map-cards.css); desktop keeps the night card.
-      className: layoutRef.current === 'mobile' ? 'astrail-evidence-popup phone-popup' : 'astrail-evidence-popup',
+      // The light kit card (phone-map-cards.css) at every width since plan A6.
+      className: 'astrail-evidence-popup phone-popup',
       closeButton: true, closeOnClick: true, offset: 16, maxWidth: '300px',
     }).setLngLat(at).setDOMContent(content).addTo(map)
   }
 
   function syncMarkerLabelVisibility() {
-    const map = getMap()
-    if (!map) return
-    const byZoom = map.getZoom() >= LABEL_ZOOM
-    // On a phone, close pins would stack their name pills into an unreadable pile, and the sheet
-    // already names every stop: only the selected pin (or selected eat suggestion) is labelled.
-    const phone = layoutRef.current === 'mobile'
+    // Close pins would stack their name pills into an unreadable pile, and the panel already names
+    // every stop: only the selected eat suggestion is labelled (the selected stop pin draws its own).
     for (const label of markerLabelsRef.current) {
-      const cls = label.classList.contains('eat-pin__label')
-        ? 'eat-pin__label--visible'
-        : 'constellation-pin__label--visible'
-      label.classList.toggle(cls, phone ? label.dataset.selected === 'true' : byZoom)
+      label.classList.toggle('eat-pin__label--visible', label.dataset.selected === 'true')
     }
   }
 
@@ -518,101 +292,37 @@ export default function TripMap({
     // targets) — reimplementing it risks dropping the base_place_id signal and double-pinning.
     const basePlaceIds = hotelBasePlaceIds(bundle)
     const labels: HTMLElement[] = []
-    // Read at draw time; a live layout change redraws (see the [layout] effect). Null — SSR and the
-    // hydration pass — draws the desktop markers, the layout that has always existed.
-    const phone = layoutRef.current === 'mobile'
     const markers = bundle.places
       .filter((tp) => hasRealCoords(tp.place.lng, tp.place.lat))
       .filter((tp) => layerMode !== 'hub' || !isHotelBasePlace(tp, basePlaceIds))
       .map((tp) => {
-        const el = document.createElement('button')
-        el.type = 'button'
-        el.setAttribute('aria-label', tp.place.name)
         const number = trailNumbers.get(tp.id) ?? null
-        el.className = [
-          'constellation-pin',
-          `constellation-pin--${tp.source_type}`,
-          number === null ? 'constellation-pin--receding' : '',
-          tp.place_id === selectedPlaceId ? 'constellation-pin--selected' : '',
-        ].filter(Boolean).join(' ')
-        // The Reel still that this stop came from, when we can attribute one honestly.
-        // Same untrusted value the popup already gates (guardrail #11: Reel content is
-        // attacker-controlled). It reaches us from Apify's Instagram scrape via the DB, and
-        // an SVG <image href> is a resource load, so it must clear the same protocol check as
-        // the popup's copy — gated HERE rather than inside buildPinGraphic so the badge below
-        // agrees with it; disagreeing would print the stop number twice.
+        // The Reel still that this stop came from, when we can attribute one honestly. Untrusted
+        // (guardrail #11: Reel content is attacker-controlled): it reaches us from Apify's scrape,
+        // and an <img src> is a resource load, so it clears the same protocol check as any link.
         // NB the empty-string guard: safeWebUrl('') resolves against our origin and returns a
-        // valid URL, which would render a broken image instead of the placeholder.
+        // valid URL, which would render a broken image instead of the glyph.
         const rawPhoto = thumbnailFor(bundle, tp)
         const photoUrl = rawPhoto ? safeWebUrl(rawPhoto) : null
-        if (phone) {
-          // Placify-style avatar pin, centred on the coordinate (components/map/phone-pin.ts). Its
-          // name pill is drawn only when selected, so it never joins the zoom-toggled labels.
-          const pinEl = buildPhonePin({
-            name: tp.place.name,
-            label: shortPlaceName(tp.place.name),
-            placeType: tp.place.place_type,
-            sourceType: tp.source_type,
-            number,
-            selected: tp.place_id === selectedPlaceId,
-            photoUrl,
-          })
-          pinEl.addEventListener('click', (e) => {
-            e.stopPropagation()
-            onSelectPlace(tp.place_id)
-            // Phones: no evidence popup. The selected, expanded, scrolled-to sheet card IS the detail.
-            activePopupRef.current?.remove()
-            activePopupRef.current = null
-          })
-          return new mapboxgl.Marker({ element: pinEl, anchor: 'center' })
-            .setLngLat([tp.place.lng, tp.place.lat]).addTo(map)
-        }
-        el.append(buildPinGraphic(photoUrl, number))
-        if (photoUrl && number !== null) el.append(buildPinBadge(number))
-        if (number !== null) {
-          const label = document.createElement('span')
-          label.className = 'constellation-pin__label'
-          label.textContent = shortPlaceName(tp.place.name)
-          label.title = tp.place.name
-          label.dataset.selected = String(tp.place_id === selectedPlaceId)
-          labels.push(label)
-          el.append(label)
-        }
-        el.addEventListener('click', (e) => {
+        // Placify-style avatar pin, centred on the coordinate (components/map/phone-pin.ts), at
+        // every width since plan A6. Its name pill is drawn only when selected.
+        const pinEl = buildPhonePin({
+          name: tp.place.name,
+          label: shortPlaceName(tp.place.name),
+          placeType: tp.place.place_type,
+          sourceType: tp.source_type,
+          number,
+          selected: tp.place_id === selectedPlaceId,
+          photoUrl,
+        })
+        pinEl.addEventListener('click', (e) => {
           e.stopPropagation()
           onSelectPlace(tp.place_id)
-          // Phones: no evidence popup. The selected, expanded, scrolled-to sheet row IS the detail
-          // (a popup here doubled it and sat under the agent chip). Desktop is unchanged.
-          if (layoutRef.current === 'mobile') {
-            activePopupRef.current?.remove()
-            activePopupRef.current = null
-            return
-          }
+          // No evidence popup: the selected, expanded, scrolled-to card in the panel IS the detail.
           activePopupRef.current?.remove()
-          activePopupRef.current = new mapboxgl.Popup({
-            className: 'astrail-evidence-popup',
-            closeButton: true,
-            closeOnClick: true,
-            offset: 18,
-            maxWidth: '340px',
-          })
-            .setLngLat([tp.place.lng, tp.place.lat])
-            .setDOMContent(
-              evidencePopupContent(buildPopupModel(bundle, tp), () => {
-                // "Turn 3D on + fly to this stop": the mode, not a one-off tilt, so the next
-                // selection or Fit stays in 3D. When the mode is already on (or nobody owns it),
-                // fly now; otherwise the mode effect flies once it has switched.
-                const at: [number, number] = [tp.place.lng, tp.place.lat]
-                if (mode3dRef.current || !onRequest3d) { flyToStreet(at); return }
-                pending3dFlyRef.current = at
-                onRequest3d()
-              }),
-            )
-            .addTo(map)
+          activePopupRef.current = null
         })
-        // anchor:'bottom' puts the teardrop's TIP on the coordinate. The default 'center' would
-        // float the whole pin half its height above the place it is pointing at.
-        return new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+        return new mapboxgl.Marker({ element: pinEl, anchor: 'center' })
           .setLngLat([tp.place.lng, tp.place.lat]).addTo(map)
       })
     // Hub mode: pin the selected PLACED hotel as the hub. Honest empty-state (Guardrail #1 / C5):
@@ -627,7 +337,7 @@ export default function TripMap({
         const el = document.createElement('button')
         el.type = 'button'
         el.setAttribute('aria-label', hub.name)
-        el.className = phone ? 'hotel-hub-pin phone-hit' : 'hotel-hub-pin'
+        el.className = 'hotel-hub-pin phone-hit'
         el.textContent = '🏨'
         const at: [number, number] = [hub.lng, hub.lat]
         el.addEventListener('click', (e) => {
@@ -655,7 +365,7 @@ export default function TripMap({
         el.className = [
           'eat-pin',
           place.id === selectedRestaurantPlaceId ? 'eat-pin--selected' : '',
-          phone ? 'phone-hit' : '',
+          'phone-hit',
         ].filter(Boolean).join(' ')
         const chip = document.createElement('span')
         chip.className = 'eat-pin__chip'
@@ -667,8 +377,7 @@ export default function TripMap({
         label.title = place.name
         label.dataset.selected = String(place.id === selectedRestaurantPlaceId)
         el.append(label)
-        // Same zoom rule as the trail labels rather than :hover — a touch device has no hover,
-        // so a hover-only name is a name that never appears on a phone.
+        // Shown when selected rather than on :hover — a touch device has no hover.
         labels.push(label)
         el.addEventListener('click', (e) => {
           e.stopPropagation()
@@ -823,6 +532,9 @@ export default function TripMap({
     const controls = getControlRects().map((r) => ({ ...r, x: r.x - (origin?.left ?? 0), y: r.y - (origin?.top ?? 0) }))
     return computeFramePadding({
       controls,
+      // The desktop floating panel's measured right edge (0 when collapsed); the phone sheet is
+      // the bottom obstruction above. Each layout only ever publishes its own.
+      leftObstruction: layoutRef.current === 'mobile' ? 0 : getPanelObstruction(),
       width: canvas?.clientWidth ?? win.w,
       height: canvas?.clientHeight ?? win.h,
       obstruction: getSheetObstruction(),
@@ -906,33 +618,6 @@ export default function TripMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready])
 
-  // A live breakpoint switch (rotation) must reconcile what the previous layout left on the map:
-  // phones show no popup, and label visibility follows a different rule on each side. Neither
-  // is redrawn on a layout change by itself (padding eases and resizes emit no zoom event).
-  useEffect(() => {
-    if (!ready) return
-    if (layout === 'mobile') {
-      activePopupRef.current?.remove()
-      activePopupRef.current = null
-    }
-    // The two layouts draw different marker graphics (phone avatars vs desktop teardrops). Redraw
-    // them — only them: no camera move, and setMarkers removes the old elements with their handlers.
-    // Before the first framing there is nothing drawn yet; the [ready] draw reads the layout itself.
-    if (framedRef.current) drawMarkers()
-    syncMarkerLabelVisibility()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layout])
-
-  useEffect(() => {
-    if (!ready) return
-    const map = getMap()
-    if (!map) return
-    map.on('zoom', syncMarkerLabelVisibility)
-    syncMarkerLabelVisibility()
-    return () => { map.off('zoom', syncMarkerLabelVisibility) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready])
-
   // The sheet changed height (compact, expanded, hidden) or the viewport crossed the md line:
   // re-apply padding with a short ease, keeping the camera's centre. Not a fresh fly-to — the
   // framing already chosen stays, it just shifts into the part of the map that is visible now.
@@ -967,7 +652,7 @@ export default function TripMap({
     }
     apply()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sheetObstruction, layout, controlRects])
+  }, [sheetObstruction, panelObstruction, layout, controlRects])
 
   // The 3D mode. Our terrain + fog follow it (camera-mode.ts; the Standard style's own z<13.7 relief
   // is its baseline and not ours to remove), and a real change eases the camera's pitch where it
@@ -1010,10 +695,13 @@ export default function TripMap({
     const container = getMap()?.getContainer?.() ?? null
     if (container) obstructionHostRef.current = container
     container?.style?.setProperty?.('--sheet-obstruction', `${layout === 'mobile' ? sheetObstruction : 0}px`)
+    // The desktop panel covers the bottom-left corner too: the Mapbox logo rides beside it.
+    container?.style?.setProperty?.('--panel-obstruction', `${layout === 'mobile' ? 0 : panelObstruction}px`)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, sheetObstruction, layout])
+  }, [ready, sheetObstruction, panelObstruction, layout])
   useEffect(() => () => {
     obstructionHostRef.current?.style?.removeProperty?.('--sheet-obstruction')
+    obstructionHostRef.current?.style?.removeProperty?.('--panel-obstruction')
   }, [])
 
   // Fly to the active day's pins when the day changes. Markers and the trail are whole-trip
@@ -1070,6 +758,19 @@ export default function TripMap({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitNonce])
+
+  // A stop card's "Show in 3D". The owner turns the mode on in the same update; if the mode effect
+  // has not applied it yet, the fly waits for it (pending3dFlyRef), exactly as the old popup did.
+  useEffect(() => {
+    if (!ready || show3dNonce === 0 || !selectedPlaceId) return
+    const place = buildPlaceIndex(bundle).get(selectedPlaceId)
+    if (!place || !hasRealCoords(place.lng, place.lat)) return
+    cameraIntentRef.current = 'place'
+    const at: [number, number] = [place.lng, place.lat]
+    if (mode3dRef.current && appliedModeRef.current) flyToStreet(at)
+    else pending3dFlyRef.current = at
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [show3dNonce])
 
   // Refresh marker selection and fly to the selected place.
   useEffect(() => {

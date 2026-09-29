@@ -51,7 +51,8 @@ describe('/app/trip/demo', () => {
 
     expect(await screen.findByText(placesForDay(TOKYO_TRIP, 1)[0].place.name)).toBeInTheDocument()
     expect(await screen.findByTestId('trip-map')).toBeInTheDocument()
-    expect(screen.getByText(/sample trail — read-only/i)).toBeInTheDocument()
+    // A6: the kit Sample tag — visible "Sample", sr-only "trail — read-only", one accessible string.
+    expect(screen.getByText('Sample', { exact: false, selector: 'span' }).textContent).toMatch(/^Sample trail — read-only$/i)
     expect(getTrip).not.toHaveBeenCalled()
     // Nothing on this page writes, so the composer that posts feedback for a trip id stays off.
     expect(screen.queryByTestId('trip-feedback-panel')).not.toBeInTheDocument()

@@ -41,8 +41,6 @@ export default function MobileMapControls({
   onToggle3d: () => void
 }) {
   const hub = layerMode === 'hub'
-  // Always allowed to go BACK to the route; only switching to the hub needs a placed hotel.
-  const layerDisabled = !hub && !canUseHubLayer
   const backRef = useRef<HTMLAnchorElement>(null)
   useReportControls(backRef, 'trip-back', [])
   // Plan amendment 3: at most agent, Fit, 3D, Hotel. On a viewport too short for four above the
@@ -74,26 +72,7 @@ export default function MobileMapControls({
         mode3d={mode3d}
         onToggle3d={onToggle3d}
         trailing={showLayerToggle && hotelFits ? (
-          <button
-            type="button"
-            data-map-control
-            onClick={onToggleLayer}
-            aria-label="Hotel map layer"
-            aria-pressed={hub}
-            disabled={layerDisabled}
-            title={layerDisabled ? 'No hotel could be placed on the map' : undefined}
-            className={[
-              'm-btn-icon pointer-events-auto',
-              // `!`: the kit's unlayered `cursor: pointer` outranks a plain utility.
-              layerDisabled ? 'cursor-not-allowed! opacity-50' : '',
-            ].join(' ')}
-          >
-            <svg data-icon="bed" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"
-              strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M3 18V7M3 14h18v4M21 14v-2.5A2.5 2.5 0 0 0 18.5 9H11v5" />
-              <circle cx="7" cy="11" r="1.8" />
-            </svg>
-          </button>
+          <HotelLayerButton hub={hub} canUseHubLayer={canUseHubLayer} onToggle={onToggleLayer} />
         ) : null}
       />
     </>
@@ -103,3 +82,34 @@ export default function MobileMapControls({
 /** Above the sheet (z-10) so the stack stays usable over an expanded sheet. */
 const EDGE = 'absolute z-20 top-[max(12px,env(safe-area-inset-top))]'
 
+/** The hotel map-layer circle, shared by the phone stack and the desktop stack. */
+export function HotelLayerButton({ hub, canUseHubLayer, onToggle }: {
+  hub: boolean
+  canUseHubLayer: boolean
+  onToggle: () => void
+}) {
+  // Always allowed to go BACK to the route; only switching to the hub needs a placed hotel.
+  const disabled = !hub && !canUseHubLayer
+  return (
+    <button
+      type="button"
+      data-map-control
+      onClick={onToggle}
+      aria-label="Hotel map layer"
+      aria-pressed={hub}
+      disabled={disabled}
+      title={disabled ? 'No hotel could be placed on the map' : undefined}
+      className={[
+        'm-btn-icon pointer-events-auto',
+        // `!`: the kit's unlayered `cursor: pointer` outranks a plain utility.
+        disabled ? 'cursor-not-allowed! opacity-50' : '',
+      ].join(' ')}
+    >
+      <svg data-icon="bed" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"
+        strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M3 18V7M3 14h18v4M21 14v-2.5A2.5 2.5 0 0 0 18.5 9H11v5" />
+        <circle cx="7" cy="11" r="1.8" />
+      </svg>
+    </button>
+  )
+}

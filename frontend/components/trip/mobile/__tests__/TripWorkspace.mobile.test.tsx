@@ -13,7 +13,7 @@ import type { TripBundle } from '@/lib/trip/backend-types'
 
 const h = vi.hoisted(() => ({
   mapMounts: 0,
-  mapProps: null as null | { onSelectPlace: (id: string) => void; layerMode?: string; focusNonce?: number; fitNonce?: number; mode3d?: boolean; onRequest3d?: () => void },
+  mapProps: null as null | { onSelectPlace: (id: string) => void; layerMode?: string; focusNonce?: number; fitNonce?: number; mode3d?: boolean; show3dNonce?: number; selectedPlaceId?: string | null },
   mobile: false,
   listeners: new Set<() => void>(),
   registered: [] as string[],
@@ -518,10 +518,15 @@ describe('TripWorkspace — the phone branch', () => {
     expect(h.mapProps!.mode3d).toBe(false)
   })
 
-  it('the popup\'s "Zoom in for 3D" request turns the mode on', () => {
+  /* A6 migration (was the popup's "Zoom in for 3D" request): the selected card's "Show in 3D". */
+  it('"Show in 3D" on the selected card turns the mode on and asks the map for a street-level fly', () => {
     renderSeeded()
-    act(() => { h.mapProps!.onRequest3d!() })
+    const first = placesForDay(TOKYO_TRIP, 1)[0]
+    fireEvent.click(document.querySelector<HTMLElement>(`[data-place-id="${first.place_id}"]`)!)
+    fireEvent.click(within(sheet()!).getByRole('button', { name: /show in 3d/i }))
     expect(h.mapProps!.mode3d).toBe(true)
+    expect(h.mapProps!.show3dNonce).toBe(1)
+    expect(h.mapProps!.selectedPlaceId).toBe(first.place_id)
     expect(within(stack()).getByRole('button', { name: '3D view' })).toHaveAttribute('aria-pressed', 'true')
   })
 
@@ -560,5 +565,80 @@ describe('TripWorkspace — the phone branch', () => {
       Object.defineProperty(window, 'innerHeight', { configurable: true, value: tall })
       act(() => { setSheetObstruction(0) })
     }
+  })
+
+  /* ---- Phase A6: the desktop floating panel ---- */
+
+  it('desktop: About, Stay, day switches and collapse never remount the map or re-register tools', () => {
+    h.mobile = false
+    renderSeeded(TOKYO_TRIP_WITH_HOTELS)
+    const mounts = h.mapMounts
+    const before = h.registered.length
+    expect(before).toBeGreaterThan(0)
+    const panel = desktopRail()!
+    fireEvent.click(within(panel).getByText('About this trip'))
+    fireEvent.click(within(panel).getByRole('button', { name: 'Stay' }))
+    fireEvent.click(within(panel).getByRole('button', { name: /^Day 2\b/ }))
+    fireEvent.click(screen.getByRole('button', { name: /hide trip details/i }))
+    fireEvent.click(screen.getByRole('button', { name: /show trip details/i }))
+    expect(h.mapMounts).toBe(mounts)
+    expect(h.registered.length).toBe(before)
+    expect(h.aborted).toEqual([])
+  })
+
+  it('desktop: the panel renders the phone content model in a kit floating panel', () => {
+    h.mobile = false
+    renderSeeded(TOKYO_TRIP_WITH_HOTELS)
+    const panel = desktopRail()!
+    expect(panel.className).toMatch(/\bui-floating-panel\b/)
+    expect(within(within(panel).getByTestId('sheet-heading')).getByRole('heading', { level: 2, name: TOKYO_TRIP.trip.inferred_destination! })).toBeInTheDocument()
+    expect(within(panel).getByRole('group', { name: 'Trip days' })).toBeInTheDocument()
+    expect(within(panel).getAllByRole('listitem').length).toBeGreaterThan(0)          // stop cards
+    expect(within(panel).getByText('About this trip')).toBeInTheDocument()
+    expect(within(panel).getByRole('link', { name: 'All trails' }).className).toMatch(/\bm-btn-icon\b/)
+    expect(sheet()).toBeNull()
+  })
+
+  it('desktop: publishes the panel as a LEFT obstruction, 0 once collapsed and after unmount', async () => {
+    vi.useFakeTimers()
+    try {
+      const { getPanelObstruction } = await import('@/lib/trip/panel-obstruction')
+      const { getSheetObstruction } = await import('@/lib/trip/sheet-obstruction')
+      h.mobile = false
+      const view = renderSeeded()
+      const panel = desktopRail()!
+      panel.getBoundingClientRect = () => ({ right: 456, left: 16, top: 16, bottom: 884, width: 440, height: 868, x: 16, y: 16, toJSON() {} }) as DOMRect
+      act(() => { window.dispatchEvent(new Event('resize')) })
+      act(() => { vi.advanceTimersByTime(400) })
+      expect(getPanelObstruction()).toBe(456)
+      expect(getSheetObstruction()).toBe(0)                      // the bottom-only store is untouched
+      fireEvent.click(screen.getByRole('button', { name: /hide trip details/i }))
+      expect(getPanelObstruction()).toBe(0)
+      fireEvent.click(screen.getByRole('button', { name: /show trip details/i }))
+      act(() => { vi.advanceTimersByTime(400) })
+      expect(getPanelObstruction()).toBe(456)
+      view.unmount()
+      expect(getPanelObstruction()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('desktop: a pin selects its card and opens it as the detail, with the confidence chip', () => {
+    h.mobile = false
+    renderSeeded()
+    act(() => { h.mapProps!.onSelectPlace('pl_akasaka') })
+    const card = document.querySelector<HTMLElement>('#trip-details-panel [data-place-id="pl_akasaka"]')!
+    expect(card).toHaveAttribute('aria-expanded', 'true')
+    expect(card.closest('[data-stop-card]')!.querySelector('[data-evidence-chip]')).not.toBeNull()
+  })
+
+  it('desktop: collapse and reopen hand keyboard focus to each other, never to <body>', () => {
+    h.mobile = false
+    renderSeeded()
+    fireEvent.click(screen.getByRole('button', { name: /hide trip details/i }))
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: /show trip details/i }))
+    fireEvent.click(screen.getByRole('button', { name: /show trip details/i }))
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: /hide trip details/i }))
   })
 })

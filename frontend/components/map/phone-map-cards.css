@@ -1,82 +1,82 @@
-/* Phone map cards and controls (Placify-pattern revamp, A4). Everything is inside the phone media
-   query AND keyed to `.phone-popup` (added by TripMap only in the phone layout) or to the shared
-   map's bottom controls, so desktop cannot change. Selectors carry one more class than the night
-   popup rules in globals.css, so they win without !important. No marker roots here. */
+/* Trip map cards and controls (Placify-pattern revamp, A4; the cards at every width since A6).
+   Keyed to `.phone-popup` (added by TripMap to every eat and stay card; the name is historical) or
+   to the shared map's bottom controls. Selectors carry one more class than the night popup rules
+   in globals.css, so they win without !important. No marker roots here. */
 
+/* ---- Eat and hotel-hub cards: white kit card, ink type, 44px close ---- */
+.astrail-evidence-popup.phone-popup .mapboxgl-popup-content {
+  background: var(--m-card);
+  border: 0;
+  border-radius: var(--m-r-card);
+  box-shadow: var(--m-shadow-2);
+  color: var(--m-text);
+  padding: 16px 18px 18px;
+}
+.astrail-evidence-popup.phone-popup.mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip { border-top-color: var(--m-card); }
+.astrail-evidence-popup.phone-popup.mapboxgl-popup-anchor-top .mapboxgl-popup-tip { border-bottom-color: var(--m-card); }
+.astrail-evidence-popup.phone-popup.mapboxgl-popup-anchor-left .mapboxgl-popup-tip { border-right-color: var(--m-card); }
+.astrail-evidence-popup.phone-popup.mapboxgl-popup-anchor-right .mapboxgl-popup-tip { border-left-color: var(--m-card); }
+
+.astrail-evidence-popup.phone-popup .mapboxgl-popup-close-button {
+  top: 6px;
+  right: 6px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--m-text-muted);
+  font-size: 22px;
+  line-height: 44px;
+}
+.astrail-evidence-popup.phone-popup .mapboxgl-popup-close-button:focus-visible {
+  outline: none;
+  box-shadow: var(--m-focus);
+}
+
+.phone-popup .evidence-popup { padding-right: 32px; }
+.phone-popup .evidence-popup__eyebrow {
+  color: var(--m-accent);
+  font: 600 12px/1.4 var(--font-ui), system-ui, sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.phone-popup .evidence-popup__title {
+  color: var(--m-text);
+  font: 600 17px/1.25 var(--font-ui), system-ui, sans-serif;
+  letter-spacing: -0.01em;
+  margin-top: 2px;
+}
+.phone-popup .evidence-popup__where,
+.phone-popup .suggestion-popup__body,
+.phone-popup .suggestion-popup__matches,
+.phone-popup .suggestion-popup__stars {
+  color: var(--m-text-muted);
+  font: 400 14px/1.45 var(--font-ui), system-ui, sans-serif;
+}
+.phone-popup .suggestion-popup__note {
+  color: var(--m-text-muted);
+  font: 400 12px/1.4 var(--font-ui), system-ui, sans-serif;
+  margin-top: 8px;
+}
+/* Source links read as the kit's secondary pill: white capsule, shadow, 44px. */
+.phone-popup .evidence-popup__source {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 10px;
+  padding: 0 18px;
+  border-radius: var(--m-r-pill);
+  background: var(--m-card);
+  box-shadow: var(--m-shadow-1);
+  color: var(--m-text);
+  font: 600 15px/1 var(--font-ui), system-ui, sans-serif;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  text-transform: none;
+}
+.phone-popup .evidence-popup__source:focus-visible { outline: none; box-shadow: var(--m-focus); }
+
+/* ---- Phone: Mapbox attribution and logo ride above the trip sheet (TripMap publishes its height) ---- */
 @media (max-width: 767.98px) {
-  /* ---- Eat and hotel-hub cards: white kit card, ink type, 44px close ---- */
-  .astrail-evidence-popup.phone-popup .mapboxgl-popup-content {
-    background: var(--m-card);
-    border: 0;
-    border-radius: var(--m-r-card);
-    box-shadow: var(--m-shadow-2);
-    color: var(--m-text);
-    padding: 16px 18px 18px;
-  }
-  .astrail-evidence-popup.phone-popup.mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip { border-top-color: var(--m-card); }
-  .astrail-evidence-popup.phone-popup.mapboxgl-popup-anchor-top .mapboxgl-popup-tip { border-bottom-color: var(--m-card); }
-  .astrail-evidence-popup.phone-popup.mapboxgl-popup-anchor-left .mapboxgl-popup-tip { border-right-color: var(--m-card); }
-  .astrail-evidence-popup.phone-popup.mapboxgl-popup-anchor-right .mapboxgl-popup-tip { border-left-color: var(--m-card); }
-
-  .astrail-evidence-popup.phone-popup .mapboxgl-popup-close-button {
-    top: 6px;
-    right: 6px;
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    color: var(--m-text-muted);
-    font-size: 22px;
-    line-height: 44px;
-  }
-  .astrail-evidence-popup.phone-popup .mapboxgl-popup-close-button:focus-visible {
-    outline: none;
-    box-shadow: var(--m-focus);
-  }
-
-  .phone-popup .evidence-popup { padding-right: 32px; }
-  .phone-popup .evidence-popup__eyebrow {
-    color: var(--m-accent);
-    font: 600 12px/1.4 var(--font-ui), system-ui, sans-serif;
-    letter-spacing: 0;
-    text-transform: none;
-  }
-  .phone-popup .evidence-popup__title {
-    color: var(--m-text);
-    font: 600 17px/1.25 var(--font-ui), system-ui, sans-serif;
-    letter-spacing: -0.01em;
-    margin-top: 2px;
-  }
-  .phone-popup .evidence-popup__where,
-  .phone-popup .suggestion-popup__body,
-  .phone-popup .suggestion-popup__matches,
-  .phone-popup .suggestion-popup__stars {
-    color: var(--m-text-muted);
-    font: 400 14px/1.45 var(--font-ui), system-ui, sans-serif;
-  }
-  .phone-popup .suggestion-popup__note {
-    color: var(--m-text-muted);
-    font: 400 12px/1.4 var(--font-ui), system-ui, sans-serif;
-    margin-top: 8px;
-  }
-  /* Source links read as the kit's secondary pill: white capsule, shadow, 44px. */
-  .phone-popup .evidence-popup__source {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-    margin-top: 10px;
-    padding: 0 18px;
-    border-radius: var(--m-r-pill);
-    background: var(--m-card);
-    box-shadow: var(--m-shadow-1);
-    color: var(--m-text);
-    font: 600 15px/1 var(--font-ui), system-ui, sans-serif;
-    letter-spacing: -0.01em;
-    text-decoration: none;
-    text-transform: none;
-  }
-  .phone-popup .evidence-popup__source:focus-visible { outline: none; box-shadow: var(--m-focus); }
-
-  /* ---- Mapbox attribution and logo ride above the trip sheet (TripMap publishes its height) ---- */
   .shared-map .mapboxgl-ctrl-bottom-left,
   .shared-map .mapboxgl-ctrl-bottom-right {
     bottom: var(--sheet-obstruction, 0px);
@@ -84,7 +84,15 @@
   }
 }
 
-@media (max-width: 767.98px) and (prefers-reduced-motion: reduce) {
+/* ---- Desktop: the Mapbox logo rides beside the floating trip panel, never under it ---- */
+@media (min-width: 768px) {
+  .shared-map .mapboxgl-ctrl-bottom-left {
+    left: var(--panel-obstruction, 0px);
+    transition: left var(--m-dur-sheet) ease-out;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
   .shared-map .mapboxgl-ctrl-bottom-left,
   .shared-map .mapboxgl-ctrl-bottom-right { transition: none; }
 }

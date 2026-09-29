@@ -48,6 +48,10 @@ export type MobileTripViewProps = {
   /** The trip camera's 3D mode, owned by TripWorkspace. */
   mode3d: boolean
   onToggle3d: () => void
+  /** A stop card's "Show in 3D": turn the mode on and fly to street level at that stop. */
+  onShow3d?: (placeId: string) => void
+  /** Desktop only: the confidence chip in the selected stop's detail. */
+  showConfidence?: boolean
   onToggleSheetHeight: () => void
   onHideSheet: () => void
   onReopenSheet: () => void
@@ -57,7 +61,7 @@ export type MobileTripViewProps = {
 }
 
 /** The sheet's title block: serif trip name, then the date range and the Sample tag. */
-function SheetHeading({ title, dates, readOnly }: { title: string; dates: string; readOnly: boolean }) {
+export function SheetHeading({ title, dates, readOnly }: { title: string; dates: string; readOnly: boolean }) {
   return (
     <div data-testid="sheet-heading" className="min-w-0">
       <h2 className="type-display truncate text-[22px] leading-[1.2] text-[var(--m-text)] [@media(max-height:700px)]:text-[20px]">{title}</h2>
@@ -112,11 +116,12 @@ function StripCell({ current, onClick, label, big, small }: {
    day: a pin tap also changes the day, and StopTimeline's scroll-to-the-selected-stop runs first
    (child effects before parent), so an effect here would scroll the pin's stop straight back out. */
 function toListTop() {
-  const body = document.getElementById('mobile-trip-sheet-body')
+  // The list's scroller: the phone sheet body or the desktop panel body (one is mounted at a time).
+  const body = document.querySelector<HTMLElement>('[data-trip-scroll]')
   if (body) body.scrollTop = 0
 }
 
-function DateStrip(p: MobileTripViewProps) {
+export function DateStrip(p: MobileTripViewProps) {
   return (
     <div role="group" aria-label="Trip days" className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [@media(max-height:700px)]:pb-1">
       {p.days.map((d) => {
@@ -214,6 +219,53 @@ function DayDisclosure({ day, rewriting }: { day: TripDay; rewriting: boolean })
 }
 
 /**
+ * What the list shows under the date strip — the day's stops or the Stay view, then About this
+ * trip. Shared by the phone sheet and the desktop floating panel (FloatingTripPanel), so the two
+ * widths render one content model.
+ */
+export function TripPanelBody(p: MobileTripViewProps) {
+  return (
+    <>
+      {p.listView === 'stay' ? (
+        <div className="flex flex-col gap-3">
+          <StaySubHeader count={p.hotels.length} />
+          <TradeoffPanel tradeoffs={p.bundle.trip.tradeoffs} variant="comparisons" tone="phone" />
+          <HotelPanel
+            hotels={p.hotels}
+            selectedHotelId={p.selectedHotelId}
+            onSelectHotel={p.onSelectHotel}
+            layerMode={p.layerMode}
+            variant="phone"
+          />
+        </div>
+      ) : (
+        <>
+          {p.activeDay ? <DaySubHeader day={p.activeDay} /> : null}
+          <StopTimeline
+            bundle={p.bundle}
+            onShow3d={p.onShow3d}
+            showConfidence={p.showConfidence}
+            places={p.dayPlaces}
+            legs={p.dayLegs}
+            restaurants={p.dayRestaurants}
+            placeIndex={p.placeIndex}
+            trailNumbers={p.trailNumbers}
+            selectedPlaceId={p.selectedPlaceId}
+            onSelectPlace={p.onSelectPlace}
+            selectedRestaurantPlaceId={p.selectedRestaurantPlaceId}
+            onSelectRestaurant={p.onSelectRestaurant}
+          />
+          {/* After the stops, not above them: the first screen of a compact sheet is for the
+              route; the day's prose is context. */}
+          {p.activeDay ? <DayDisclosure day={p.activeDay} rewriting={p.summaryRewriting} /> : null}
+        </>
+      )}
+      <AboutThisTrip bundle={p.bundle} readOnly={p.readOnly} feedback={p.feedback} />
+    </>
+  )
+}
+
+/**
  * The phone trip view: map above, a stop sheet below, a floating top bar. Owns no state — every
  * selection, day, layer and sheet value belongs to TripWorkspace, which also keeps the map driver
  * and the agent tools mounted outside this branch.
@@ -240,39 +292,7 @@ export default function MobileTripView(p: MobileTripViewProps) {
         heading={<SheetHeading title={tripTitle(p.bundle.trip)} dates={tripDateRange(p.bundle.trip)} readOnly={p.readOnly} />}
         header={<DateStrip {...p} />}
       >
-        {p.listView === 'stay' ? (
-          <div className="flex flex-col gap-3">
-            <StaySubHeader count={p.hotels.length} />
-            <TradeoffPanel tradeoffs={p.bundle.trip.tradeoffs} variant="comparisons" tone="phone" />
-            <HotelPanel
-              hotels={p.hotels}
-              selectedHotelId={p.selectedHotelId}
-              onSelectHotel={p.onSelectHotel}
-              layerMode={p.layerMode}
-              variant="phone"
-            />
-          </div>
-        ) : (
-          <>
-            {p.activeDay ? <DaySubHeader day={p.activeDay} /> : null}
-            <StopTimeline
-              bundle={p.bundle}
-              places={p.dayPlaces}
-              legs={p.dayLegs}
-              restaurants={p.dayRestaurants}
-              placeIndex={p.placeIndex}
-              trailNumbers={p.trailNumbers}
-              selectedPlaceId={p.selectedPlaceId}
-              onSelectPlace={p.onSelectPlace}
-              selectedRestaurantPlaceId={p.selectedRestaurantPlaceId}
-              onSelectRestaurant={p.onSelectRestaurant}
-            />
-            {/* After the stops, not above them: the first screen of a compact sheet is for the
-                route; the day's prose is context. */}
-            {p.activeDay ? <DayDisclosure day={p.activeDay} rewriting={p.summaryRewriting} /> : null}
-          </>
-        )}
-        <AboutThisTrip bundle={p.bundle} readOnly={p.readOnly} feedback={p.feedback} />
+        <TripPanelBody {...p} />
       </MobileTripSheet>
     </div>
   )

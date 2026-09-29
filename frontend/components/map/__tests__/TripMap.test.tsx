@@ -270,21 +270,19 @@ describe('TripMap', () => {
 
   // With one persistent instance the camera no longer resets on navigation, so the trip
   // view has to frame its own places rather than inherit the generation globe.
-  it('anchors the teardrop by its tip, not its middle', async () => {
-    // anchor:'bottom' is what puts the point ON the coordinate. The default 'center' floats the
-    // whole pin half its height above the place it claims to mark.
+  /* A6 migration (was "anchors the teardrop by its tip"): desktop draws the phone's avatar pin, a
+     circle, whose correct anchor is its centre — the same one the phone has always used. */
+  it('draws the avatar pin at desktop width too, anchored at its centre', async () => {
     renderMap()
     await flush()
     fireLoad()
     await flush()
-    // Trail pins only. An eat marker is a round chip, and a circle's ANCHOR IS ITS CENTRE —
-    // bottom-anchoring one would float it above the restaurant it marks. Different shape,
-    // different correct anchor; asserting "every marker" conflated the two.
     const trailMarkers = MarkerCtor.mock.calls
       .map((c) => c[0] as { element: HTMLElement, anchor?: string })
-      .filter((o) => o?.element?.classList.contains('constellation-pin'))
+      .filter((o) => o?.element?.classList.contains('phone-pin'))
     expect(trailMarkers.length).toBeGreaterThan(0)
-    expect(trailMarkers.every((o) => o.anchor === 'bottom')).toBe(true)
+    expect(trailMarkers.every((o) => o.anchor === 'center')).toBe(true)
+    expect(markerElements.some((e) => e.classList.contains('constellation-pin'))).toBe(false)
   })
 
   it('keeps the stop number visible even when the pin carries a photo', async () => {
@@ -293,9 +291,8 @@ describe('TripMap', () => {
     fireLoad()
     await flush()
     const marker = markerElements.find((e) => e.getAttribute('aria-label') === 'Akasaka Station')!
-    const n = marker.querySelector('.constellation-pin__drop-number')?.textContent
-      ?? marker.querySelector('.constellation-pin__badge')?.textContent
-    expect(n).toBe('1')
+    expect(marker.querySelector('.phone-pin__photo')).not.toBeNull()
+    expect(marker.querySelector('.phone-pin__badge')?.textContent).toBe('1')
   })
 
   it('never asks for more padding than the canvas can give', async () => {
@@ -316,9 +313,8 @@ describe('TripMap', () => {
 
   it('refuses a hostile Reel thumbnail rather than rendering it', async () => {
     // thumbnail_url arrives from Apify's scrape of Instagram — attacker-controlled third-party
-    // content (guardrail #11). The popup already routes its copy through safeWebUrl; the pin's
-    // <image href> is the same value and must clear the same check, or the two disagree about
-    // what is safe to load. Falling back to the placeholder is the correct degradation.
+    // content (guardrail #11). The pin's <img src> must clear the protocol check; falling back to
+    // the place-type glyph is the correct degradation.
     const hostile = {
       ...TOKYO_TRIP,
       inspiration: TOKYO_TRIP.inspiration.map((i, idx) =>
@@ -334,8 +330,8 @@ describe('TripMap', () => {
     await flush()
 
     const marker = markerElements.find((e) => e.getAttribute('aria-label') === 'Akasaka Station')!
-    expect(marker.querySelector('image')).toBeNull()
-    expect(marker.querySelector('.constellation-pin__placeholder')).not.toBeNull()
+    expect(marker.querySelector('img')).toBeNull()
+    expect(marker.querySelector('.phone-pin__glyph')).not.toBeNull()
     // And nothing anywhere on the map smuggled the string through.
     expect(markerElements.some((e) => e.innerHTML.includes('javascript:'))).toBe(false)
   })
@@ -423,9 +419,11 @@ describe('TripMap', () => {
     expect(eat!.getAttribute('aria-label')).toBe('Koma Sushi, sushi')
   })
 
-  it('shows the eat label by zoom, not by hover — a phone has no hover', async () => {
-    mapInstance.getZoom.mockReturnValue(13)          // city zoom: labels on
-    render(
+  /* A6 migration (was "by zoom"): one rule at every width — an eat pin's name shows when it is
+     the selected suggestion, never by hover (a touch device has none) and never by zoom. */
+  it('shows the eat label for the selected suggestion only', async () => {
+    mapInstance.getZoom.mockReturnValue(13)
+    const view = render(
       <MapProvider>
         <TripMap bundle={withEatSuggestion() as never} activeDayNumber={1} selectedPlaceId={null} onSelectPlace={() => {}} />
       </MapProvider>,
@@ -433,14 +431,16 @@ describe('TripMap', () => {
     await flush()
     fireLoad()
     await flush()
-
-    const label = markerElements
-      .find((e) => e.classList.contains('eat-pin'))!
-      .querySelector('.eat-pin__label')!
-    expect(label.classList.contains('eat-pin__label--visible')).toBe(true)
-    // ...and the trail label's own class is NOT borrowed: an unscoped shared modifier would
-    // reveal trail labels the zoom gate had just hidden.
-    expect(label.classList.contains('constellation-pin__label--visible')).toBe(false)
+    const label = () => markerElements.filter((e) => e.classList.contains('eat-pin')).at(-1)!.querySelector('.eat-pin__label')!
+    expect(label().classList.contains('eat-pin__label--visible')).toBe(false)
+    view.rerender(
+      <MapProvider>
+        <TripMap bundle={withEatSuggestion() as never} activeDayNumber={1} selectedPlaceId={null} onSelectPlace={() => {}}
+          selectedRestaurantPlaceId="pl_koma" />
+      </MapProvider>,
+    )
+    await flush()
+    expect(label().classList.contains('eat-pin__label--visible')).toBe(true)
   })
 
   it('flies to a restaurant chosen from the sidebar and opens its card', async () => {
@@ -637,112 +637,63 @@ describe('TripMap', () => {
 
     // Filter by class, not by position: eat markers are appended after the trail pins, so a
     // trailing slice silently starts grabbing restaurants instead.
-    const markers = markerElements.filter((el) => el.classList.contains('constellation-pin'))
+    const markers = markerElements.filter((el) => el.classList.contains('phone-pin'))
     const byLabel = (name: string) => markers.find((el) => el.getAttribute('aria-label') === name)!
-    expect(byLabel('Akasaka Station')).toHaveClass('constellation-pin', 'constellation-pin--reel_extracted')
+    // A6 migration: the avatar pin (phone-pin) at every width; classes renamed, numbers unchanged.
+    expect(byLabel('Akasaka Station')).toHaveClass('phone-pin', 'phone-pin--reel_extracted')
     expect(byLabel('Akasaka Station')).toHaveTextContent('1')
     // a later-day stop is no longer dimmed — it carries its global number and stays lit
-    expect(byLabel('SANDO LAB TOKYO')).not.toHaveClass('constellation-pin--receding')
+    expect(byLabel('SANDO LAB TOKYO')).not.toHaveClass('phone-pin--receding')
     expect(byLabel('SANDO LAB TOKYO')).toHaveTextContent('3')
     expect(byLabel('Tokyo Disneyland')).toHaveTextContent('5')
     // the undayed base hotel is not a stop on the trail — it recedes, unnumbered
-    expect(byLabel('Shinjuku Granbell Hotel')).toHaveClass('constellation-pin--receding')
+    expect(byLabel('Shinjuku Granbell Hotel')).toHaveClass('phone-pin--receding')
   })
 
-  it('shows a place-name chip at city zoom and hides it when zoomed out', async () => {
-    renderMap()
+  /* A6 migration (was "a chip at city zoom"): the name pill belongs to the selected pin only, at
+     every width; the stop number is always on the badge (the agent's tools address stops by it). */
+  it('names the selected pin with a pill, and only that pin, while every pin keeps its number', async () => {
+    renderMap({ selectedPlaceId: TOKYO_TRIP.places[0].place_id })
     await flush()
     fireLoad()
     await flush()
-
-    const marker = markerElements.find(
-      (element) => element.getAttribute('aria-label') === 'Akasaka Station',
-    )!
-    const chip = marker.querySelector<HTMLElement>('.constellation-pin__label')!
-    // The stop number must survive whatever the pin looks like: the WebMCP tools address stops
-    // by it ("move stop 7"), so it is the shared vocabulary between the agent and the screen.
-    // It renders inside the teardrop when there is no photo, and as a badge when there is.
-    const shownNumber =
-      marker.querySelector('.constellation-pin__drop-number')?.textContent
-      ?? marker.querySelector('.constellation-pin__badge')?.textContent
-    expect(shownNumber).toBe('1')
-    expect(chip).toHaveTextContent('Akasaka Station')
-    expect(chip).toHaveClass('constellation-pin__label--visible')
-
-    mapInstance.getZoom.mockReturnValue(8)
-    const zoomHandler = mapInstance.on.mock.calls.find((call) => call[0] === 'zoom')?.[1]
-    act(() => { (zoomHandler as () => void)() })
-    expect(chip).not.toHaveClass('constellation-pin__label--visible')
+    const marker = markerElements.filter((e) => e.getAttribute('aria-label') === 'Akasaka Station').at(-1)!
+    expect(marker.querySelector('.phone-pin__badge')?.textContent).toBe('1')
+    expect(marker.querySelector('.phone-pin__name')).toHaveTextContent('Akasaka Station')
+    const others = markerElements.filter((e) => e.classList.contains('phone-pin') && e.getAttribute('aria-label') !== 'Akasaka Station')
+    expect(others.some((e) => e.querySelector('.phone-pin__name'))).toBe(false)
   })
 
-  it('truncates a long marker chip without losing the full accessible name', async () => {
+  it('truncates a long name pill without losing the full accessible name', async () => {
     const bundle = structuredClone(TOKYO_TRIP)
     const fullName = 'The Extremely Long Museum of Contemporary Astronomical Art'
     bundle.places[0].place.name = fullName
-    renderMap({ bundle })
+    renderMap({ bundle, selectedPlaceId: bundle.places[0].place_id })
     await flush()
     fireLoad()
 
-    const marker = markerElements.find(
-      (element) => element.getAttribute('aria-label') === fullName,
-    )!
-    const chip = marker.querySelector<HTMLElement>('.constellation-pin__label')!
-    expect(chip.textContent).toMatch(/…$/)
-    expect(chip.textContent!.length).toBeLessThan(fullName.length)
-    expect(chip).toHaveAttribute('title', fullName)
+    const marker = markerElements.filter((element) => element.getAttribute('aria-label') === fullName).at(-1)!
+    const pill = marker.querySelector<HTMLElement>('.phone-pin__name')!
+    expect(pill.textContent).toMatch(/…$/)
+    expect(pill.textContent!.length).toBeLessThan(fullName.length)
+    expect(pill).toHaveAttribute('title', fullName)
   })
 
-  it('opens evidence in a text-only popup when a marker is clicked', async () => {
-    const bundle = structuredClone(TOKYO_TRIP)
-    bundle.places[0].evidence_json.quote = '<img src=x onerror="alert(1)"> Visit before sunset.'
-    // Attribution now comes from `source_reel_url` (the field backend-types reserves for the
-    // Reel), so the override moves with it. A code the trip's inspiration does not carry also
-    // keeps the pin's thumbnail out of the way, leaving the quote as the only markup risk here.
-    bundle.places[0].evidence_json.source_reel_url = 'https://www.instagram.com/reel/safe-source/'
-    bundle.places[0].evidence_json.source_url = null
+  /* A6 migration: the desktop evidence popup is retired — the selected card in the floating panel
+     is the stop's detail at every width (StopCard). A pin click selects and opens no popup. The
+     text-only / hostile-URL contract moves with the content: StopCard.test "hostile evidence". */
+  it('selects the stop on a pin click and opens no popup, at desktop width', async () => {
     const onSelectPlace = vi.fn()
-
-    renderMap({ bundle, onSelectPlace })
+    renderMap({ onSelectPlace })
     await flush()
     fireLoad()
-
-    const marker = markerElements.find(
-      (element) => element.getAttribute('aria-label') === 'Akasaka Station',
-    )!
+    const marker = markerElements.find((element) => element.getAttribute('aria-label') === 'Akasaka Station')!
+    PopupCtor.mockClear()
     act(() => { marker.click() })
-
-    expect(onSelectPlace).toHaveBeenCalledWith(bundle.places[0].place_id)
-    expect(PopupCtor).toHaveBeenCalledWith(expect.objectContaining({
-      className: 'astrail-evidence-popup',
-    }))
-    const popup = popupElements.at(-1)!
-    expect(popup).toHaveTextContent('Stop 1')
-    expect(popup).toHaveTextContent('Day 1')
-    expect(popup).toHaveTextContent('<img src=x onerror="alert(1)"> Visit before sunset.')
-    expect(popup.querySelector('img')).toBeNull()
-    expect(popup.querySelector('a')).toHaveAttribute(
-      'href', 'https://www.instagram.com/reel/safe-source/',
-    )
+    expect(onSelectPlace).toHaveBeenCalledWith(TOKYO_TRIP.places[0].place_id)
+    expect(PopupCtor).not.toHaveBeenCalled()
   })
 
-  it('does not make an attacker-controlled non-http source URL clickable', async () => {
-    const bundle = structuredClone(TOKYO_TRIP)
-    // BOTH source fields: either one reaching an href unchecked is the same hole.
-    bundle.places[0].evidence_json.source_url = 'javascript:alert(document.cookie)'
-    bundle.places[0].evidence_json.source_reel_url = 'javascript:alert(document.cookie)'
-
-    renderMap({ bundle })
-    await flush()
-    fireLoad()
-    const marker = markerElements.find(
-      (element) => element.getAttribute('aria-label') === 'Akasaka Station',
-    )!
-    act(() => { marker.click() })
-
-    const popup = popupElements.at(-1)!
-    expect(popup).toHaveTextContent('javascript:alert(document.cookie)')
-    expect(popup.querySelector('a')).toBeNull()
-  })
 
   it('colours each day segment while keeping the trail continuous', async () => {
     renderMap()
@@ -949,20 +900,23 @@ describe('TripMap on a phone', () => {
     expect(PopupCtor).not.toHaveBeenCalled()
   })
 
-  it('keeps the desktop eat card class unchanged', async () => {
+  /* A6 migration: the light kit card (phone-popup) at every width, not the night card. */
+  it('opens the eat card in the light kit style at desktop width too', async () => {
     await loaded()
     PopupCtor.mockClear()
     const eat = markerElements.filter((e) => e.classList.contains('eat-pin')).at(-1)!
     act(() => { eat.click() })
-    expect(PopupCtor).toHaveBeenCalledWith(expect.objectContaining({ className: 'astrail-evidence-popup' }))
+    expect(PopupCtor).toHaveBeenCalledWith(expect.objectContaining({ className: 'astrail-evidence-popup phone-popup' }))
   })
 
-  it('still opens the evidence popup on desktop', async () => {
+  /* A6 migration (was "still opens the evidence popup on desktop"): selected card as detail. */
+  it('opens no stop popup on desktop either: the selected card is the detail', async () => {
     const onSelectPlace = vi.fn()
     await loaded({ onSelectPlace })
     PopupCtor.mockClear()
     act(() => { pin('Akasaka Station').click() })
-    expect(PopupCtor).toHaveBeenCalledWith(expect.objectContaining({ className: 'astrail-evidence-popup' }))
+    expect(onSelectPlace).toHaveBeenCalledTimes(1)
+    expect(PopupCtor).not.toHaveBeenCalled()
   })
 
   it('re-fits once to the area above the sheet when its first measurement lands, then only eases', async () => {
@@ -1122,11 +1076,15 @@ describe('TripMap on a phone', () => {
     mapInstance.getContainer.mockReturnValue({ clientWidth: 390, clientHeight: 844, style } as never)
     const view = await loaded()
     act(() => { setSheetObstruction(380) })
-    expect(style.setProperty).toHaveBeenLastCalledWith('--sheet-obstruction', '380px')
+    expect(style.setProperty).toHaveBeenCalledWith('--sheet-obstruction', '380px')
+    style.setProperty.mockClear()
     act(() => { setSheetObstruction(0) })
-    expect(style.setProperty).toHaveBeenLastCalledWith('--sheet-obstruction', '0px')
+    expect(style.setProperty).toHaveBeenCalledWith('--sheet-obstruction', '0px')
+    // A6: the desktop panel's left strip is published beside it — 0 on a phone.
+    expect(style.setProperty).toHaveBeenCalledWith('--panel-obstruction', '0px')
     view.unmount()
     expect(style.removeProperty).toHaveBeenCalledWith('--sheet-obstruction')
+    expect(style.removeProperty).toHaveBeenCalledWith('--panel-obstruction')
     mapInstance.getContainer.mockReturnValue({ clientWidth: 1440, clientHeight: 900 })
   })
 
@@ -1235,7 +1193,6 @@ describe('TripMap across a live breakpoint switch', () => {
     process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN = 'pk.test'
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1 })
     vi.stubGlobal('cancelAnimationFrame', () => {})
-    mapInstance.getZoom.mockReturnValue(13)                 // above LABEL_ZOOM
     mm = vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
       get matches() { return mobile }, media: query, onchange: null,
       addListener: () => {}, removeListener: () => {},
@@ -1253,47 +1210,25 @@ describe('TripMap across a live breakpoint switch', () => {
   const loaded = async () => { renderMap(); await flush(); fireLoad(); await flush() }
   const pin = (name: string) => markerElements.find((e) => e.getAttribute('aria-label') === name)!
 
-  it('closes a desktop evidence popup when the layout turns into the phone view', async () => {
-    mobile = false
-    await loaded()
-    act(() => { pin('Akasaka Station').click() })
-    const popup = PopupCtor.mock.results.at(-1)!.value as { remove: ReturnType<typeof vi.fn> }
-    expect(popup.remove).not.toHaveBeenCalled()
-    setMobile(true)
-    expect(popup.remove).toHaveBeenCalled()
-  })
 
   /* Amendment 6: a live 767↔768 switch rebuilds the marker graphics — and does nothing else. */
-  it('rebuilds markers across a desktop→phone→desktop round trip: no camera move, one live handler', async () => {
+  /* A6 migration (was "rebuilds markers across a round trip"): one pin graphic at every width, so a
+     live 767↔768 switch has nothing to rebuild — it touches no marker and moves no camera. */
+  it('changes nothing on a desktop→phone→desktop round trip: same markers, no camera move, one handler', async () => {
     mobile = false
     const onSelectPlace = vi.fn()
     renderMap({ onSelectPlace }); await flush(); fireLoad(); await flush()
-    const desktopFirst = pin('Akasaka Station')
-    expect(desktopFirst.className).toMatch(/\bconstellation-pin\b/)
-    const markersBefore = MarkerCtor.mock.results.map((r) => r.value as { remove: ReturnType<typeof vi.fn> })
-    mapInstance.fitBounds.mockClear(); mapInstance.flyTo.mockClear(); mapInstance.easeTo.mockClear()
-
+    const first = pin('Akasaka Station')
+    expect(first.className).toMatch(/^phone-pin\b/)
+    mapInstance.fitBounds.mockClear(); mapInstance.flyTo.mockClear()
+    const built = MarkerCtor.mock.calls.length
     setMobile(true)
-    const live = () => markerElements.filter((e) => e.getAttribute('aria-label') === 'Akasaka Station').at(-1)!
-    expect(live().className).toMatch(/^phone-pin\b/)
-    for (const m of markersBefore) expect(m.remove).toHaveBeenCalled()      // old graphics gone
-
     setMobile(false)
-    expect(live().className).toMatch(/\bconstellation-pin\b/)
-    expect(live()).not.toBe(desktopFirst)                                   // rebuilt, not reused
-    expect(mapInstance.fitBounds).not.toHaveBeenCalled()                    // no re-frame
+    expect(MarkerCtor.mock.calls.length).toBe(built)
+    expect(mapInstance.fitBounds).not.toHaveBeenCalled()
     expect(mapInstance.flyTo).not.toHaveBeenCalled()
-
-    act(() => { live().click() })
-    expect(onSelectPlace).toHaveBeenCalledTimes(1)                          // no duplicate handler
+    act(() => { first.click() })
+    expect(onSelectPlace).toHaveBeenCalledTimes(1)
   })
 
-  it('restores the desktop labels when a phone rotates to desktop width', async () => {
-    mobile = true
-    await loaded()
-    const visible = () => markerElements.filter((e) => e.querySelector('.constellation-pin__label--visible')).length
-    expect(visible()).toBe(0)                               // phone: only a selected pin is named
-    setMobile(false)
-    expect(visible()).toBeGreaterThan(1)                    // desktop at this zoom: all named
-  })
 })

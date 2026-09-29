@@ -6,7 +6,7 @@ import type {
 } from '@/lib/trip/backend-types'
 import { buildRouteLinks } from '@/lib/trip/route-links'
 import { stopProvenance } from '@/lib/trip/stop-provenance'
-import { thumbnailFor } from '@/components/map/popup-model'
+import { buildPopupModel, thumbnailFor } from '@/components/map/popup-model'
 import EatCardLinks from './EatCardLinks'
 import { Connector, LegConnector } from './LegConnector'
 import StopCard from './StopCard'
@@ -24,7 +24,7 @@ import StopCard from './StopCard'
 
 export default function StopTimeline({
   bundle, places, legs, restaurants, placeIndex, trailNumbers, selectedPlaceId, onSelectPlace,
-  selectedRestaurantPlaceId, onSelectRestaurant,
+  selectedRestaurantPlaceId, onSelectRestaurant, onShow3d, showConfidence = false,
 }: {
   bundle: TripBundle
   places: TripPlace[]
@@ -38,6 +38,10 @@ export default function StopTimeline({
   onSelectPlace: (placeId: string) => void
   selectedRestaurantPlaceId: string | null
   onSelectRestaurant: (placeId: string) => void
+  /** "Show in 3D" in the selected stop's detail; omitted, the button is not offered. */
+  onShow3d?: (placeId: string) => void
+  /** Desktop: the confidence chip in the selected stop's detail (the phone keeps it out). */
+  showConfidence?: boolean
 }) {
   const listRef = useRef<HTMLOListElement>(null)
   // The last row the user tapped HERE. A selection echoing that tap keeps 'nearest' (the row is
@@ -92,6 +96,11 @@ export default function StopTimeline({
                 placeIndex={placeIndex}
                 selectedRestaurantPlaceId={selectedRestaurantPlaceId}
                 onSelectRestaurant={onSelectRestaurant}
+                // The trip-relative detail (the Reel link, the local-script name, confidence) is
+                // derived for the open card only — the same model the map's cards are built from.
+                detail={tp.place_id === selectedPlaceId ? buildPopupModel(bundle, tp) : null}
+                showConfidence={showConfidence}
+                onShow3d={onShow3d ? () => onShow3d(tp.place_id) : undefined}
               />
             </li>
           )

@@ -80,8 +80,9 @@ describe('computeFramePadding with measured controls', () => {
       it(`${W}x${H}: no framed pin under the stack, left panel pad kept`, () => {
         const x = W - 16 - 44
         const controls: Rect[] = [0, 1, 2, 3].map((i) => ({ x, y: 16 + i * 52, w: 44, h: 44 }))
-        const pad = computeFramePadding({ width: W, height: H, obstruction: 0, controls })
-        expect(pad.left).toBe(480)
+        const panelRight = W === 1024 ? 364 : 456      // the floating panel, measured live
+        const pad = computeFramePadding({ width: W, height: H, obstruction: 0, controls, leftObstruction: panelRight })
+        expect(pad.left).toBe(panelRight + 40)
         for (const c of controls) expect(overlaps(framedRect(pad, W, H), c)).toBe(false)
       })
     }

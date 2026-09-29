@@ -14,7 +14,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import DaySelector from '@/components/trip/DaySelector'
+import { dayLabel } from '@/lib/trip/day-labels'
 import { tripDateRange } from '@/lib/trip/trip-presenters'
 import { buildStayPopup } from '@/components/map/suggestion-popup'
 import { statusLabel } from '@/lib/reels/labels'
@@ -109,10 +109,11 @@ describe('the harness itself', () => {
 })
 
 describe('date output is locale-independent', () => {
-  it('DaySelector prints the SSR spelling in a non-US browser', () => {
+  // A6 migration: DaySelector is retired; the date strip and day sub-header print dayLabel().
+  it('the date strip prints the SSR spelling in a non-US browser', () => {
     // The exact reported failure: server "Sep 18" vs client "18 Sept" on /app/trip/demo.
-    render(<DaySelector days={[day()]} activeDayNumber={1} onSelect={() => {}} />)
-    expect(screen.getByRole('tab', { name: /day 1/i })).toHaveTextContent('Sep 18')
+    expect(dayLabel(day()).monthDay).toBe('Sep 18')
+    expect(dayLabel(day()).name).toBe('Day 1, Fri 18 Sep')
   })
 
   it('tripDateRange prints the SSR spelling in a non-US browser', () => {
@@ -151,9 +152,7 @@ describe('a date-only string names the same calendar day everywhere', () => {
     const zones = ['Pacific/Midway', 'America/Los_Angeles', 'UTC', 'Asia/Singapore', 'Pacific/Kiritimati']
     for (const zone of zones) {
       process.env.TZ = zone
-      const { unmount } = render(<DaySelector days={[day()]} activeDayNumber={1} onSelect={() => {}} />)
-      expect(screen.getByRole('tab', { name: /day 1/i }), zone).toHaveTextContent('Sep 18')
-      unmount()
+      expect(dayLabel(day()).monthDay, zone).toBe('Sep 18')
     }
     process.env.TZ = 'UTC'
   })

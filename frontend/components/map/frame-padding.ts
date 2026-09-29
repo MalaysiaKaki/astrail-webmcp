@@ -4,7 +4,8 @@
  * Pure, so the geometry is testable without a Mapbox instance. TripMap measures the canvas and
  * reads the sheet obstruction; this decides the pads.
  *
- * Desktop (canvas >= 768px) is unchanged: clear the 440px left panel. On a phone the bottom pad is
+ * Desktop (canvas >= 768px) clears the floating panel's MEASURED right edge (lib/trip/panel-
+ * obstruction; 0 when collapsed) plus a gap. On a phone the bottom pad is
  * the mobile sheet's REAL covered height (lib/trip/sheet-obstruction), not the fixed 42% the old
  * sheet assumed — that value ignored the sheet's actual height and its hidden state, so a pin
  * selected with the sheet at 82% was framed for 42% and landed under it.
@@ -88,11 +89,15 @@ export function phoneStackFits({ buttons, safeTop, viewportHeight, obstruction }
 }
 
 const DESKTOP_BREAKPOINT = 768
+/** Desktop: room between the panel's right edge and a framed pin (its radius and name pill). */
+export const DESKTOP_PANEL_GAP = 40
+/** Desktop pad on a side nothing covers. */
+export const DESKTOP_EDGE = 80
 /** The gap kept between a control's edge and a framed pin's drawn edge. */
 const CONTROL_CLEARANCE = PIN_RADIUS + 2
 
 export function computeFramePadding({
-  width, height, obstruction, popupRoom = false, safeTop = 0, controls,
+  width, height, obstruction, popupRoom = false, safeTop = 0, controls, leftObstruction = 0,
 }: {
   width: number
   height: number
@@ -105,10 +110,15 @@ export function computeFramePadding({
   /** The map controls' measured rects, in canvas pixels. Any the base pads do not already clear
    *  push the cheapest pad outward. Omitted: the base pads (which clear the modelled phone stack). */
   controls?: readonly Rect[]
+  /** Desktop: pixels the floating panel covers at the left (its right edge); 0 when collapsed. */
+  leftObstruction?: number
 }): FramePadding {
   const wide = width >= DESKTOP_BREAKPOINT
   const wanted = wide
-    ? { top: 80, right: 80, bottom: 80, left: 480 }
+    ? {
+        top: DESKTOP_EDGE, right: DESKTOP_EDGE, bottom: DESKTOP_EDGE,
+        left: leftObstruction > 0 ? leftObstruction + DESKTOP_PANEL_GAP : DESKTOP_EDGE,
+      }
     : {
         // Below the top row of controls wherever they really are: the constant is the 12px case.
         top: MOBILE_TOP_CLEARANCE + (controlsTop(safeTop) - MOBILE_CONTROL_INSET),

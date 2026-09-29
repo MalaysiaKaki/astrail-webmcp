@@ -14,19 +14,11 @@ import { useSharedMap } from '@/components/map/MapProvider'
 import { useOptionalGeneration } from '@/components/generation/GenerationProvider'
 import { useOptionalWebMcpRegistry } from '@/components/webmcp/WebMcpRegistry'
 import Astronaut from '@/components/mascot/Astronaut'
-import DaySelector from './DaySelector'
-import DayOverview from './DayOverview'
-import ItineraryCards from './ItineraryCards'
-import RestaurantStrip from './RestaurantStrip'
-import HotelPanel from './HotelPanel'
-import PlaceIntelPanel from './PlaceIntelPanel'
-import OrchestratorSummary from './OrchestratorSummary'
-import AgentDecisionRail from './AgentDecisionRail'
-import TripPreferenceNote from './TripPreferenceNote'
-import TradeoffPanel from './TradeoffPanel'
 import TripFeedbackPanel from './TripFeedbackPanel'
 import { useFeedbackComposer } from './use-feedback-composer'
-import MobileTripView, { type MobileListView } from './mobile/MobileTripView'
+import MobileTripView, { type MobileListView, type MobileTripViewProps } from './mobile/MobileTripView'
+import FloatingTripPanel from './mobile/FloatingTripPanel'
+import { HotelLayerButton } from './mobile/MobileMapControls'
 import type { SheetState } from './mobile/MobileTripSheet'
 import { useTripLayout } from '@/lib/trip/use-trip-layout'
 import { fitLabel, fitTarget } from '@/lib/trip/fit-target'
@@ -39,48 +31,6 @@ function prefersReducedMotion(): boolean {
 }
 
 const TripMap = dynamic(() => import('@/components/map/TripMap'), { ssr: false })
-
-// Base chevron points right (›). Callers rotate it to point up/down/left per state.
-function Chevron({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-      strokeLinecap="round" strokeLinejoin="round" aria-hidden
-      className={['h-4 w-4', className ?? ''].join(' ')}
-    >
-      <polyline points="9 6 15 12 9 18" />
-    </svg>
-  )
-}
-
-// Shared chrome for both panel toggles: a cream pill that reads on paper and over the map.
-// `paper-scope` on the reopen tab (which lives outside the panel) makes these vars resolve
-// to the same paper palette as the in-panel collapse control.
-const TOGGLE_CHROME =
-  'flex items-center justify-center rounded-full border border-[var(--line)] ' +
-  'bg-[rgba(253,251,245,0.94)] text-[var(--muted)] backdrop-blur-sm ' +
-  'shadow-[0_2px_12px_rgba(0,0,0,0.2)] transition-opacity duration-200 hover:text-[var(--starlight)]'
-
-// One segment of the map layer switch (Route ⇄ Hotel). The active segment gets the brass fill;
-// the rest read as a muted, tappable label — same paper palette as the panel toggles above.
-function segClass(active: boolean): string {
-  return [
-    'type-label rounded-full px-3 py-1 text-[11px] uppercase tracking-wide transition-colors',
-    active ? 'bg-[var(--brass-soft)] text-[var(--brass-bright)]' : 'text-[var(--muted)] hover:text-[var(--starlight)]',
-  ].join(' ')
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="mt-5">
-      {/* Serif sentence-case headers — the uppercase-eyebrow-on-every-section cadence is
-          the classic generated-UI tell; uppercase micro-labels stay reserved for form
-          labels and data captions. */}
-      <h3 className="type-display mb-2 text-[15px] text-[var(--starlight)]">{title}</h3>
-      {children}
-    </section>
-  )
-}
 
 /**
  * @param bundle    A trip supplied directly, instead of read from Supabase. `/app/trip/demo`
@@ -172,6 +122,8 @@ export default function TripWorkspace({
      page is open, and honoured by every camera command TripMap issues. One value for both layouts,
      so rotating across 768px keeps the map as tilted as it was. */
   const [mode3d, setMode3d] = useState(false)
+  // Bumped by a stop card's "Show in 3D": fly to that stop at street level (the mode turns on too).
+  const [show3dNonce, setShow3dNonce] = useState(0)
   /* Which panel tree to render. null during SSR and hydration: the desktop tree then renders
      behind `max-md:hidden`, so desktop paints its rail straight from the server HTML exactly as
      before, and a phone shows no desktop flash before the client snapshot picks the phone tree.
@@ -369,13 +321,9 @@ export default function TripWorkspace({
     if (typeof day === 'number') setActiveDayNumber(day)
     setSelectedPlaceId(placeId)
     setPanelOpen(true)
-    if (layout === 'mobile') {
-      // On a phone the pin stays in view: select, show its row, keep the sheet compact.
-      setMobileList('stops')
-      setExpanded(false)
-      return
-    }
-    setExpanded(true)
+    // The pin stays in view: select, show its card in the stop list, keep the phone sheet compact.
+    setMobileList('stops')
+    setExpanded(false)
   }
 
   function selectPlaceFromList(placeId: string) {
@@ -384,6 +332,50 @@ export default function TripWorkspace({
   }
 
   const sheetState: SheetState = !panelOpen ? 'hidden' : expanded ? 'expanded' : 'compact'
+
+  // One set of props for both layouts: the phone sheet and the desktop panel render the same
+  // content model, so they can only differ in their container.
+  const viewProps: MobileTripViewProps = {
+    bundle,
+    readOnly,
+    days,
+    activeDay,
+    activeDayNumber,
+    onSelectDay: (n) => { setActiveDayNumber(n); setMobileList('stops'); setLayerMode('route') },
+    dayPlaces,
+    dayLegs,
+    dayRestaurants,
+    placeIndex,
+    trailNumbers,
+    selectedPlaceId,
+    onSelectPlace: selectPlaceFromList,
+    selectedRestaurantPlaceId,
+    onSelectRestaurant: setSelectedRestaurantPlaceId,
+    hotels,
+    selectedHotelId,
+    onSelectHotel: setSelectedHotelId,
+    layerMode,
+    onLayerMode: setLayerMode,
+    canUseHubLayer,
+    listView: mobileList,
+    onStay: () => { setMobileList('stay'); if (canUseHubLayer) setLayerMode('hub') },
+    sheet: sheetState,
+    fitTarget: fitTarget(bundle, activeDayNumber, layerMode, selectedHotelId),
+    onFit: () => setFitNonce((n) => n + 1),
+    mode3d,
+    onToggle3d: () => setMode3d((v) => !v),
+    onShow3d: (placeId) => {
+      if (placeId !== selectedPlaceId) setSelectedPlaceId(placeId)
+      setMode3d(true)
+      setShow3dNonce((n) => n + 1)
+    },
+    showConfidence: layout !== 'mobile',
+    onToggleSheetHeight: () => setExpanded((v) => !v),
+    onHideSheet: () => setPanelOpen(false),
+    onReopenSheet: () => { setExpanded(false); setPanelOpen(true) },
+    summaryRewriting,
+    feedback,
+  }
 
   return (
     <>
@@ -426,313 +418,42 @@ export default function TripWorkspace({
           focusNonce={focusNonce}
           fitNonce={fitNonce}
           mode3d={mode3d}
-          onRequest3d={() => setMode3d(true)}
+          show3dNonce={show3dNonce}
         />
       </div>
 
       {layout === 'mobile' ? (
-        <MobileTripView
-          bundle={bundle}
-          readOnly={readOnly}
-          days={days}
-          activeDay={activeDay}
-          activeDayNumber={activeDayNumber}
-          onSelectDay={(n) => { setActiveDayNumber(n); setMobileList('stops'); setLayerMode('route') }}
-          dayPlaces={dayPlaces}
-          dayLegs={dayLegs}
-          dayRestaurants={dayRestaurants}
-          placeIndex={placeIndex}
-          trailNumbers={trailNumbers}
-          selectedPlaceId={selectedPlaceId}
-          onSelectPlace={selectPlaceFromList}
-          selectedRestaurantPlaceId={selectedRestaurantPlaceId}
-          onSelectRestaurant={setSelectedRestaurantPlaceId}
-          hotels={hotels}
-          selectedHotelId={selectedHotelId}
-          onSelectHotel={setSelectedHotelId}
-          layerMode={layerMode}
-          onLayerMode={setLayerMode}
-          canUseHubLayer={canUseHubLayer}
-          listView={mobileList}
-          onStay={() => { setMobileList('stay'); if (canUseHubLayer) setLayerMode('hub') }}
-          sheet={sheetState}
-          fitTarget={fitTarget(bundle, activeDayNumber, layerMode, selectedHotelId)}
-          onFit={() => setFitNonce((n) => n + 1)}
-          mode3d={mode3d}
-          onToggle3d={() => setMode3d((v) => !v)}
-          onToggleSheetHeight={() => setExpanded((v) => !v)}
-          onHideSheet={() => setPanelOpen(false)}
-          onReopenSheet={() => { setExpanded(false); setPanelOpen(true) }}
-          summaryRewriting={summaryRewriting}
-          feedback={feedback}
-        />
+        <MobileTripView {...viewProps} />
       ) : (
-      <div className={layout === null ? 'max-md:hidden' : undefined}>
-
-      {/* Desktop map controls: zoom, 3D and Fit as kit circles down the right edge, clear of the
-          details panel on the left and the layer switch at the top centre. */}
-      <MapControlStack
-        variant="desktop"
-        owner="trip-stack-desktop"
-        className="paper-scope pointer-events-none absolute right-4 top-4 z-20"
-        mode3d={mode3d}
-        onToggle3d={() => setMode3d((v) => !v)}
-        onZoomIn={() => getMap()?.zoomIn({ duration: prefersReducedMotion() ? 0 : 300 })}
-        onZoomOut={() => getMap()?.zoomOut({ duration: prefersReducedMotion() ? 0 : 300 })}
-        fit={(() => {
-          const target = fitTarget(bundle, activeDayNumber, layerMode, selectedHotelId)
-          return target ? { label: fitLabel(target), onFit: () => setFitNonce((n) => n + 1) } : null
-        })()}
-      />
-
-      {/* Map layer switch — route line vs. hotel hub-and-spokes, never both (plan decision #3).
-          Floats over the map, clear of the left/bottom details panel. The Hotel segment is
-          disabled when no hotel could be placed, so it never flips to a blank map (C5).
-
-          The WHOLE control goes when the trip has no hotels, not just the Hotel segment: a
-          disabled toggle is still an affordance advertising a feature this build does not have,
-          and with hotels gone "Route" is the only mode there is. Removing it is also what makes
-          the hidden state recoverable — see lib/webmcp/tools/map.ts, where both map tools now
-          refuse to switch INTO a hub layer that would draw nothing, since with no toggle on
-          screen there would be no way back out of it. */}
-      {hasHotels ? (
-        <div
-          role="group"
-          aria-label="Map layer"
-          className={[
-            'paper-scope pointer-events-auto absolute z-20 left-1/2 top-4 -translate-x-1/2',
-            'flex items-center gap-0.5 rounded-full border border-[var(--line)]',
-            'bg-[rgba(253,251,245,0.94)] p-0.5 shadow-[0_2px_12px_rgba(0,0,0,0.2)] backdrop-blur-sm',
-          ].join(' ')}
-        >
-          <button
-            type="button"
-            onClick={() => setLayerMode('route')}
-            aria-pressed={layerMode === 'route'}
-            className={segClass(layerMode === 'route')}
-          >
-            Route
-          </button>
-          <button
-            type="button"
-            onClick={() => setLayerMode('hub')}
-            aria-pressed={layerMode === 'hub'}
-            disabled={!canUseHubLayer}
-            title={canUseHubLayer ? undefined : 'No hotel could be placed on the map'}
-            className={[segClass(layerMode === 'hub'), canUseHubLayer ? '' : 'cursor-not-allowed opacity-40'].join(' ')}
-          >
-            Hotel
-          </button>
-        </div>
-      ) : null}
-
-      <aside
-        id="trip-details-panel"
-        className={[
-          'trip-details-panel pointer-events-auto absolute z-10 paper-scope bg-[rgba(243,238,226,0.55)] backdrop-blur-sm',
-          'inset-x-0 bottom-0 rounded-t-[var(--radius-card)] transition-all duration-300 ease-out',
-          expanded ? 'h-[82dvh]' : 'h-[42dvh]',
-          panelOpen ? 'translate-y-[0%]' : 'translate-y-[100%]',
-          // Desktop pins translate-y to 0 so the mobile close (translate-y-[100%]) never
-          // composes with the horizontal slide into a diagonal — the edge tab rides this
-          // transform, so a stray Y offset would fling it off-screen when collapsed.
-          'md:inset-y-0 md:left-0 md:right-auto md:h-full md:w-[440px] md:rounded-none md:rounded-r-[var(--radius-card)] md:translate-y-[0%]',
-          panelOpen ? 'md:translate-x-[0%]' : 'md:translate-x-[-100%]',
-        ].join(' ')}
-        aria-label="Trip details"
-      >
-        {/* Collapse control — docked INSIDE the panel edge (never overhanging the map).
-            Pinned as a direct child of the aside so it stays put while the content scrolls,
-            and rides the panel's slide out when collapsed. Its twin, the reopen tab below,
-            takes over at the screen edge once the panel is gone. */}
-        <button
-          type="button"
-          onClick={() => setPanelOpen(false)}
-          aria-label="Hide trip details and show the full map"
-          aria-expanded={panelOpen}
-          aria-controls="trip-details-scroll"
-          aria-hidden={!panelOpen}
-          tabIndex={panelOpen ? 0 : -1}
-          className={[
-            TOGGLE_CHROME,
-            'absolute z-20',
-            panelOpen ? 'opacity-100' : 'opacity-0 pointer-events-none',
-            // mobile: top-right corner inside the sheet, clear of the centered drag handle
-            'h-7 w-12 right-3 top-2',
-            // desktop: vertical pill inset from the right edge, vertically centered
-            'md:h-14 md:w-7 md:top-1/2 md:-translate-y-1/2',
-          ].join(' ')}
-        >
-          <Chevron className="rotate-90 md:rotate-180" />
-        </button>
-
-        {/* Scrollable content — inert (skipped by pointers, tab order, and AT) while hidden. */}
-        <div
-          id="trip-details-scroll"
-          className="h-full overflow-y-auto rounded-[inherit]"
-          inert={!panelOpen}
-        >
-        <div className="relative shrink-0 px-2 pt-2">
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            aria-expanded={expanded}
-            className="mx-auto block h-1.5 w-10 rounded-full bg-[var(--line)] md:hidden"
-            aria-label={expanded ? 'Collapse panel' : 'Expand panel'}
+        /* Desktop (plan A6): the SAME content model in a floating kit panel on the left, plus the
+           kit control stack on the right. A null layout (SSR, hydration) renders it behind
+           `max-md:hidden`, so desktop paints straight from the server HTML and a phone shows no
+           desktop flash before the client snapshot picks its tree. */
+        <div className={layout === null ? 'max-md:hidden' : undefined}>
+          <FloatingTripPanel
+            {...viewProps}
+            open={panelOpen}
+            onClose={() => setPanelOpen(false)}
+            onOpen={() => setPanelOpen(true)}
+          />
+          <MapControlStack
+            variant="desktop"
+            owner="trip-stack-desktop"
+            className="paper-scope pointer-events-none absolute right-4 top-4 z-20"
+            mode3d={mode3d}
+            onToggle3d={() => setMode3d((v) => !v)}
+            onZoomIn={() => getMap()?.zoomIn({ duration: prefersReducedMotion() ? 0 : 300 })}
+            onZoomOut={() => getMap()?.zoomOut({ duration: prefersReducedMotion() ? 0 : 300 })}
+            fit={viewProps.fitTarget ? { label: fitLabel(viewProps.fitTarget), onFit: viewProps.onFit } : null}
+            trailing={hasHotels ? (
+              <HotelLayerButton
+                hub={layerMode === 'hub'}
+                canUseHubLayer={canUseHubLayer}
+                onToggle={() => setLayerMode(layerMode === 'hub' ? 'route' : 'hub')}
+              />
+            ) : null}
           />
         </div>
-        <div className="p-4 pt-1">
-          {/* Up-nav — this route lives OUTSIDE the (shell) layout, so it has no sidebar; without
-              this link the workspace is a dead end. Lands on /app/trips, which restores the full
-              sidebar (Home · Trails · Settings). */}
-          <Link
-            href="/app/trips"
-            className="type-label mb-3 inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-[var(--muted)] transition-colors hover:text-[var(--starlight)]"
-          >
-            <svg
-              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-              strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-3.5 w-3.5"
-            >
-              <polyline points="15 6 9 12 15 18" />
-            </svg>
-            All trails
-          </Link>
-          {/* Said in the page, not only in the tool layer: an agent reading this workspace should
-              know before it tries that nothing here writes. The reviewer's exact ask — "label the
-              page so the agent is not set up to fail". */}
-          {readOnly && (
-            <div className="mb-3">
-              <p className="type-label inline-block rounded-full bg-[var(--brass-soft)] px-3 py-1 text-[11px] uppercase tracking-wide text-[var(--brass-bright)]">
-                Sample trail — read-only
-              </p>
-              <p className="type-body mt-1.5 text-xs text-[var(--muted)]">
-                A saved example, not an account. Nothing here can be changed or saved — plan your
-                own trail to edit an itinerary.
-              </p>
-            </div>
-          )}
-          <OrchestratorSummary bundle={bundle} />
-          <TripPreferenceNote trip={bundle.trip} />
-          {/* Day-pacing notes only ("Heads up") — the hotel comparison lives with the hotel
-              list under "Where to stay" so there is ONE hotel decision surface, not two. */}
-          <TradeoffPanel tradeoffs={bundle.trip.tradeoffs} variant="notes" />
-
-          <Section title="Days">
-            <DaySelector days={days} activeDayNumber={activeDayNumber} onSelect={setActiveDayNumber} />
-          </Section>
-
-          <Section title="Itinerary">
-            <div className="flex flex-col gap-3">
-              {activeDay ? (
-                /* Dimmed, not hidden: the prose is still the best account of the day we have, and
-                   blanking it would trade a stale sentence for no sentence at all. */
-                <div className={summaryRewriting ? 'opacity-70 transition-opacity' : 'transition-opacity'}>
-                  {summaryRewriting ? (
-                    /* role="status", not a bare label: inserted into the DOM it is announced once,
-                       which is the point — the reader is TOLD the words below are about to change,
-                       not merely shown a dot they may never look at. */
-                    <p
-                      role="status" data-testid="summary-rewriting"
-                      className="type-label mb-1 flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-[var(--brass-bright)]"
-                    >
-                      <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--brass)] motion-safe:animate-pulse" />
-                      Updating this day&apos;s summary
-                    </p>
-                  ) : null}
-                  <DayOverview day={activeDay} />
-                </div>
-              ) : null}
-              {/* The day's legs ride WITH the stops they join, so the panel reads as directions
-                  ("Akasaka Station → 3 min walk → Harry Potter Cafe") instead of a list of
-                  places plus a lookup table. There is deliberately no separate "Getting around"
-                  section any more: the same legs in two places is worse than either. */}
-              <ItineraryCards
-                places={dayPlaces}
-                /* Covers only. `thumbnailFor` resolves a stop back to the Reel it came from
-                   through `bundle.inspiration`, which the day's stops cannot reach on their own. */
-                bundle={bundle}
-                legs={dayLegs}
-                placeIndex={placeIndex}
-                trailNumbers={trailNumbers}
-                selectedPlaceId={selectedPlaceId}
-                onSelectPlace={setSelectedPlaceId}
-              />
-            </div>
-          </Section>
-
-          <Section title="Where to eat">
-            <RestaurantStrip
-              restaurants={dayRestaurants}
-              placeIndex={placeIndex}
-              selectedPlaceId={selectedRestaurantPlaceId}
-              onSelect={setSelectedRestaurantPlaceId}
-            />
-          </Section>
-
-          {/* Hidden outright when the trip has no hotels (see `hasHotels`), rather than shown
-              with HotelPanel's empty state: "No hotel suggestions for these dates" reports the
-              result of a search, and no search ran. */}
-          {hasHotels ? (
-            <Section title="Where to stay">
-              <div className="flex flex-col gap-3">
-                {/* Price-vs-rating context sits WITH the hotels it compares. It is context, not a
-                    second pick — the Recommended badge on the list below stays the single pick. */}
-                <TradeoffPanel tradeoffs={bundle.trip.tradeoffs} variant="comparisons" />
-                <HotelPanel
-                  hotels={hotels}
-                  selectedHotelId={selectedHotelId}
-                  onSelectHotel={setSelectedHotelId}
-                  layerMode={layerMode}
-                />
-              </div>
-            </Section>
-          ) : null}
-
-          <Section title="Place detail">
-            <PlaceIntelPanel tripPlace={selectedTripPlace} />
-          </Section>
-
-          <Section title="How Astrail built this">
-            <AgentDecisionRail events={bundle.events} />
-          </Section>
-
-          {/* Feedback composer — explicit status allowlist (plan T3), NOT reachability:
-              places_ready falls through to this return and must NOT show the panel. `key` +
-              bundle.trip.id bind the panel to the LOADED trip and reset its state across a
-              trip-to-trip route transition. */}
-          {!readOnly && (bundle.trip.status === 'complete' || bundle.trip.status === 'saved_with_gaps') && (
-            <Section title="How was this trail?">
-              <TripFeedbackPanel key={bundle.trip.id} tripId={bundle.trip.id} composer={feedback} />
-            </Section>
-          )}
-        </div>
-        </div>
-      </aside>
-
-      {/* Reopen tab — the collapse control's twin. Sits at the screen edge (a sibling of the
-          panel, so it stays put while the panel is off-screen) and fades in once the panel
-          is tucked away, so collapsing is never a dead end. */}
-      <button
-        type="button"
-        onClick={() => setPanelOpen(true)}
-        aria-label="Show trip details"
-        aria-expanded={panelOpen}
-        aria-controls="trip-details-scroll"
-        aria-hidden={panelOpen}
-        tabIndex={panelOpen ? -1 : 0}
-        className={[
-          TOGGLE_CHROME,
-          'paper-scope pointer-events-auto absolute z-20',
-          panelOpen ? 'opacity-0 pointer-events-none' : 'opacity-100',
-          // mobile: horizontal pill peeking at the bottom-center
-          'h-7 w-12 bottom-4 left-1/2 -translate-x-1/2',
-          // desktop: vertical tab on the far-left screen edge, vertically centered
-          'md:h-14 md:w-7 md:bottom-auto md:left-0 md:top-1/2 md:translate-x-0 md:-translate-y-1/2',
-        ].join(' ')}
-      >
-        <Chevron className="-rotate-90 md:rotate-0" />
-      </button>
-      </div>
       )}
     </main>
     </>

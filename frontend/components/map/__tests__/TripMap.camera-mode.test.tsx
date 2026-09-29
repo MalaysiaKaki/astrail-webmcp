@@ -207,19 +207,21 @@ describe('TripMap 3D camera mode', () => {
     expect(mapInstance.easeTo.mock.calls.filter((c) => 'pitch' in c[0])).toHaveLength(0)
   })
 
-  it('the popup\'s "Zoom in for 3D" turns the mode on, then flies to the stop tilted', async () => {
-    const onRequest3d = vi.fn()
-    const view = await mount({ onRequest3d })
-    const pin = markerElements.find((e) => e.classList.contains('constellation-pin') && !e.classList.contains('constellation-pin--receding'))!
-    act(() => { pin.click() })
-    const zoom = popupElements.at(-1)!.querySelector<HTMLButtonElement>('.evidence-popup__zoom')!
+  /* A6 migration: the desktop evidence popup (and its "Zoom in for 3D") is retired; the selected
+     card's "Show in 3D" replaces it. The owner turns the mode on and bumps show3dNonce in one update. */
+  it('"Show in 3D" (mode on + nonce in one update) flies to the selected stop at street level, tilted', async () => {
+    const stop = TOKYO_TRIP.places[0]
+    const view = await mount({ selectedPlaceId: stop.place_id, show3dNonce: 0 })
     mapInstance.flyTo.mockClear()
-    act(() => { zoom.click() })
-    expect(onRequest3d).toHaveBeenCalledTimes(1)
-    expect(mapInstance.flyTo).not.toHaveBeenCalled()          // waits for the mode, not a one-off tilt
-    await view.set({ mode3d: true })
-    expect(mapInstance.flyTo.mock.calls.at(-1)![0]).toEqual(expect.objectContaining({ zoom: 17, pitch: PITCH_3D }))
+    await view.set({ mode3d: true, show3dNonce: 1 })
+    expect(mapInstance.flyTo.mock.calls.at(-1)![0]).toEqual(expect.objectContaining({
+      center: [stop.place.lng, stop.place.lat], zoom: 17, pitch: PITCH_3D,
+    }))
     expect(state.terrain).not.toBeNull()
+    // Again, with the mode already on: another street-level flight, no second terrain.
+    mapInstance.flyTo.mockClear()
+    await view.set({ show3dNonce: 2 })
+    expect(mapInstance.flyTo.mock.calls.at(-1)![0]).toEqual(expect.objectContaining({ zoom: 17 }))
   })
 
   it('leaving the route with 3D on clears terrain before the source and restores the fog (shared map)', async () => {

@@ -87,6 +87,7 @@ export default function MobileTripSheet({
         <div className="shrink-0 px-4">{header}</div>
         <div
           id="mobile-trip-sheet-body"
+          data-trip-scroll
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-2 pb-[calc(24px+env(safe-area-inset-bottom))]"
         >
           {children}

@@ -1,18 +1,32 @@
 import { describe, it, expect } from 'vitest'
 import {
-  computeFramePadding, mobileControlRects, MAX_STACK_BUTTONS, MOBILE_TOP_CLEARANCE, MOBILE_SHEET_GAP, PIN_RADIUS,
+  computeFramePadding, mobileControlRects, DESKTOP_PANEL_GAP, MAX_STACK_BUTTONS, MOBILE_TOP_CLEARANCE, MOBILE_SHEET_GAP, PIN_RADIUS,
   type Rect,
 } from '@/components/map/frame-padding'
 
 describe('computeFramePadding', () => {
-  it('keeps the desktop pads exactly as they were (clear the 440px left panel)', () => {
-    expect(computeFramePadding({ width: 1440, height: 900, obstruction: 0 }))
+  /* A6 migration (was a fixed 480 left pad for the flush 440px rail): desktop clears the floating
+     panel's MEASURED right edge plus DESKTOP_PANEL_GAP — 440 reproduces the old 480 exactly. */
+  it('clears the measured left panel on desktop', () => {
+    expect(computeFramePadding({ width: 1440, height: 900, obstruction: 0, leftObstruction: 440 }))
       .toEqual({ top: 80, right: 80, bottom: 80, left: 480 })
+    expect(computeFramePadding({ width: 1440, height: 900, obstruction: 0, leftObstruction: 456 }).left)
+      .toBe(456 + DESKTOP_PANEL_GAP)
   })
 
-  it('ignores a stale obstruction on desktop — there is no sheet there', () => {
-    expect(computeFramePadding({ width: 1024, height: 768, obstruction: 400 }))
-      .toEqual({ top: 80, right: 80, bottom: 80, left: 480 })
+  it('uses the plain edge pad on desktop once the panel is collapsed (0)', () => {
+    expect(computeFramePadding({ width: 1440, height: 900, obstruction: 0, leftObstruction: 0 }))
+      .toEqual({ top: 80, right: 80, bottom: 80, left: 80 })
+  })
+
+  it('ignores a stale sheet obstruction on desktop — there is no sheet there', () => {
+    expect(computeFramePadding({ width: 1024, height: 768, obstruction: 400, leftObstruction: 364 }))
+      .toEqual({ top: 80, right: 80, bottom: 80, left: 404 })
+  })
+
+  it('ignores a stale panel obstruction on a phone — there is no panel there', () => {
+    const phone = computeFramePadding({ width: 390, height: 844, obstruction: 380 })
+    expect(computeFramePadding({ width: 390, height: 844, obstruction: 380, leftObstruction: 456 })).toEqual(phone)
   })
 
   it('keeps desktop popup room: the pin lands in the upper third', () => {
@@ -112,7 +126,7 @@ describe('computeFramePadding', () => {
     })
 
     it('ignores the inset on desktop (no phone controls there)', () => {
-      expect(computeFramePadding({ width: 1440, height: 900, obstruction: 0, safeTop: 47 }))
+      expect(computeFramePadding({ width: 1440, height: 900, obstruction: 0, safeTop: 47, leftObstruction: 440 }))
         .toEqual({ top: 80, right: 80, bottom: 80, left: 480 })
     })
   })

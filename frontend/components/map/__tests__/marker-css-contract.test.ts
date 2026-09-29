@@ -95,10 +95,10 @@ describe('marker CSS contract: Mapbox owns marker-root positioning', () => {
       // a selector LIST verbatim, so it is asserted as written.
       '.eat-pin__label--visible,\n.eat-pin:hover .eat-pin__label',
       '.hotel-hub-pin',
-      // Phone markers (components/map/phone-pins.css), all inside the phone media query.
+      // Trip markers (components/map/phone-pins.css): phone-only until A6, every width since.
       '.eat-pin--selected.phone-hit .eat-pin__chip',
       '.eat-pin.phone-hit',
-      '.eat-pin.phone-hit,\n  .hotel-hub-pin.phone-hit',
+      '.eat-pin.phone-hit,\n.hotel-hub-pin.phone-hit',
       '.eat-pin.phone-hit .eat-pin__chip',
       '.phone-pin',
       '.phone-pin--agent_suggested .phone-pin__avatar',
@@ -108,6 +108,8 @@ describe('marker CSS contract: Mapbox owns marker-root positioning', () => {
       '.phone-pin--user_requested .phone-pin__avatar',
       '.phone-pin:focus-visible',
       '.phone-pin:focus-visible .phone-pin__avatar',
+      // A6: the pointer hover ring (a descendant avatar rule; declares only box-shadow).
+      '.phone-pin:not(.phone-pin--selected):hover .phone-pin__avatar',
     ].sort())
   })
 

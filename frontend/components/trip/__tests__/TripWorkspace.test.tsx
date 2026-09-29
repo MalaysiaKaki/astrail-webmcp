@@ -185,24 +185,28 @@ describe('TripWorkspace', () => {
     expect(leaked).toEqual([])
   })
 
-  it('toggles the panel open/closed from the single edge control', async () => {
+  /* A6 migration: the floating panel's kit controls. The hide circle no longer carries
+     aria-expanded (the kit paints [aria-expanded="true"] as a pressed toggle); the reopen button
+     keeps aria-expanded="false", and the panel itself goes inert, as the rail did. */
+  it('collapses the floating panel and reopens it: never a dead end', async () => {
     getTrip.mockResolvedValueOnce(TOKYO_TRIP)
     renderWorkspace(TOKYO_TRIP.trip.id)
 
-    const toggle = await screen.findByRole('button', { name: /hide trip details/i })
-    expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    expect(document.getElementById('trip-details-scroll')).not.toHaveAttribute('inert')
+    const hide = await screen.findByRole('button', { name: /hide trip details/i })
+    expect(hide).toHaveAttribute('aria-controls', 'trip-details-scroll')
+    expect(hide.className).toMatch(/\bm-btn-icon\b/)
+    expect(document.getElementById('trip-details-panel')).not.toHaveAttribute('inert')
 
-    // Collapse: same control flips to a reopen affordance and the content goes inert.
-    fireEvent.click(toggle)
+    fireEvent.click(hide)
     const reopen = screen.getByRole('button', { name: /show trip details/i })
     expect(reopen).toHaveAttribute('aria-expanded', 'false')
-    expect(document.getElementById('trip-details-scroll')).toHaveAttribute('inert')
+    expect(reopen.className).toMatch(/\bm-btn-primary\b/)
+    expect(document.getElementById('trip-details-panel')).toHaveAttribute('inert')
 
-    // Reopen from the very same control — closing is never a dead end.
     fireEvent.click(reopen)
-    expect(screen.getByRole('button', { name: /hide trip details/i })).toHaveAttribute('aria-expanded', 'true')
-    expect(document.getElementById('trip-details-scroll')).not.toHaveAttribute('inert')
+    expect(screen.getByRole('button', { name: /hide trip details/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /show trip details/i })).toBeNull()
+    expect(document.getElementById('trip-details-panel')).not.toHaveAttribute('inert')
   })
 
   // This route sits outside the (shell) layout (no sidebar), so the panel must carry its own
@@ -221,10 +225,10 @@ describe('TripWorkspace', () => {
     const lastDay = TOKYO_TRIP.days[TOKYO_TRIP.days.length - 1].day_number!
     const day1Place = placesForDay(TOKYO_TRIP, 1)[0].place.name
     const lastDayPlace = placesForDay(TOKYO_TRIP, lastDay)[0].place.name
-    const lastTab = new RegExp(`day ${lastDay}`, 'i')
-    // wait for load
-    await screen.findByRole('tab', { name: lastTab })
-    fireEvent.click(screen.getByRole('tab', { name: lastTab }))
+    // A6 migration: the date strip (buttons named "Day N, …") replaced the DaySelector tabs.
+    const lastTab = new RegExp(`^day ${lastDay}\\b`, 'i')
+    await screen.findByRole('button', { name: lastTab })
+    fireEvent.click(screen.getByRole('button', { name: lastTab }))
     // getAllByText: that day's narrated title is also the place name (Tokyo Disneyland)
     await waitFor(() => expect(screen.getAllByText(lastDayPlace).length).toBeGreaterThan(0))
     expect(screen.queryByText(day1Place)).not.toBeInTheDocument()
@@ -236,17 +240,20 @@ describe('TripWorkspace', () => {
      The hotel cases below load TOKYO_TRIP_WITH_HOTELS: hotel search ships off, so a trip made
      today has no hotel rows and the whole control is hidden (the case just after them). The
      surfaces still have to work for trips generated before the switch, whose rows are real. */
+  /* A6 migration: the Route/Hotel segment moved into the kit — the "Hotel map layer" circle in the
+     desktop control stack (as on the phone) and the Stay chip in the date strip. */
   it('toggles the map layer between route and hotel', async () => {
     getTrip.mockResolvedValueOnce(TOKYO_TRIP_WITH_HOTELS)
     renderWorkspace(TOKYO_TRIP.trip.id)
-    const hotelBtn = await screen.findByRole('button', { name: /^hotel$/i })
-    const routeBtn = screen.getByRole('button', { name: /^route$/i })
-    expect(routeBtn).toHaveAttribute('aria-pressed', 'true')
+    const hotelBtn = await screen.findByRole('button', { name: 'Hotel map layer' })
     expect(hotelBtn).toHaveAttribute('aria-pressed', 'false')
-
     fireEvent.click(hotelBtn)
-    expect(hotelBtn).toHaveAttribute('aria-pressed', 'true')
-    expect(routeBtn).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Hotel map layer' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Hotel map layer' }))
+    expect(screen.getByRole('button', { name: 'Hotel map layer' })).toHaveAttribute('aria-pressed', 'false')
+    // The Stay chip switches the map to the hotel layer too.
+    fireEvent.click(within(screen.getByRole('group', { name: 'Trip days' })).getByRole('button', { name: 'Stay' }))
+    expect(screen.getByRole('button', { name: 'Hotel map layer' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   // C5: no hotel got a coordinate ⇒ the hub layer has nothing to draw, so the Hotel segment is
@@ -260,7 +267,7 @@ describe('TripWorkspace', () => {
     }
     getTrip.mockResolvedValueOnce(allUnresolved)
     renderWorkspace(TOKYO_TRIP.trip.id)
-    expect(await screen.findByRole('button', { name: /^hotel$/i })).toBeDisabled()
+    expect(await screen.findByRole('button', { name: 'Hotel map layer' })).toBeDisabled()
   })
 
   // Hotel search is OFF (2026-08-30): Travala's MCP endpoint 401s every unauthenticated call, so
@@ -272,20 +279,20 @@ describe('TripWorkspace', () => {
     getTrip.mockResolvedValueOnce({ ...TOKYO_TRIP, hotels: [] })
     renderWorkspace(TOKYO_TRIP.trip.id)
     // Wait for the bundle, via something that is NOT hotel-related.
-    await screen.findByRole('tab', { name: /day 1/i })
+    await screen.findByRole('button', { name: /^day 1\b/i })
+    // A6: no Stay chip, no hotel circle — a disabled toggle is still an affordance offering a
+    // feature this build does not have.
+    expect(screen.queryByRole('button', { name: 'Stay' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Hotel map layer' })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Where to stay' })).not.toBeInTheDocument()
-    // The whole segmented control goes, not just the Hotel segment: a disabled toggle is still
-    // an affordance offering a feature this build does not have.
-    expect(screen.queryByRole('group', { name: /map layer/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /^hotel$/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /^route$/i })).not.toBeInTheDocument()
   })
 
   it('still shows them for a trip that has hotel rows, so old trips keep their data', async () => {
     getTrip.mockResolvedValueOnce(TOKYO_TRIP_WITH_HOTELS)
     renderWorkspace(TOKYO_TRIP.trip.id)
-    expect(await screen.findByRole('heading', { name: 'Where to stay' })).toBeInTheDocument()
-    expect(screen.getByRole('group', { name: /map layer/i })).toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: 'Stay' }))
+    expect(screen.getByRole('heading', { name: 'Where to stay' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Hotel map layer' })).toBeInTheDocument()
     expect(screen.getAllByText(TOKYO_TRIP_WITH_HOTELS.hotels[0].name).length).toBeGreaterThan(0)
   })
 
@@ -295,9 +302,9 @@ describe('TripWorkspace', () => {
   it('offers no hotel surface on the demo bundle, the way it offers none on a new trip', async () => {
     getTrip.mockResolvedValueOnce(TOKYO_TRIP)
     renderWorkspace(TOKYO_TRIP.trip.id)
-    await screen.findByRole('tab', { name: /day 1/i })
-    expect(screen.queryByRole('heading', { name: 'Where to stay' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('group', { name: /map layer/i })).not.toBeInTheDocument()
+    await screen.findByRole('button', { name: /^day 1\b/i })
+    expect(screen.queryByRole('button', { name: 'Stay' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Hotel map layer' })).not.toBeInTheDocument()
     // and no invented price reaches the page along with it
     expect(screen.queryByText(/128/)).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Price vs rating' })).not.toBeInTheDocument()
@@ -305,12 +312,16 @@ describe('TripWorkspace', () => {
 
   // Merge-lite (2026-08-06): ONE hotel decision surface. The price-vs-rating card renders exactly
   // once (inside "Where to stay", not also at the top), and the pacing notes render as "Heads up".
+  // Merge-lite (2026-08-06): ONE hotel decision surface. A6: price-vs-rating lives in the Stay view
+  // (with the hotels it compares), the pacing notes in About › Trade-offs, each exactly once.
   it('renders the price-vs-rating card once, with pacing notes under Heads up', async () => {
     getTrip.mockResolvedValueOnce(TOKYO_TRIP_WITH_HOTELS)
     renderWorkspace(TOKYO_TRIP.trip.id)
-    await screen.findByRole('heading', { name: 'Price vs rating' })
+    await screen.findByRole('heading', { name: 'Heads up' })
+    expect(screen.getAllByRole('heading', { name: 'Heads up' })).toHaveLength(1)
+    expect(screen.queryByRole('heading', { name: 'Price vs rating' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Stay' }))
     expect(screen.getAllByRole('heading', { name: 'Price vs rating' })).toHaveLength(1)
-    expect(screen.getByRole('heading', { name: 'Heads up' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Tradeoffs' })).not.toBeInTheDocument()
   })
 
@@ -384,7 +395,8 @@ describe('TripWorkspace', () => {
     getTrip.mockResolvedValueOnce(bundleWith('complete'))
     renderWorkspace(TOKYO_TRIP.trip.id)
     expect(await screen.findByTestId('trip-feedback-panel')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: /how was this trail/i })).toBeInTheDocument()
+    // A6: an About row (a card-link disclosure), no longer a rail section heading.
+    expect(screen.getByText(/how was this trail/i).closest('summary')).not.toBeNull()
   })
 
   it('mounts the feedback panel on saved_with_gaps trips', async () => {
@@ -472,14 +484,18 @@ describe('TripWorkspace seeded with a bundle', () => {
 
   it('labels the read-only sample so the agent is not set up to fail', async () => {
     renderSeeded({ readOnly: true })
-    expect(await screen.findByText(/sample trail — read-only/i)).toBeInTheDocument()
+    // A6: the kit Sample tag, whose accessible text still says the whole sentence.
+    const tag = await screen.findByText('Sample', { exact: false, selector: 'span' })
+    expect(tag.textContent).toMatch(/^Sample trail — read-only$/i)
   })
 
   it('does not label an ordinary trip read-only', async () => {
     getTrip.mockResolvedValueOnce(TOKYO_TRIP)
     renderWorkspace(TOKYO_TRIP.trip.id)
     await screen.findByTestId('trip-map')
-    expect(screen.queryByText(/sample trail — read-only/i)).not.toBeInTheDocument()
+    // A6: the Sample tag (visible "Sample" + sr-only "trail — read-only") is absent altogether.
+    expect(screen.queryByText(/trail — read-only/i)).not.toBeInTheDocument()
+    expect(screen.queryByText('Sample', { selector: 'span' })).not.toBeInTheDocument()
   })
 
   // TOKYO_TRIP is `saved_with_gaps`, which is on the composer's allowlist — so this is the gate
