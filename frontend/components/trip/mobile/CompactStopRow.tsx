@@ -3,7 +3,7 @@
 import type { TripPlace } from '@/lib/trip/backend-types'
 import type { StopProvenance } from '@/lib/trip/stop-provenance'
 import { safeHref } from '@/lib/safe-href'
-import { humanize } from './StopParts'
+import { humanize, provenanceLabel } from './StopParts'
 
 /**
  * One stop in the desktop sidebar's navigator (A10 item 4): number, the Reel still, the name, the
@@ -11,7 +11,7 @@ import { humanize } from './StopParts'
  * a dialog opener (aria-haspopup) that marks the current place (aria-current), never a disclosure:
  * nothing expands under it. Grows with text zoom rather than clipping at its 64px minimum.
  */
-export default function CompactStopRow({ tp, pin, total, provenance: p, thumbnail, selected, onTap }: {
+export default function CompactStopRow({ tp, pin, total, provenance: p, thumbnail, selected, onTap, captionOmitted = false }: {
   tp: TripPlace
   pin: number | undefined
   total: number
@@ -19,6 +19,8 @@ export default function CompactStopRow({ tp, pin, total, provenance: p, thumbnai
   thumbnail: string | null
   selected: boolean
   onTap: () => void
+  /** See StopCard: a bounded view's dropped caption is not "no caption evidence". */
+  captionOmitted?: boolean
 }) {
   const src = thumbnail ? safeHref(thumbnail) : undefined
   return (
@@ -59,7 +61,7 @@ export default function CompactStopRow({ tp, pin, total, provenance: p, thumbnai
         <span className="t-meta truncate">
           <span>{humanize(tp.place.place_type)}</span>
           <span aria-hidden> · </span>
-          <span className={p.kind === 'none' ? '' : 'font-medium text-[var(--m-accent)]'}>{p.label}</span>
+          <span className={p.kind === 'none' ? '' : 'font-medium text-[var(--m-accent)]'}>{provenanceLabel(p, captionOmitted)}</span>
         </span>
       </span>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round"

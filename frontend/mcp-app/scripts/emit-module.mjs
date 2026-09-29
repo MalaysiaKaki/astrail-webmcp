@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 
 const frontend = fileURLToPath(new URL('../..', import.meta.url))
 const source = fileURLToPath(new URL('../dist/itinerary.html', import.meta.url))
-const target = fileURLToPath(new URL('../../lib/mcp/widget/generated/itinerary-v1.ts', import.meta.url))
+const target = fileURLToPath(new URL('../../lib/mcp/widget/generated/itinerary-v2.ts', import.meta.url))
 
 let html
 try {

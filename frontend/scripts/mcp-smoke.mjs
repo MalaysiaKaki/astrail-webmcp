@@ -112,7 +112,7 @@ const reels = await call('list_saved_reels', { limit: 5 })
 assert.notEqual(reels.isError, true, text(reels))
 step('list_saved_reels', `${reels.structuredContent.reels.length} reel(s)`)
 
-const resource = await rpc('resources/read', { uri: 'ui://astrail/itinerary-v1.html' })
+const resource = await rpc('resources/read', { uri: 'ui://astrail/itinerary-v2.html' })
 const content = resource.contents?.[0]
 assert.equal(content?.mimeType, 'text/html;profile=mcp-app')
 assert.ok((content?.text?.length ?? 0) > 1000, 'widget HTML missing')

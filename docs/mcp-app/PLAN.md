@@ -206,7 +206,7 @@ frontend/lib/mcp/server.ts          # createAstrailMcpServer(auth) + tools/list 
 frontend/lib/mcp/instructions.ts
 frontend/lib/mcp/contract.ts        # zod input/output schemas, McpTripBundle schema over backend-types rows, summarize() (mirrors backend/models/mcp.py)
 frontend/lib/mcp/tools/{profile,trips,itinerary,reels,render-itinerary}.ts
-frontend/lib/mcp/widget/itinerary-resource.ts   # registerAppResource, CSP, URI ui://astrail/itinerary-v1.html
+frontend/lib/mcp/widget/itinerary-resource.ts   # registerAppResource, CSP, URI ui://astrail/itinerary-v2.html
 frontend/lib/mcp/__tests__/*.test.ts
 frontend/lib/mcp/__tests__/webmcp-baseline.sha256   # SHA-256 of every WebMCP file at def74fd (works in shallow CI)
 frontend/mcp-app/vite.config.ts  tsconfig.json  itinerary.html
@@ -217,7 +217,7 @@ frontend/mcp-app/src/day-view.ts            # per-day slices of the real McpTrip
 frontend/mcp-app/src/links.ts               # capture-phase anchor delegation → app.openLink when supported
 frontend/mcp-app/src/widget.css             # @import "tailwindcss"; @source "../../components/trip"; token/type subset
 frontend/mcp-app/src/preview.tsx            # local preview from TOKYO_TRIP-derived DTO
-frontend/mcp-app/scripts/emit-module.mjs    # dist/itinerary.html → lib/mcp/widget/generated/itinerary-v1.ts (gitignored)
+frontend/mcp-app/scripts/emit-module.mjs    # dist/itinerary.html → lib/mcp/widget/generated/itinerary-v2.ts (gitignored)
 ```
 
 ### 4.2 Change (frontend and CI)
@@ -351,7 +351,7 @@ Pydantic `backend/models/mcp.py` and `frontend/lib/mcp/contract.ts` change toget
 | `list_trips` | `{limit?=20 (1–50), cursor?}` | `{trips:[{trip_id, title, destination, status, start_date, end_date, day_count, created_at}], next_cursor}` | Ordered by `(created_at desc, id desc)`, keyset on the same pair. |
 | `get_itinerary` | `{trip_id, day?}` | `ItinerarySummary` (§5.2). When `day` is given, `days` is filtered to it. | The validated `day` is **passed to the backend** (`{trip_id, day?}` body), and the terminal day-drop never removes it. Errors distinguish two cases:<br>• the day isn't in the saved trip → "This trip has no Day N (its days are: 1, 2, 4)."<br>• the day was omitted from a partial view → "Day N isn't available in this partial result; open the trip in Astrail." |
 | `list_saved_reels` | `{limit?=20, cursor?}` | `{reels:[{reel_id, kind:'reel'\|'post', shortcode, status, saved_at, places:[{name, city, country}] (≤10)}], next_cursor}` | Normalized kind and shortcode, not the raw URL. |
-| `render_itinerary` | `{trip_id, focus_day?}` | `ItinerarySummary` plus `focus_day`. The widget-only full bundle goes in result `_meta["astrail/bundle"]`, hidden from the model. | `_meta.ui.resourceUri: "ui://astrail/itinerary-v1.html"`. Description: "Show a trip itinerary as an interactive card. Call get_itinerary first to confirm the trip_id; this re-reads the trip from Astrail and renders it." It re-reads on purpose, so the widget never renders model-supplied data. `focus_day` is passed to the backend as the protected `day`, and gets the same two-case error as `get_itinerary`. |
+| `render_itinerary` | `{trip_id, focus_day?}` | `ItinerarySummary` plus `focus_day`. The widget-only full bundle goes in result `_meta["astrail/bundle"]`, hidden from the model. | `_meta.ui.resourceUri: "ui://astrail/itinerary-v2.html"`. Description: "Show a trip itinerary as an interactive card. Call get_itinerary first to confirm the trip_id; this re-reads the trip from Astrail and renders it." It re-reads on purpose, so the widget never renders model-supplied data. `focus_day` is passed to the backend as the protected `day`, and gets the same two-case error as `get_itinerary`. |
 
 ### 5.2 Data contract: one backend bundle, two projections
 
@@ -416,7 +416,9 @@ Every reduced value stays assignable to the unchanged row types. The types are n
 
 **We never return an oversized success.** SQL-limit truncation also sets flags: `truncated.{days,stops,legs,restaurants,hotels,inspiration,suggestion_places}`. The text fallback and the widget banner both say "Showing part of this trip (N of M days)".
 
-## 6. Widget (`ui://astrail/itinerary-v1.html`)
+## 6. Widget (`ui://astrail/itinerary-v2.html`)
+
+> v2 (2026-09-29) redraws the card as the Placify phone trip page (TripHero-style hero, date strip, DayHeaderCard, StopTimeline cards, Stay list). The data contract is unchanged; the component list below describes v1.
 
 ### Build and styles
 
@@ -475,7 +477,7 @@ Each widget instance keeps its own state.
   - no `frameDomains`
   - `prefersBorder: true`
   - `domain`: unset in dev; a dedicated domain is required before submission (**Q8**)
-- **Versioning:** any breaking HTML, JS or CSS change moves to `itinerary-v2.html` and `render_itinerary` is updated with it.
+- **Versioning:** any breaking HTML, JS or CSS change moves to the next `itinerary-vN.html` (v1 → v2 was the Placify redesign) and `render_itinerary` is updated with it.
 
 ## 7. Test plan
 

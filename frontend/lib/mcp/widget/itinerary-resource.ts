@@ -2,14 +2,15 @@
  * The itinerary widget as an MCP Apps UI resource (docs/mcp-app/PLAN.md §6).
  *
  * The HTML is the single-file Vite build, inlined as a string at build time (`npm run
- * build:widgets` writes ./generated/itinerary-v1.ts). A missing build is a compile error, not a
- * blank widget. The URI is versioned: a breaking HTML/JS/CSS change ships as itinerary-v2.
+ * build:widgets` writes ./generated/itinerary-v2.ts). A missing build is a compile error, not a
+ * blank widget. The URI is versioned: a breaking HTML/JS/CSS change ships as the next version
+ * (v2 is the Placify phone-page redesign; hosts cache resources by URI).
  */
 import { RESOURCE_MIME_TYPE, registerAppResource } from '@modelcontextprotocol/ext-apps/server'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { McpConfig } from '../config'
 import { ITINERARY_RESOURCE_URI } from '../contract'
-import { ITINERARY_WIDGET_HTML } from './generated/itinerary-v1'
+import { ITINERARY_WIDGET_HTML } from './generated/itinerary-v2'
 
 /**
  * Where Reel covers load from. The widget never fetches (connectDomains is empty); it only shows

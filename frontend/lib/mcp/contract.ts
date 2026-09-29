@@ -378,7 +378,7 @@ export const renderSummarySchema = itinerarySummarySchema.extend({ focus_day: z.
 
 /** `_meta` key carrying the widget-only bundle on render_itinerary results (hidden from the model). */
 export const BUNDLE_META_KEY = 'astrail/bundle'
-export const ITINERARY_RESOURCE_URI = 'ui://astrail/itinerary-v1.html'
+export const ITINERARY_RESOURCE_URI = 'ui://astrail/itinerary-v2.html'
 
 // ---- Compile-time proof that the bundle is a real TripBundle (N2) ----
 

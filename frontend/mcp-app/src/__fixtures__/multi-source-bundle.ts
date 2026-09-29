@@ -3,7 +3,7 @@
  * shape the widget has to render honestly:
  *   - stops from a Reel, a user request that carries Reel evidence, and an Astrail pick;
  *   - an unscheduled stop (day_number null);
- *   - a day with legs but no stops (TransportStrip), weather from open_meteo and from 'manual';
+ *   - a day with legs but no stops (StopTimeline's leg connectors), weather from open_meteo and from 'manual';
  *   - a suggestion-only restaurant (named via suggestion_places) and one with no place at all;
  *   - placed+ranked, placed+unranked and unresolved hotels.
  * Every value is one the MCP projection can really send (documented defaults included), and the
@@ -285,5 +285,77 @@ export const NO_DAYS_RESPONSE: ItineraryResponse = {
 /** A different trip, for the "restored state belongs to another trip" rule. */
 export const OTHER_TRIP_RESPONSE: ItineraryResponse = {
   ...MULTI_SOURCE_RESPONSE,
-  bundle: { ...bundle, trip: { ...bundle.trip, id: I.otherTrip, title: 'Another trip' } },
+  bundle: { ...bundle, trip: { ...bundle.trip, id: I.otherTrip, title: 'Another trip', inferred_destination: 'Osaka, Japan' } },
+}
+
+// ---- Bounded-view and layout cases (Codex round 4: F2, F3, F5) ----
+
+/** The byte budget dropped every inspiration row: Reel stops remain, their covers do not. */
+export const CAPPED_INSPIRATION_RESPONSE: ItineraryResponse = {
+  bundle: { ...bundle, inspiration: [] },
+  truncated: { ...NO_TRUNCATION, inspiration: true },
+  saved_day_numbers: [1, 2, 3],
+}
+
+/** The same bundle with no inspiration and NO truncation: a trip that genuinely has no Reel rows. */
+export const NO_REELS_COMPLETE_RESPONSE: ItineraryResponse = {
+  ...CAPPED_INSPIRATION_RESPONSE,
+  truncated: NO_TRUNCATION,
+}
+
+/** A saved-with-gaps trip whose Reel stops lost their quotes to the budget (quotes → [], then the
+    primary quote → null), exactly as backend mcp_budget.py reduces them. */
+const quotesCut: McpTripBundle = {
+  ...bundle,
+  trip: { ...bundle.trip, status: 'saved_with_gaps' },
+  places: bundle.places.map((tp) => (tp.source_type === 'reel_extracted'
+    ? { ...tp, evidence_json: { ...tp.evidence_json, quote: null, quotes: [] } }
+    : tp)),
+}
+export const CAPPED_QUOTES_RESPONSE: ItineraryResponse = {
+  bundle: quotesCut,
+  truncated: { ...NO_TRUNCATION, quotes: true },
+  saved_day_numbers: [1, 2, 3],
+}
+/** Control: the same quote-less stops in a COMPLETE result — there the absence is real. */
+export const NO_QUOTES_COMPLETE_RESPONSE: ItineraryResponse = {
+  ...CAPPED_QUOTES_RESPONSE,
+  truncated: NO_TRUNCATION,
+}
+
+const LONG = 'Sukiyakiimahanasakusakaminarimonriversidegrandhotelandresidences'
+/** Unbroken long strings wherever the card prints free text: nothing may widen the page. */
+export const LONG_TEXT_RESPONSE: ItineraryResponse = {
+  ...MULTI_SOURCE_RESPONSE,
+  bundle: {
+    ...bundle,
+    trip: { ...bundle.trip, inferred_destination: `${LONG}, Japan`, origin_city: LONG },
+    days: bundle.days.map((d) => (d.day_number === 1
+      ? { ...d, title: `${LONG} day`, summary: `${LONG}${LONG}`, weather_summary: LONG }
+      : d)),
+    places: bundle.places.map((tp) => (tp.id === I.tpSensoji || tp.id === I.tpShibuyaSky
+      ? { ...tp, place: { ...tp.place, name: `${tp.place.name} ${LONG}${LONG}`, area: LONG } }
+      : tp)),
+    restaurants: bundle.restaurants.map((r) => ({ ...r, cuisine: `${LONG}${LONG}`, summary: `${LONG}${LONG}` })),
+    suggestion_places: bundle.suggestion_places.map((p) => ({ ...p, name: `${LONG}${LONG}` })),
+    hotels: bundle.hotels.map((h) => ({ ...h, name: `${h.name} ${LONG}${LONG}`, area: LONG })),
+  },
+}
+
+/** Twelve days, so the date strip overflows at phone width and Day 12 starts offscreen. */
+const extraDays = Array.from({ length: 9 }, (_, i) => {
+  const n = i + 4
+  return {
+    id: id(200 + n), trip_id: I.trip, day_number: n, day_date: `2026-10-${String(11 + n).padStart(2, '0')}`,
+    title: `Day ${n} in Tokyo`, summary: null, weather_summary: null, weather_source: null, weather_payload: {},
+  }
+})
+export const TWELVE_DAY_RESPONSE: ItineraryResponse = {
+  bundle: {
+    ...bundle,
+    trip: { ...bundle.trip, end_date: '2026-10-23' },
+    days: [...bundle.days, ...extraDays],
+  },
+  truncated: NO_TRUNCATION,
+  saved_day_numbers: Array.from({ length: 12 }, (_, i) => i + 1),
 }
