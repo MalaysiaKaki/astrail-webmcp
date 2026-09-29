@@ -102,6 +102,9 @@ describe('marker CSS contract: Mapbox owns marker-root positioning', () => {
       '.eat-pin.phone-hit .eat-pin__chip',
       '.phone-pin',
       '.phone-pin--agent_suggested .phone-pin__avatar',
+      // A9 desktop day emphasis: dims CHILDREN only (Mapbox writes the root's inline opacity).
+      '.phone-pin--dimmed .phone-pin__avatar,\n.phone-pin--dimmed .phone-pin__badge',
+      '.phone-pin--dimmed:hover .phone-pin__avatar,\n.phone-pin--dimmed:hover .phone-pin__badge,\n.phone-pin--dimmed:focus-visible .phone-pin__avatar',
       '.phone-pin--receding .phone-pin__avatar',
       '.phone-pin--selected',
       '.phone-pin--selected .phone-pin__avatar',

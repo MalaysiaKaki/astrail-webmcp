@@ -6,114 +6,28 @@ import { thumbnailFor } from './popup-model'
 import { buildEatPopup, buildStayPopup } from './suggestion-popup'
 import type { Place, RestaurantSuggestion, TripBundle, TripPlace } from '@/lib/trip/backend-types'
 import {
-  trailCoordinates, buildTrailNumbers, buildPlaceIndex, placesForDay, hasRealCoords,
+  buildTrailNumbers, buildPlaceIndex, placesForDay, hasRealCoords,
   selectedHotel, hubSpokeFeatures, isHotelBasePlace, hotelBasePlaceIds,
   orderedDays, restaurantsForDay,
 } from '@/lib/trip/selectors'
 import { consumeTripFramed } from '@/lib/trip/map-handoff'
 import { fitTarget } from '@/lib/trip/fit-target'
-import { readSafeAreaTop } from '@/lib/trip/safe-area'
 import { getSheetObstruction, useSheetObstruction } from '@/lib/trip/sheet-obstruction'
 import { getPanelObstruction, usePanelObstruction } from '@/lib/trip/panel-obstruction'
 import { useTripLayout } from '@/lib/trip/use-trip-layout'
-import { computeFramePadding } from './frame-padding'
-import { cameraPitch, createTerrainController, nativeBuildings, PITCH_3D, type TerrainController } from './camera-mode'
+import { measureFramePadding } from './map-padding'
+import { cameraPitch, createTerrainController, PITCH_3D, type TerrainController } from './camera-mode'
 import { getControlRects, useControlRects } from '@/lib/trip/control-obstruction'
 import { buildPhonePin } from './phone-pin'
 import './phone-pins.css'
 import './phone-map-cards.css'
+import {
+  addBuildingLayer, BUILDING_LAYER_ID, buildEatPin, dayTrailFeatureCollection, safeWebUrl, shortPlaceName,
+} from './trail-features'
 import { useSharedMap } from '@/components/map/MapProvider'
-
-const DAY_ROUTE_COLORS = [
-  '#F4D7A1', // light starlight brass
-  '#C9974E', // Astrail brass
-  '#8F632C', // dark bronze
-  '#E7B866', // bright amber
-  '#A97842', // warm umber
-  '#FFE2AA', // pale gold
-] as const
-
-const BUILDING_LAYER_ID = 'astrail-3d-buildings'
-const LABEL_MAX_CHARS = 24
-
-function shortPlaceName(name: string): string {
-  const chars = Array.from(name)
-  if (chars.length <= LABEL_MAX_CHARS) return name
-  return `${chars.slice(0, LABEL_MAX_CHARS - 1).join('')}…`
-}
-
-function safeWebUrl(raw: string): string | null {
-  try {
-    // Resolved against our own origin so same-origin paths ("/landing/x.webp") work — an
-    // absolute-only parse silently dropped them. The protocol check still runs afterwards, so a
-    // javascript: or data: URL lifted from a caption is rejected exactly as before.
-    const base = typeof window === 'undefined' ? 'https://astrail.xyz' : window.location.origin
-    const parsed = new URL(raw, base)
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.href : null
-  } catch {
-    return null
-  }
-}
-
-const SVG_NS = 'http://www.w3.org/2000/svg'
-/** Fork and knife, so an eat pin reads as "somewhere to eat" and not as an unexplained dot.
- *  Stroked rather than filled: at this size a filled cutlery shape turns to mud, while two
- *  strokes stay legible down to ~10px. */
-function buildEatGlyph(): SVGSVGElement {
-  const svg = document.createElementNS(SVG_NS, 'svg')
-  svg.setAttribute('viewBox', '0 0 16 16')
-  svg.setAttribute('class', 'eat-pin__glyph')
-  svg.setAttribute('aria-hidden', 'true')
-  const path = document.createElementNS(SVG_NS, 'path')
-  // Fork: three tines meeting a stem. Knife: a tapered blade over a stem.
-  path.setAttribute('d', 'M4 3v3M6 3v3M8 3v3M6 6v7M11.5 3c1.2 0 1.8 1.4 1.8 2.6S12.7 8 11.5 8M11.5 8v5')
-  svg.append(path)
-  return svg
-}
-
-/**
- * Split the continuous journey into day features. The connector from the previous day's last
- * stop to this day's first stop belongs to the arriving day, so adjacent features share an
- * endpoint and the route never breaks visually.
- */
-function dayTrailFeatureCollection(
-  bundle: TripBundle,
-): GeoJSON.FeatureCollection<GeoJSON.LineString, { day_number: number; color: string }> {
-  const dayNumbers = [...new Set(
-    bundle.places
-      .filter((tripPlace) => tripPlace.day_number !== null)
-      .map((tripPlace) => tripPlace.day_number as number),
-  )].sort((a, b) => a - b)
-  const features: GeoJSON.Feature<
-    GeoJSON.LineString,
-    { day_number: number; color: string }
-  >[] = []
-  let previous: [number, number] | null = null
-
-  dayNumbers.forEach((dayNumber, dayIndex) => {
-    const dayPlaces = placesForDay(bundle, dayNumber)
-      .filter((tripPlace) => hasRealCoords(tripPlace.place.lng, tripPlace.place.lat))
-    if (dayPlaces.length === 0) return
-
-    const withinDay = dayPlaces.length === 1
-      ? [[dayPlaces[0].place.lng, dayPlaces[0].place.lat] as [number, number]]
-      : trailCoordinates({ ...bundle, places: dayPlaces })
-    const coordinates = previous ? [previous, ...withinDay] : withinDay
-    previous = withinDay.at(-1) ?? previous
-    if (coordinates.length < 2) return
-
-    features.push({
-      type: 'Feature',
-      properties: {
-        day_number: dayNumber,
-        color: DAY_ROUTE_COLORS[dayIndex % DAY_ROUTE_COLORS.length],
-      },
-      geometry: { type: 'LineString', coordinates },
-    })
-  })
-
-  return { type: 'FeatureCollection', features }
-}
+import { addDayEmphasisLayers, applyDayEmphasis, removeChevronImage } from './day-emphasis'
+import { reconcileOnMap, type PinEntry } from './pin-reconcile'
+import { buildHoverCard, canHover, createHoverPreview } from './hover-preview'
 
 export default function TripMap({
   bundle, activeDayNumber, selectedPlaceId, onSelectPlace,
@@ -192,6 +106,38 @@ export default function TripMap({
   // A card's "Show in 3D" waiting for the mode to turn on.
   const pending3dFlyRef = useRef<[number, number] | null>(null)
   const controlRects = useControlRects()
+  // Desktop day emphasis (plan v2): the drawn stop pins, reconciled in place (dimming, name pills)
+  // on day, zoom, selection, layout and camera changes, and the one hover preview.
+  const pinEntriesRef = useRef<PinEntry[]>([])
+  const activeDayRef = useRef(activeDayNumber)
+  activeDayRef.current = activeDayNumber
+  const selectedRef = useRef(selectedPlaceId)
+  selectedRef.current = selectedPlaceId
+  // The moveend listener is registered once, so everything reconcile() reads comes through refs.
+  const layerModeRef = useRef(layerMode)
+  layerModeRef.current = layerMode
+  const hoverRef = useRef<ReturnType<typeof createHoverPreview> | null>(null)
+  if (!hoverRef.current) {
+    hoverRef.current = createHoverPreview(() => new mapboxgl.Popup({
+      className: 'astrail-evidence-popup phone-popup pin-hover-popup',
+      closeButton: false, closeOnClick: false, offset: 30, maxWidth: '280px',
+    }))
+  }
+  const hover = hoverRef.current
+
+  /* One reconcile for the desktop emphasis: the route's filters and paint, and the pins' dimming
+     and name pills. No marker is rebuilt and the camera never moves. On a phone it undoes every
+     desktop-only change, so the phone map is exactly as before. */
+  function reconcile() {
+    const map = getMap()
+    if (!map) return
+    const desktop = layoutRef.current === 'desktop'
+    if (typeof map.setFilter === 'function') applyDayEmphasis(map as unknown as Parameters<typeof applyDayEmphasis>[0], activeDayRef.current, desktop && layerModeRef.current === 'route')
+    reconcileOnMap(map, pinEntriesRef.current, {
+      activeDay: activeDayRef.current, selectedPlaceId: selectedRef.current, desktop,
+      controls: getControlRects(), panelRight: getPanelObstruction(),
+    })
+  }
 
   function clearRoutes() {
     const map = getMap()
@@ -223,11 +169,15 @@ export default function TripMap({
     const map = getMap()
     if (!map) return
     activePopupRef.current?.remove()
-    activePopupRef.current = new mapboxgl.Popup({
+    hover.hide()   // the hover preview never coexists with an eat or stay card
+    const popup = new mapboxgl.Popup({
       // The light kit card (phone-map-cards.css) at every width since plan A6.
       className: 'astrail-evidence-popup phone-popup',
       closeButton: true, closeOnClick: true, offset: 16, maxWidth: '300px',
     }).setLngLat(at).setDOMContent(content).addTo(map)
+    activePopupRef.current = popup
+    // Closed by its ✕ or a map click: forget it, so hover previews can return.
+    popup.on?.('close', () => { if (activePopupRef.current === popup) activePopupRef.current = null })
   }
 
   function syncMarkerLabelVisibility() {
@@ -256,9 +206,13 @@ export default function TripMap({
     return () => {
       activePopupRef.current?.remove()
       activePopupRef.current = null
+      hover.hide()
       markerLabelsRef.current = []
+      pinEntriesRef.current = []
       clearRoutes()
       clearBuildings()
+      const leaving = getMap()
+      if (leaving) removeChevronImage(leaving as unknown as Parameters<typeof removeChevronImage>[0])
       // Terrain and fog go before the map is handed back: the shared map outlives this route, and
       // /app/trips (or the next trip) must never inherit this trip's 3D atmosphere.
       // Only on the live map: when the whole /app shell is leaving, MapProvider may already have
@@ -283,6 +237,8 @@ export default function TripMap({
   function drawMarkers() {
     const map = getMap()
     if (!map) return
+    hover.hide()   // its marker is about to be replaced
+    const entries: PinEntry[] = []
     // Global trail numbers: every stop across the whole trip is numbered 1..N in journey
     // order (Day 1's first stop = 1, the last day's final stop = N), so the numbered pins
     // read as one sequence you can follow end to end — independent of the active day.
@@ -319,11 +275,21 @@ export default function TripMap({
         })
         pinEl.addEventListener('click', (e) => {
           e.stopPropagation()
+          hover.hide()
           onSelectPlace(tp.place_id)
           // No evidence popup: the selected, expanded, scrolled-to card in the panel IS the detail.
           activePopupRef.current?.remove()
           activePopupRef.current = null
         })
+        // Desktop, pointer devices: a light preview of the stop. Read at event time, so a rotation
+        // or an eat card opened since the pins were drawn is honoured.
+        const at: [number, number] = [tp.place.lng, tp.place.lat]
+        pinEl.addEventListener('mouseenter', () => {
+          if (layoutRef.current !== 'desktop' || !canHover() || activePopupRef.current) return
+          hover.show(map, at, buildHoverCard({ name: tp.place.name, cover: photoUrl, stop: number, day: tp.day_number }))
+        })
+        pinEl.addEventListener('mouseleave', () => hover.hide())
+        entries.push({ el: pinEl, tp, lngLat: at, label: shortPlaceName(tp.place.name) })
         return new mapboxgl.Marker({ element: pinEl, anchor: 'center' })
           .setLngLat([tp.place.lng, tp.place.lat]).addTo(map)
       })
@@ -361,24 +327,7 @@ export default function TripMap({
       })
       .filter((x): x is { r: RestaurantSuggestion; place: Place } => x !== null)
       .map(({ r, place }) => {
-        const el = document.createElement('button')
-        el.type = 'button'
-        el.setAttribute('aria-label', `${place.name}${r.cuisine ? `, ${r.cuisine}` : ''}`)
-        el.className = [
-          'eat-pin',
-          place.id === selectedRestaurantPlaceId ? 'eat-pin--selected' : '',
-          'phone-hit',
-        ].filter(Boolean).join(' ')
-        const chip = document.createElement('span')
-        chip.className = 'eat-pin__chip'
-        chip.append(buildEatGlyph())
-        el.append(chip)
-        const label = document.createElement('span')
-        label.className = 'eat-pin__label'
-        label.textContent = shortPlaceName(place.name)
-        label.title = place.name
-        label.dataset.selected = String(place.id === selectedRestaurantPlaceId)
-        el.append(label)
+        const { el, label } = buildEatPin(r, place, place.id === selectedRestaurantPlaceId)
         // Shown when selected rather than on :hover — a touch device has no hover.
         labels.push(label)
         el.addEventListener('click', (e) => {
@@ -390,8 +339,10 @@ export default function TripMap({
       })
 
     markerLabelsRef.current = labels     // assigned AFTER the eat labels join the list
+    pinEntriesRef.current = entries
     setMarkers([...markers, ...eatMarkers])
     syncMarkerLabelVisibility()
+    reconcile()
   }
 
   // "Constellation trail" (docs/roadmap/trip-map-day-connections.md): one continuous brass
@@ -435,6 +386,12 @@ export default function TripMap({
       },
     })
     routeIdsRef.current.push(id, casingId, coreId)
+    // The active day's casing, solid core and chevrons, on this same source (plan v2 amendment 6).
+    // Tracked with the trail, so every route cleanup removes them; reconcile() shows them on desktop.
+    if (typeof map.setFilter === 'function') {
+      routeIdsRef.current.push(...addDayEmphasisLayers(map as unknown as Parameters<typeof addDayEmphasisLayers>[0], activeDayRef.current))
+    }
+    reconcile()
   }
 
   // Drop to street level, tilted: this is what turns "a dot on a map" into "what is actually around
@@ -445,36 +402,8 @@ export default function TripMap({
 
   function drawBuildings() {
     const map = getMap()
-    if (!map || buildingLayerAddedRef.current || map.getLayer(BUILDING_LAYER_ID)) return
-    // Mapbox Standard draws its own 3D buildings; adding ours as well would z-fight them. The
-    // custom layer is only the fallback for a style without them — never both.
-    if (nativeBuildings(map)) return
-    // Standard normally exposes vector buildings through `composite`. Other styles may not;
-    // skipping the layer keeps those styles fully functional instead of failing the trip map.
-    if (!map.getSource('composite')) return
-    try {
-      map.addLayer({
-        id: BUILDING_LAYER_ID,
-        type: 'fill-extrusion',
-        source: 'composite',
-        'source-layer': 'building',
-        minzoom: 15,
-        slot: 'middle',
-        filter: ['==', ['get', 'extrude'], 'true'],
-        paint: {
-          'fill-extrusion-color': '#B89D78',
-          'fill-extrusion-height': ['coalesce', ['get', 'height'], 8],
-          'fill-extrusion-base': ['coalesce', ['get', 'min_height'], 0],
-          'fill-extrusion-opacity': 0.42,
-          'fill-extrusion-vertical-gradient': true,
-        },
-      })
-      buildingLayerAddedRef.current = true
-    } catch {
-      // A style can expose `composite` without a `building` source-layer. That is a supported
-      // no-buildings state; the route and DOM markers remain available above the canvas.
-      buildingLayerAddedRef.current = false
-    }
+    if (!map || buildingLayerAddedRef.current) return
+    buildingLayerAddedRef.current = addBuildingLayer(map)
   }
 
   // Hotel-hub map (plan 2026-08-04-hotel-hub-map, T9): hub mode's counterpart to drawTrail. Straight
@@ -516,35 +445,10 @@ export default function TripMap({
     else drawTrail()
   }
 
-  // The details panel overlays the map — the left 440px on desktop, the stop sheet on a phone —
-  // so uniform padding would frame a day's pins right underneath it. The geometry (and why it is
-  // measured against the CANVAS, capped at 70%) lives in ./frame-padding; this only measures.
-  // `popupRoom` biases the pin into the upper third so an evidence popup has somewhere to go.
+  // The details panel overlays the map (the left panel on desktop, the stop sheet on a phone), so
+  // uniform padding would frame a day's pins right underneath it: ./map-padding measures it.
   function framePadding(opts?: { popupRoom?: boolean }) {
-    const map = getMap()
-    // Defensive: the map may not be ready, and framing must never throw — a padding helper
-    // taking down the whole map effect would be a far worse bug than a loosely framed camera.
-    const canvas = typeof map?.getCanvas === 'function' ? map.getCanvas() : null
-    // `??`, not `||`: a canvas measured at ZERO (transiently, mid-layout) is a real measurement.
-    // No canvas at all still falls back to the window.
-    const win = typeof window === 'undefined' ? { w: 1024, h: 768 } : { w: window.innerWidth, h: window.innerHeight }
-    // The controls measured themselves in viewport pixels; the pads are in canvas pixels.
-    const container = typeof map?.getContainer === 'function' ? map.getContainer() : null
-    const origin = typeof container?.getBoundingClientRect === 'function' ? container.getBoundingClientRect() : null
-    const controls = getControlRects().map((r) => ({ ...r, x: r.x - (origin?.left ?? 0), y: r.y - (origin?.top ?? 0) }))
-    return computeFramePadding({
-      controls,
-      // The desktop floating panel's measured right edge (0 when collapsed); the phone sheet is
-      // the bottom obstruction above. Each layout only ever publishes its own.
-      leftObstruction: layoutRef.current === 'mobile' ? 0 : getPanelObstruction(),
-      width: canvas?.clientWidth ?? win.w,
-      height: canvas?.clientHeight ?? win.h,
-      obstruction: getSheetObstruction(),
-      popupRoom: opts?.popupRoom,
-      // The phone controls sit below the notch (max(12px, env(safe-area-inset-top))); the camera
-      // clears them where they really are. Desktop has no such controls and never reads it.
-      safeTop: layoutRef.current === 'mobile' ? readSafeAreaTop() : 0,
-    })
+    return measureFramePadding(getMap(), layoutRef.current === 'mobile', opts?.popupRoom)
   }
 
   // essential: framing is not decoration — reduced-motion must still land on the pins,
@@ -739,6 +643,48 @@ export default function TripMap({
     flyToDay(1400)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDayNumber])
+
+  // The desktop emphasis follows the day, the layout and the obstructions a pill must clear; a
+  // layout change also drops a hover card (a phone has no hover). Filters and classes only.
+  useEffect(() => {
+    if (!ready || !framedRef.current) return
+    hover.hide()
+    reconcile()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDayNumber, layout])
+  useEffect(() => {
+    if (!ready || !framedRef.current) return
+    reconcile()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panelObstruction, controlRects])
+
+  // Name pills are placed in screen space, so every settled camera move (zoom, pan, pitch, bearing,
+  // the 3D toggle) re-places them. One reconcile per animation frame at most.
+  useEffect(() => {
+    if (!ready) return
+    const map = getMap()
+    if (!map || typeof map.on !== 'function') return
+    let frame = 0
+    const onMoveEnd = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => reconcile())
+    }
+    map.on('moveend', onMoveEnd)
+    return () => { cancelAnimationFrame(frame); map.off?.('moveend', onMoveEnd) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready])
+
+  // A refreshed itinerary (an agent edit, a replan) redraws the pins and the trail from the new
+  // bundle. Skips the first render: the [ready] framing draws that one.
+  const drawnBundleRef = useRef(bundle)
+  useEffect(() => {
+    if (drawnBundleRef.current === bundle) return
+    drawnBundleRef.current = bundle
+    if (!ready || !framedRef.current) return
+    drawMarkers()
+    drawRouteLayer()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bundle])
 
   // The phone's "Fit" control. Keyed on the counter alone, so every press moves the camera and no
   // other prop change is mistaken for one. The target comes from the same fitTarget() the button

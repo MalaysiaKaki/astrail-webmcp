@@ -22,6 +22,7 @@ import { useTripLayout } from '@/lib/trip/use-trip-layout'
 import { fitLabel, fitTarget } from '@/lib/trip/fit-target'
 import { PhoneFailed, PhoneGenerating, PhoneLoading, PhoneNotFound } from './mobile/PhoneStateScreens'
 import MapControlStack from '@/components/map/MapControlStack'
+import MapDayChip from '@/components/map/MapDayChip'
 import { planReveal, type RevealPlace } from '@/lib/trip/reveal'
 import { useTripTab } from '@/lib/trip/use-trip-tab'
 import TripTabUrl from './TripTabUrl'
@@ -373,6 +374,7 @@ export default function TripWorkspace({
             onClose={() => setPanelOpen(false)}
             onOpen={() => setPanelOpen(true)}
           />
+          {activeDay && mobileList === 'stops' && layerMode === 'route' ? <MapDayChip day={activeDay} /> : null}
           <MapControlStack
             variant="desktop"
             owner="trip-stack-desktop"

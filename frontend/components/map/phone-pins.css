@@ -139,3 +139,22 @@
 @media (prefers-reduced-motion: reduce) {
   .phone-pin__avatar { transition: none; }
 }
+
+/* Desktop day emphasis (plan v2, amendment 6), applied by components/map/pin-reconcile. Dimming is
+   on the CHILDREN, not the root: Mapbox writes an inline opacity on the marker root for terrain
+   occlusion, which would override a class. Dimmed pins stay clickable. */
+.phone-pin--dimmed .phone-pin__avatar,
+.phone-pin--dimmed .phone-pin__badge {
+  opacity: 0.45;
+}
+.phone-pin--dimmed:hover .phone-pin__avatar,
+.phone-pin--dimmed:hover .phone-pin__badge,
+.phone-pin--dimmed:focus-visible .phone-pin__avatar {
+  opacity: 1;
+}
+
+/* A name pill flipped to the pin's left when its right side would cross the edge or a control. */
+.phone-pin__name--left {
+  left: auto;
+  right: calc(100% - 4px);
+}

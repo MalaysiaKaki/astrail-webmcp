@@ -309,3 +309,24 @@ describe('the panel tabs (plan v2 §2, amendment 9)', () => {
     expect(scroller().scrollTop).toBe(240)
   })
 })
+
+describe('the day chip on the desktop map', () => {
+  beforeEach(() => { window.history.replaceState(null, '', '/app/trip/demo'); window.sessionStorage.clear() })
+  const chip = () => screen.queryByTestId('map-day-chip')
+
+  it('names the active day and follows a day switch', async () => {
+    mount()
+    await flush()
+    expect(chip()).toHaveTextContent('Day 1 · Sep 18')
+    await act(async () => { screen.getByRole('button', { name: /^Day 2/ }).click() })
+    expect(chip()).toHaveTextContent('Day 2 · Sep 19')
+    expect(chip()!.className).toMatch(/pointer-events-none/)
+  })
+
+  it('is not shown in the Stay view, where no day is active', async () => {
+    mount()
+    await flush()
+    await act(async () => { stayChip().click() })
+    expect(chip()).toBeNull()
+  })
+})

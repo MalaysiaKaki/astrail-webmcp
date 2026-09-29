@@ -653,7 +653,10 @@ describe('TripMap', () => {
 
   /* A6 migration (was "a chip at city zoom"): the name pill belongs to the selected pin only, at
      every width; the stop number is always on the badge (the agent's tools address stops by it). */
+  /* A9 migration: on desktop the active day's pins are named from zoom 11 (plan v2 amendment 7), so
+     this pins the zoomed-out view, where the selected pin is still the only one named. */
   it('names the selected pin with a pill, and only that pin, while every pin keeps its number', async () => {
+    mapInstance.getZoom.mockReturnValue(10)
     renderMap({ selectedPlaceId: TOKYO_TRIP.places[0].place_id })
     await flush()
     fireLoad()
