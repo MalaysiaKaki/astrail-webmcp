@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import Script from "next/script";
 import { Fraunces, Figtree, IBM_Plex_Mono } from "next/font/google";
 import { SITE_ORIGIN } from "@/lib/site";
 import { SITE_VIEWPORT } from "@/lib/site-viewport";
@@ -41,7 +40,7 @@ export const metadata: Metadata = {
   title: "Astrail · Plan trips from your saved travel Reels",
   description:
     "Paste your saved travel Reels. Astrail extracts the places, verifies them, and builds a day-by-day itinerary with the reasoning attached. Beta opening soon.",
-  // This repository deploys a separate hackathon surface. Keep every route out of search so it
+  // This is a separate deployment of Astrail. Keep every route out of search so it
   // cannot compete with the production product at astrail.xyz.
   robots: {
     index: false,
@@ -73,9 +72,6 @@ export default function RootLayout({
     >
       <body>
         {children}
-        {/* Tally popup loader — powers the in-app Feedback button (PdNreP) and the
-            landing "Notify me" popup (QKjrvk). CSP already allows tally.so (script/frame). */}
-        <Script src="https://tally.so/widgets/embed.js" strategy="lazyOnload" />
       </body>
     </html>
   );

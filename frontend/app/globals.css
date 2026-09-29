@@ -611,55 +611,6 @@ button:focus-visible {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), 0 14px 34px rgba(0, 0, 0, 0.24);
 }
 
-/* The remembered-preferences panel on /app.
-
-   A DEDICATED CLASS, not Tailwind utilities, and it must stay below the scoped surface rules
-   above for the same reason `.surface--selected` does: those rules are unlayered, so they
-   out-rank every single-class utility, and a border written only in markup silently never
-   paints. That trap has cost this branch a visible affordance once already.
-
-   It borrows `.surface--selected`'s emphasis wholesale — brass tint poured over whatever the
-   scope painted, a doubled ring, and a glow — because the app already means "this one, look
-   here" with exactly that, and inventing a second dialect for it would be worse than loud. */
-.memory-panel {
-  border: 1px solid var(--brass);
-  border-radius: 14px;
-  box-shadow:
-    inset 0 0 0 999px var(--brass-soft),
-    0 0 0 1px var(--brass),
-    0 0 18px var(--brass-glow);
-}
-
-/* Arrives rather than appears. The read is async, so this panel lands a beat after the page —
-   without the entrance it pops in as a layout jump on the screen the demo opens on. */
-@media (prefers-reduced-motion: no-preference) {
-  .memory-panel {
-    animation: memory-panel-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-}
-
-/* The dot, repainted for paper.
-
-   `.pulse-dot` sets `background: var(--brass-bright)` — the LIGHT brass — which reads because
-   the activity rail it was built for sits on black. This panel is on the paper palette, where
-   the same token is nearly invisible against a brass-tinted fill. Scoped as a descendant so it
-   out-ranks the base rule; a Tailwind `bg-` utility here would be swallowed by that unlayered
-   rule exactly as the panel's own border would have been. */
-.memory-panel .pulse-dot {
-  background: var(--brass);
-  box-shadow: 0 0 6px var(--brass-glow);
-}
-
-@keyframes memory-panel-in {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
 
 .constellation-pin {
   align-items: center;
@@ -962,7 +913,6 @@ button:focus-visible {
 
 .evidence-popup__eyebrow,
 .evidence-popup__label,
-.evidence-popup__confidence,
 .evidence-popup__source {
   margin: 0;
 }
@@ -982,23 +932,6 @@ button:focus-visible {
   font-size: 15px;
   line-height: 1.2;
   margin: 0 22px 2px 0;
-}
-
-.evidence-popup__quote {
-  border-left: 2px solid rgba(239, 201, 141, 0.58);
-  color: rgba(255, 248, 235, 0.88);
-  font-size: 12px;
-  line-height: 1.45;
-  margin: 0;
-  max-height: 132px;
-  overflow-y: auto;
-  padding-left: 10px;
-  white-space: pre-wrap;
-}
-
-.evidence-popup__confidence {
-  color: rgba(248, 234, 209, 0.58);
-  font-size: 10px;
 }
 
 .evidence-popup__source {
@@ -1276,10 +1209,6 @@ button:focus-visible {
     animation: none;
   }
 
-  .trip-details-panel {
-    transition: none;
-  }
-
   .constellation-pin {
     transition: none;
   }
@@ -1348,15 +1277,6 @@ button:focus-visible {
    Everything below is layout only; the content is built as DOM nodes in TripMap.tsx so caption
    text is never parsed as markup. */
 
-.evidence-popup__image {
-  display: block;
-  width: calc(100% + 2rem);
-  margin: -1rem -1rem 0.75rem;
-  height: 7.5rem;
-  object-fit: cover;
-  border-radius: 0.5rem 0.5rem 0 0;
-}
-
 .evidence-popup__subtitle {
   margin-top: 0.125rem;
   font-size: 0.8125rem;
@@ -1369,53 +1289,12 @@ button:focus-visible {
   color: color-mix(in srgb, currentColor 52%, transparent);
 }
 
-.evidence-popup__context {
-  margin: 0.25rem 0 0;
-  padding: 0;
-  list-style: none;
-  font-size: 0.75rem;
-  line-height: 1.45;
-  color: color-mix(in srgb, currentColor 78%, transparent);
-}
-
-.evidence-popup__context li {
-  position: relative;
-  padding-left: 0.75rem;
-}
-
-.evidence-popup__context li::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0.5em;
-  width: 0.25rem;
-  height: 0.25rem;
-  border-radius: 999px;
-  background: #c9974e;
-}
-
 .evidence-popup__actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   margin-top: 0.75rem;
-}
-
-.evidence-popup__zoom {
-  border: 1px solid color-mix(in srgb, #c9974e 55%, transparent);
-  border-radius: 999px;
-  padding: 0.25rem 0.625rem;
-  font-size: 0.6875rem;
-  letter-spacing: 0.02em;
-  color: #e8d5b0;
-  background: transparent;
-  transition: border-color 140ms ease, color 140ms ease;
-}
-
-.evidence-popup__zoom:hover {
-  border-color: #c9974e;
-  color: #fff;
 }
 
 /* The popup can now be tall enough to run off a phone; cap it and let it scroll. */
@@ -1425,11 +1304,6 @@ button:focus-visible {
   overscroll-behavior: contain;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .evidence-popup__zoom {
-    transition: none;
-  }
-}
 
 /* --- "Where to eat" pins ---------------------------------------------------------------------
    Suggestions were listed in the panel but never drawn, so clicking one told you nothing about
@@ -1580,81 +1454,12 @@ button:focus-visible {
   margin-top: 0.55rem;
 }
 
-/* Mobile trip view type floor (plan 2026-09-27, "Minimums on mobile": body >= 14px, labels >= 12px).
-   The phone view reuses desktop children (HotelPanel, RestaurantStrip, AgentDecisionRail, ...) whose
-   captions are 9-11px — fine at a desk, unreadable on a phone. One scoped floor here instead of a
-   mobile variant of every child: `.mobile-trip` exists only on the phone tree, so desktop is
-   untouched. Unlayered, so it outranks the Tailwind utilities it overrides. */
-.mobile-trip .text-xs,
-.mobile-trip .text-\[13px\] {
-  font-size: 14px;
-  line-height: 1.45;
-}
-.mobile-trip .text-\[9px\],
-.mobile-trip .text-\[10px\],
-.mobile-trip .text-\[10\.5px\],
-.mobile-trip .text-\[11px\] {
-  font-size: 12px;
-}
-
 /* Phone dock overlay hit-target floor (plan acceptance #4: prompt dismiss, tool list, rail
    controls >= 44x44). Those buttons are shared with the desktop dock, where they stay compact;
    `.phone-dock` exists only inside PhoneDock's overlay. Unlayered, so it outranks utilities. */
 .phone-dock button {
   min-height: 44px;
   min-width: 44px;
-}
-
-/* Challenge banner on phones (plan Phase 4). One 44px line that scrolls away with the page
-   rather than sticking; the whole row is the sample-trail link via the link's ::after. Desktop
-   (>= 768px) keeps the sticky two-row notice untouched: nothing below applies there, and the
-   phone lead is display:none. Unlayered, so these beat the component's Tailwind utilities. */
-.challenge-banner__phone,
-.challenge-banner__short { display: none; }
-
-@media (max-width: 767.98px) {
-  .challenge-banner {
-    position: relative;
-    padding: 0 16px;
-  }
-  .challenge-banner__row {
-    flex-direction: row;
-    flex-wrap: nowrap;
-    justify-content: center;
-    min-height: 44px;
-    gap: 0;
-    white-space: nowrap;
-  }
-  .challenge-banner__lead,
-  .challenge-banner__note { display: none; }
-  .challenge-banner__phone { display: inline; white-space: pre; }
-  .challenge-banner__short { display: inline; }
-  .challenge-banner__link {
-    position: static;
-    align-self: stretch;
-    min-height: 44px;
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    background: none;
-    gap: 6px;
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
-  .challenge-banner__link:hover { background: none; color: var(--brass-bright); }
-  .challenge-banner__link::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-  }
-  .challenge-banner__full {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
 }
 
 /* Trip feedback on phones (plan Phase 5: About this trip, and the failed-generation screen). The
