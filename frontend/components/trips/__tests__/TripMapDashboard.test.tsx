@@ -91,7 +91,7 @@ describe('TripMapDashboard', () => {
     expect(shared.setMarkers).toHaveBeenCalled()
     expect(mapInstance.fitBounds).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ pitch: 45, maxZoom: 13 }),
+      expect.objectContaining({ pitch: 0, maxZoom: 13 }), // 3D mode off by default (C5: was a fixed 45)
     )
     // Marks the handoff so the workspace can settle in seamlessly on "Open trip".
     expect(markTripFramed).toHaveBeenCalledWith('trip-1')
