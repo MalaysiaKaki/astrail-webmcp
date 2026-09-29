@@ -12,6 +12,7 @@ import MobileTripSheet, { type SheetState } from './MobileTripSheet'
 import StopTimeline from './StopTimeline'
 import type { FeedbackComposer } from '../use-feedback-composer'
 import AboutThisTrip from './AboutThisTrip'
+import SelectedPlaceCard from './SelectedPlaceCard'
 import { dayLabel } from '@/lib/trip/day-labels'
 import type { FitTarget } from '@/lib/trip/fit-target'
 
@@ -30,6 +31,9 @@ export type MobileTripViewProps = {
   placeIndex: Map<string, Place>
   trailNumbers: Map<string, number>
   selectedPlaceId: string | null
+  /** The selected stop's row, or null. Shown as a pinned "Selected place" card when it is not on
+   *  the active day's list (an undayed base hotel): fix 1. */
+  selectedTripPlace: TripPlace | null
   onSelectPlace: (placeId: string) => void
   selectedRestaurantPlaceId: string | null
   onSelectRestaurant: (placeId: string) => void
@@ -239,6 +243,19 @@ export function TripPanelBody(p: MobileTripViewProps) {
         </div>
       ) : (
         <>
+          {p.selectedTripPlace && !p.dayPlaces.some((tp) => tp.place_id === p.selectedTripPlace!.place_id) ? (
+            <SelectedPlaceCard
+              bundle={p.bundle}
+              tp={p.selectedTripPlace}
+              trailNumbers={p.trailNumbers}
+              placeIndex={p.placeIndex}
+              onSelectPlace={p.onSelectPlace}
+              onShow3d={p.onShow3d}
+              showConfidence={p.showConfidence}
+              selectedRestaurantPlaceId={p.selectedRestaurantPlaceId}
+              onSelectRestaurant={p.onSelectRestaurant}
+            />
+          ) : null}
           {p.activeDay ? <DaySubHeader day={p.activeDay} /> : null}
           <StopTimeline
             bundle={p.bundle}

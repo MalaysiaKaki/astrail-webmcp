@@ -265,6 +265,7 @@ export default function TripWorkspace({
     placeIndex,
     trailNumbers,
     selectedPlaceId,
+    selectedTripPlace,
     onSelectPlace: selectPlaceFromList,
     selectedRestaurantPlaceId,
     onSelectRestaurant: setSelectedRestaurantPlaceId,
