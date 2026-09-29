@@ -258,7 +258,9 @@ export function TripPanelBody(p: MobileTripViewProps & {
         </div>
       ) : (
         <>
-          {p.selectedTripPlace && !p.dayPlaces.some((tp) => tp.place_id === p.selectedTripPlace!.place_id) ? (
+          {/* Only a place with NO day: it has no list to open. A dayed stop selected before a
+              strip switch is not pinned above another day's stops. */}
+          {p.selectedTripPlace && p.selectedTripPlace.day_number === null ? (
             <SelectedPlaceCard
               bundle={p.bundle}
               tp={p.selectedTripPlace}

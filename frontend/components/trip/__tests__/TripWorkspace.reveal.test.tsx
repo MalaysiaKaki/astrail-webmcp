@@ -92,6 +92,15 @@ describe('an undayed selected place (fix 1)', () => {
     expect(card(placesForDay(TOKYO_TRIP, 1)[0].place_id)).not.toBeNull()
   })
 
+  it('is only for a place with no day: a lingering selection from another day is not pinned above it', async () => {
+    mount()
+    await flush()
+    await act(async () => { mapProps.current!.onSelectPlace(placesForDay(TOKYO_TRIP, 1)[0].place_id) })
+    await act(async () => { screen.getByRole('button', { name: /^Day 2/ }).click() })
+    expect(screen.queryByRole('region', { name: 'Selected place' })).toBeNull()
+    expect(card(placesForDay(TOKYO_TRIP, 1)[0].place_id)).toBeNull()
+  })
+
   it('does not duplicate a place that IS on the active day\'s list', async () => {
     mount()
     await flush()

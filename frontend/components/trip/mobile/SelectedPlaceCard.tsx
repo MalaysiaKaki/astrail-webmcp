@@ -7,7 +7,7 @@ import { buildPopupModel, thumbnailFor } from '@/components/map/popup-model'
 import StopCard from './StopCard'
 
 /**
- * The detail of a selected place that is NOT on the active day's list (Codex final-review fix 1).
+ * The detail of a selected place with no day, so on no day's list (Codex final-review fix 1).
  *
  * Every located trip place has a pin, but the list shows one day. An undayed place (the base hotel
  * of an older trip) has no day to switch to, so selecting its pin used to highlight it and show
