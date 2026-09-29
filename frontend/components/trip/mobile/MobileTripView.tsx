@@ -14,6 +14,7 @@ import type { FeedbackComposer } from '../use-feedback-composer'
 import AboutThisTrip from './AboutThisTrip'
 import SelectedPlaceCard from './SelectedPlaceCard'
 import { useRevealScroll } from './use-reveal-scroll'
+import DayHeaderCard from '../panel/DayHeaderCard'
 import { dayLabel } from '@/lib/trip/day-labels'
 import type { FitTarget } from '@/lib/trip/fit-target'
 import type { RevealPlace, TripTab } from '@/lib/trip/reveal'
@@ -236,7 +237,11 @@ function DayDisclosure({ day, rewriting }: { day: TripDay; rewriting: boolean })
  * trip. Shared by the phone sheet and the desktop floating panel (FloatingTripPanel), so the two
  * widths render one content model.
  */
-export function TripPanelBody(p: MobileTripViewProps) {
+export function TripPanelBody(p: MobileTripViewProps & {
+  /** 'card' (desktop Trip tab): the day header card with its weather. 'sub' (phone): the
+   *  compact sub-header, unchanged. */
+  dayHeader?: 'sub' | 'card'
+}) {
   useRevealScroll(p.revealRequest)
   return (
     <>
@@ -266,7 +271,7 @@ export function TripPanelBody(p: MobileTripViewProps) {
               onSelectRestaurant={p.onSelectRestaurant}
             />
           ) : null}
-          {p.activeDay ? <DaySubHeader day={p.activeDay} /> : null}
+          {p.activeDay ? (p.dayHeader === 'card' ? <DayHeaderCard day={p.activeDay} /> : <DaySubHeader day={p.activeDay} />) : null}
           <StopTimeline
             bundle={p.bundle}
             onShow3d={p.onShow3d}

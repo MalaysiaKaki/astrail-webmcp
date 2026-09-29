@@ -591,7 +591,8 @@ describe('TripWorkspace — the phone branch', () => {
     renderSeeded(TOKYO_TRIP_WITH_HOTELS)
     const panel = desktopRail()!
     expect(panel.className).toMatch(/\bui-floating-panel\b/)
-    expect(within(within(panel).getByTestId('sheet-heading')).getByRole('heading', { level: 2, name: TOKYO_TRIP.trip.inferred_destination! })).toBeInTheDocument()
+    // A9: the title is the hero's heading (Reel covers, dates, stat chips), not the phone sheet's.
+    expect(within(within(panel).getByTestId('trip-hero')).getByRole('heading', { level: 2, name: TOKYO_TRIP.trip.inferred_destination! })).toBeInTheDocument()
     expect(within(panel).getByRole('group', { name: 'Trip days' })).toBeInTheDocument()
     expect(within(panel).getAllByRole('listitem').length).toBeGreaterThan(0)          // stop cards
     expect(within(panel).getByText('About this trip')).toBeInTheDocument()

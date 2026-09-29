@@ -193,7 +193,8 @@ describe('TripWorkspace', () => {
     renderWorkspace(TOKYO_TRIP.trip.id)
 
     const hide = await screen.findByRole('button', { name: /hide trip details/i })
-    expect(hide).toHaveAttribute('aria-controls', 'trip-details-scroll')
+    // A9: the panel, not the Trip tab's scroller — only the open tab's scroller is mounted.
+    expect(hide).toHaveAttribute('aria-controls', 'trip-details-panel')
     expect(hide.className).toMatch(/\bm-btn-icon\b/)
     expect(document.getElementById('trip-details-panel')).not.toHaveAttribute('inert')
 

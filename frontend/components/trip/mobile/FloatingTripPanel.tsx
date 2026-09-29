@@ -1,10 +1,13 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import Link from 'next/link'
 import { measurePanelObstruction, setPanelObstruction } from '@/lib/trip/panel-obstruction'
-import { DateStrip, SheetHeading, TripPanelBody, type MobileTripViewProps } from './MobileTripView'
-import { tripDateRange, tripTitle } from '@/lib/trip/trip-presenters'
+import { DateStrip, TripPanelBody, type MobileTripViewProps } from './MobileTripView'
+import TripHero from '../panel/TripHero'
+import { tripTitle } from '@/lib/trip/trip-presenters'
+import TripTabs, { panelId, tabId } from '../panel/TripTabs'
+import { ForYouInterim, BuildInterim, placeholderBadge } from '../panel/InterimTabs'
 
 /** Longer than the 300ms slide, so a measurement lands on the settled box. */
 export const PANEL_SETTLE_MS = 340
@@ -16,10 +19,19 @@ export type FloatingTripPanelProps = MobileTripViewProps & {
 }
 
 /**
- * The desktop trip view (plan A6): the phone sheet's content model in a floating kit panel on the
- * left of a full-bleed map — serif heading, date strip, day sub-header, stop cards with their legs,
- * About this trip, and the Stay view. The SAME components as the phone (MobileTripView's pieces),
- * so the two widths cannot drift apart; only the container differs.
+ * The desktop trip view (plan A6, rebuilt by the v2 plan): a floating kit panel on the left of a
+ * full-bleed map. A fixed header — the back and hide controls, the hero (Reel covers, title,
+ * dates, stat chips, the personalised badge) and the segmented tabs — over one scroller per tab.
+ *
+ *   Trip           the date strip, a day header card with its weather, the stop cards with their
+ *                  legs (the phone's own components), the day overview, About this trip.
+ *   For you        what the trip was planned with and what it chose for you.
+ *   How it was     the build story.
+ *   built
+ *
+ * The map and the agent tools live outside this panel (TripWorkspace), so switching tabs never
+ * remounts the map or interrupts the camera. Only the open tab is mounted; the Trip tab's scroll
+ * position is kept across a round trip through the others.
  *
  * It is the one writer of the left-obstruction signal (lib/trip/panel-obstruction): its measured
  * right edge once settled, 0 the moment it collapses and on unmount. The camera pads by it.
@@ -40,6 +52,7 @@ export default function FloatingTripPanel(p: FloatingTripPanelProps) {
     moveFocus.current = false
     ;(p.open ? hideRef : reopenRef).current?.focus()
   }, [p.open])
+  const tripScroll = useKeptScroll(p.tab === 'trip')
   return (
     <div className="paper-scope mobile-trip pointer-events-none absolute inset-0">
       <aside
@@ -54,42 +67,68 @@ export default function FloatingTripPanel(p: FloatingTripPanelProps) {
           p.open ? 'translate-x-0' : '-translate-x-[calc(100%+24px)]',
         ].join(' ')}
       >
-        <div className="flex shrink-0 items-start gap-3 px-4 pb-2 pt-4">
-          <Link href="/app/trips" aria-label="All trails" className="m-btn-icon shrink-0">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1"
-              strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <polyline points="15 5 8 12 15 19" />
-            </svg>
-          </Link>
-          <div className="min-w-0 flex-1 pt-0.5">
-            <SheetHeading title={tripTitle(p.bundle.trip)} dates={tripDateRange(p.bundle.trip)} readOnly={p.readOnly} />
+        <header className="flex shrink-0 flex-col gap-3 px-4 pb-3 pt-4 [@media(max-height:560px)]:gap-2 [@media(max-height:560px)]:pb-2 [@media(max-height:560px)]:pt-3">
+          <div className="flex items-center justify-between gap-3">
+            <Link href="/app/trips" aria-label="All trails" className="m-btn-icon shrink-0">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1"
+                strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <polyline points="15 5 8 12 15 19" />
+              </svg>
+            </Link>
+            {/* Short viewports (844x390 landscape): the hero gives its height back to the list and
+                the title rides this row instead. Hidden from AT here: the hero's heading is the one
+                heading, and it stays in the tree (visually hidden) at every height. */}
+            <p aria-hidden className="type-display hidden min-w-0 flex-1 truncate text-[length:var(--t-title)] leading-tight text-[var(--m-text)] [@media(max-height:560px)]:block">
+              {tripTitle(p.bundle.trip)}
+            </p>
+            <button
+              ref={hideRef}
+              type="button"
+              onClick={() => { moveFocus.current = true; p.onClose() }}
+              aria-label="Hide trip details and show the full map"
+              // No aria-expanded here: the kit paints [aria-expanded="true"] as a pressed ink circle,
+              // and this is an action, not a toggle state. The reopen button carries it (false).
+              aria-controls="trip-details-panel"
+              className="m-btn-icon shrink-0"
+            >
+              {/* A panel sliding out to the left: "put the list away", not "close the trip". */}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"
+                strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+                <path d="M9.5 4.5v15M15.5 9.5 13 12l2.5 2.5" />
+              </svg>
+            </button>
           </div>
-          <button
-            ref={hideRef}
-            type="button"
-            onClick={() => { moveFocus.current = true; p.onClose() }}
-            aria-label="Hide trip details and show the full map"
-            // No aria-expanded here: the kit paints [aria-expanded="true"] as a pressed ink circle,
-            // and this is an action, not a toggle state. The reopen button carries it (false).
-            aria-controls="trip-details-scroll"
-            className="m-btn-icon shrink-0"
+          <div className="[@media(max-height:560px)]:sr-only">
+            <TripHero bundle={p.bundle} readOnly={p.readOnly} badge={placeholderBadge(p.bundle.trip)} />
+          </div>
+          <TripTabs tab={p.tab} onTab={p.onTab} />
+        </header>
+
+        {p.tab === 'trip' ? (
+          <div role="tabpanel" id={panelId('trip')} aria-labelledby={tabId('trip')} className="flex min-h-0 flex-1 flex-col">
+            <div className="shrink-0 px-4"><DateStrip {...p} /></div>
+            <div
+              id="trip-details-scroll"
+              ref={tripScroll}
+              data-trip-scroll
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-6 pt-2"
+            >
+              <TripPanelBody {...p} dayHeader="card" />
+            </div>
+          </div>
+        ) : (
+          <div
+            role="tabpanel"
+            id={panelId(p.tab)}
+            aria-labelledby={tabId(p.tab)}
+            // A focusable panel is the WAI-ARIA default when its first content is not a control.
+            tabIndex={0}
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-6 pt-1 focus-visible:outline-none focus-visible:shadow-[inset_var(--m-focus)]"
           >
-            {/* A panel sliding out to the left: "put the list away", not "close the trip". */}
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"
-              strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
-              <path d="M9.5 4.5v15M15.5 9.5 13 12l2.5 2.5" />
-            </svg>
-          </button>
-        </div>
-        <div className="shrink-0 px-4"><DateStrip {...p} /></div>
-        <div
-          id="trip-details-scroll"
-          data-trip-scroll
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-6 pt-2"
-        >
-          <TripPanelBody {...p} />
-        </div>
+            {p.tab === 'for-you' ? <ForYouInterim {...p} /> : <BuildInterim {...p} />}
+          </div>
+        )}
       </aside>
 
       {!p.open ? (
@@ -99,7 +138,7 @@ export default function FloatingTripPanel(p: FloatingTripPanelProps) {
           onClick={() => { moveFocus.current = true; p.onOpen() }}
           aria-label="Show trip details"
           aria-expanded={false}
-          aria-controls="trip-details-scroll"
+          aria-controls="trip-details-panel"
           className="m-btn-primary pointer-events-auto absolute left-4 top-4 z-20"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25"
@@ -111,6 +150,22 @@ export default function FloatingTripPanel(p: FloatingTripPanelProps) {
       ) : null}
     </div>
   )
+}
+
+/**
+ * The Trip tab's scroll position, kept while another tab is open (only the open tab is mounted).
+ * Restored before paint on the way back; a reveal that lands in the same render scrolls after it.
+ */
+function useKeptScroll(mounted: boolean) {
+  const top = useRef(0)
+  const el = useRef<HTMLDivElement | null>(null)
+  useLayoutEffect(() => {
+    if (!mounted || !el.current) return
+    const node = el.current
+    node.scrollTop = top.current
+    return () => { top.current = node.scrollTop }
+  }, [mounted])
+  return el
 }
 
 function useReportPanel(ref: React.RefObject<HTMLElement | null>, open: boolean) {

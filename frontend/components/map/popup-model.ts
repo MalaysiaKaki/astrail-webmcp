@@ -98,7 +98,7 @@ function isReelEvidence(kind: string): boolean {
  * Deliberately ONLY the trailing slash: the code itself must still match exactly, or a cover
  * would be attributed to a Reel the place did not come from (guardrail #1).
  */
-const reelKey = (url: string): string => url.replace(/\/+$/, '')
+export const reelKey = (url: string): string => url.replace(/\/+$/, '')
 
 /**
  * The Instagram Reel a stop came from, if it can be attributed honestly.

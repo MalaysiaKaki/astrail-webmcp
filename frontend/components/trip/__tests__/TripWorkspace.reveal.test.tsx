@@ -52,7 +52,8 @@ import MapProvider from '@/components/map/MapProvider'
 import TripWorkspace from '@/components/trip/TripWorkspace'
 
 async function flush() {
-  await act(async () => { await new Promise((r) => setTimeout(r, 0)) })
+  // Long enough for one animation frame: the reveal scrolls in the frame after the card mounts.
+  await act(async () => { await new Promise((r) => setTimeout(r, 20)) })
 }
 
 function mount(bundle: TripBundle = TOKYO_TRIP_WITH_HOTELS) {
@@ -111,6 +112,7 @@ function showOnMap(args: Record<string, unknown>) {
 const hidePanel = () => screen.getByRole('button', { name: 'Hide trip details and show the full map' })
 const panel = () => document.getElementById('trip-details-panel')!
 const stayChip = () => screen.getByRole('button', { name: 'Stay' })
+const openTab = (name: string) => act(async () => { screen.getByRole('tab', { name }).click() })
 
 describe('revealPlace (amendment 5)', () => {
   beforeEach(() => { window.history.replaceState(null, '', '/app/trip/demo'); window.sessionStorage.clear() })
@@ -197,7 +199,9 @@ describe('show_on_map drives the same reveal (amendments 5 and 10)', () => {
   it('day: the Trip tab and that day\'s list, from Stay', async () => {
     mount()
     await flush()
+    await openTab('Trip')
     await act(async () => { stayChip().click() })
+    await openTab('For you')
     await showOnMap({ target: 'day', day: 2 })
     expect(window.location.search).toBe('')
     expect(screen.queryByText('Where to stay')).toBeNull()
@@ -207,7 +211,9 @@ describe('show_on_map drives the same reveal (amendments 5 and 10)', () => {
   it('trip: the Trip tab and the stops list, from Stay', async () => {
     mount()
     await flush()
+    await openTab('Trip')
     await act(async () => { stayChip().click() })
+    await openTab('How it was built')
     await showOnMap({ target: 'trip' })
     expect(window.location.search).toBe('')
     expect(screen.queryByText('Where to stay')).toBeNull()
@@ -221,5 +227,85 @@ describe('show_on_map drives the same reveal (amendments 5 and 10)', () => {
     expect(panel()).not.toHaveAttribute('inert')
     expect(window.location.search).toBe('')
     expect(screen.getByText('Where to stay')).toBeInTheDocument()
+  })
+})
+
+describe('the panel tabs (plan v2 §2, amendment 9)', () => {
+  const KEY = `astrail:trip-tab:${TOKYO_TRIP_WITH_HOTELS.trip.id}`
+  beforeEach(() => { window.history.replaceState(null, '', '/app/trip/demo'); window.sessionStorage.clear() })
+  const selected = () => screen.getByRole('tab', { selected: true }).textContent
+
+  it('opens on Trip with the hero, the tabs and the Trip tab\'s day card and weather', async () => {
+    mount()
+    await flush()
+    expect(selected()).toBe('Trip')
+    const panel = screen.getByRole('tabpanel')
+    expect(panel).toHaveAttribute('aria-labelledby', 'trip-tab-trip')
+    expect(within(panel).getByTestId('day-header-card')).toBeInTheDocument()
+    expect(within(panel).getByTestId('weather-chip')).toHaveTextContent('31°C · 55% rain')
+    expect(screen.getByTestId('trip-hero')).toBeInTheDocument()
+  })
+
+  it('a tab change rewrites ?tab= with replaceState and remembers it for this trip', async () => {
+    const push = vi.spyOn(window.history, 'pushState')
+    mount()
+    await flush()
+    await openTab('How it was built')
+    expect(window.location.search).toBe('?tab=build')
+    expect(window.sessionStorage.getItem(KEY)).toBe('build')
+    expect(screen.getByTestId('build-interim')).toBeInTheDocument()
+    await openTab('Trip')
+    expect(window.location.search).toBe('')
+    expect(push).not.toHaveBeenCalled()
+  })
+
+  it('the URL wins over the stored tab on load', async () => {
+    window.sessionStorage.setItem(KEY, 'build')
+    window.history.replaceState(null, '', '/app/trip/demo?tab=for-you')
+    mount()
+    await flush()
+    expect(selected()).toBe('For you')
+    expect(window.sessionStorage.getItem(KEY)).toBe('for-you')
+  })
+
+  it('with no URL tab, the stored tab for THIS trip returns', async () => {
+    window.sessionStorage.setItem(KEY, 'for-you')
+    window.sessionStorage.setItem('astrail:trip-tab:some_other_trip', 'build')
+    mount()
+    await flush()
+    expect(selected()).toBe('For you')
+  })
+
+  it('an unknown ?tab= is ignored', async () => {
+    window.history.replaceState(null, '', '/app/trip/demo?tab=settings')
+    mount()
+    await flush()
+    expect(selected()).toBe('Trip')
+  })
+
+  for (const from of ['For you', 'How it was built']) {
+    it(`a map pin reveals its stop from the ${from} tab, with no remount of the map`, async () => {
+      mount()
+      await flush()
+      await openTab(from)
+      const map = screen.getByTestId('trip-map')
+      const stop = placesForDay(TOKYO_TRIP, 2)[0]
+      await act(async () => { mapProps.current!.onSelectPlace(stop.place_id) })
+      await flush()
+      expect(selected()).toBe('Trip')
+      expect(card(stop.place_id)).toHaveAttribute('aria-current', 'true')
+      expect(screen.getByTestId('trip-map')).toBe(map)
+    })
+  }
+
+  it('the Trip tab keeps its scroll position across a trip to another tab', async () => {
+    mount()
+    await flush()
+    const scroller = () => document.querySelector<HTMLElement>('[data-trip-scroll]')!
+    scroller().scrollTop = 240
+    await openTab('For you')
+    expect(document.querySelector('[data-trip-scroll]')).toBeNull()
+    await openTab('Trip')
+    expect(scroller().scrollTop).toBe(240)
   })
 })
