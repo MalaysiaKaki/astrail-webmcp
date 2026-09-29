@@ -10,6 +10,7 @@ import { buildPopupModel, thumbnailFor } from '@/components/map/popup-model'
 import EatCardLinks from './EatCardLinks'
 import { Connector, LegConnector } from './LegConnector'
 import StopCard from './StopCard'
+import CompactStopRow from './CompactStopRow'
 
 /**
  * The phone itinerary: numbered stop cards joined by the legs between them (Placify pattern).
@@ -25,6 +26,7 @@ import StopCard from './StopCard'
 export default function StopTimeline({
   bundle, places, legs, restaurants, placeIndex, trailNumbers, selectedPlaceId, onSelectPlace,
   selectedRestaurantPlaceId, onSelectRestaurant, onShow3d, showConfidence = false,
+  variant = 'cards', detailPlaceId = null, detailFooter = null,
 }: {
   bundle: TripBundle
   places: TripPlace[]
@@ -42,6 +44,13 @@ export default function StopTimeline({
   onShow3d?: (placeId: string) => void
   /** Desktop: the confidence chip in the selected stop's detail (the phone keeps it out). */
   showConfidence?: boolean
+  /** 'cards' (phone): the Placify stop cards, the selected one expanded. 'rows' (desktop, A10):
+   *  compact rows that open the place card on the map; only `detailPlaceId` expands, when its
+   *  detail lives in the sidebar instead. Every suggestion of the day is listed after the stops. */
+  variant?: 'cards' | 'rows'
+  detailPlaceId?: string | null
+  /** Under the sidebar detail: the way back to the map card. */
+  detailFooter?: React.ReactNode
 }) {
   const listRef = useRef<HTMLOListElement>(null)
   // The last row the user tapped HERE. A selection echoing that tap keeps 'nearest' (the row is
@@ -69,6 +78,7 @@ export default function StopTimeline({
   const anchoredTo = (placeId: string) => restaurants.filter((r) => r.near_place_id === placeId)
   // Suggestions not tied to a stop on this list still belong to the day; they must stay reachable.
   const unanchored = restaurants.filter((r) => !r.near_place_id || !onList.has(r.near_place_id))
+  const rows = variant === 'rows'
 
   return (
     <>
@@ -83,13 +93,25 @@ export default function StopTimeline({
           return (
             <li key={tp.id} className="scroll-mt-3">
               {link ? <LegConnector link={link} /> : i > 0 ? <Connector /> : null}
+              {rows && tp.place_id !== detailPlaceId ? (
+                <CompactStopRow
+                  tp={tp}
+                  pin={trailNumbers.get(tp.id)}
+                  total={trailNumbers.size}
+                  provenance={stopProvenance(tp)}
+                  thumbnail={thumbnailFor(bundle, tp)}
+                  selected={tp.place_id === selectedPlaceId}
+                  onTap={() => { tappedRef.current = tp.place_id; onSelectPlace(tp.place_id) }}
+                />
+              ) : (
+              <>
               <StopCard
                 tp={tp}
                 pin={trailNumbers.get(tp.id)}
                 total={trailNumbers.size}
                 provenance={stopProvenance(tp)}
                 thumbnail={thumbnailFor(bundle, tp)}
-                selected={tp.place_id === selectedPlaceId}
+                selected={rows || tp.place_id === selectedPlaceId}
                 eatCount={anchoredTo(tp.place_id).length}
                 onTap={() => { tappedRef.current = tp.place_id; onSelectPlace(tp.place_id) }}
                 restaurants={anchoredTo(tp.place_id)}
@@ -98,21 +120,24 @@ export default function StopTimeline({
                 onSelectRestaurant={onSelectRestaurant}
                 // The trip-relative detail (the Reel link, the local-script name, confidence) is
                 // derived for the open card only — the same model the map's cards are built from.
-                detail={tp.place_id === selectedPlaceId ? buildPopupModel(bundle, tp) : null}
+                detail={rows || tp.place_id === selectedPlaceId ? buildPopupModel(bundle, tp) : null}
                 showConfidence={showConfidence}
                 onShow3d={onShow3d ? () => onShow3d(tp.place_id) : undefined}
               />
+              {rows ? detailFooter : null}
+              </>
+              )}
             </li>
           )
         })}
       </ol>
       )}
       {trailing.map((t) => <LegConnector key={t.leg.id} link={t} />)}
-      {unanchored.length > 0 ? (
-        <section className="mt-6">
-          <h3 className="type-display mb-3 text-[20px] leading-tight text-[var(--m-text)]">Where to eat</h3>
+      {(rows ? restaurants : unanchored).length > 0 ? (
+        <section className="mt-6 scroll-mt-3" data-day-eats={rows ? '' : undefined}>
+          <h3 tabIndex={rows ? -1 : undefined} className="type-display mb-3 text-[20px] leading-tight text-[var(--m-text)] focus-visible:outline-none">Where to eat</h3>
           <EatCardLinks
-            restaurants={unanchored}
+            restaurants={rows ? restaurants : unanchored}
             placeIndex={placeIndex}
             selectedPlaceId={selectedRestaurantPlaceId}
             onSelect={onSelectRestaurant}

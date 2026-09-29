@@ -57,6 +57,7 @@ export default function EatCardLinks({ restaurants, placeIndex, selectedPlaceId,
               {place ? (
                 <button
                   type="button"
+                  data-eat-place-id={place.id}
                   onClick={() => onSelect(place.id)}
                   aria-pressed={chosen}
                   aria-label={`Show ${place.name} on the map`}

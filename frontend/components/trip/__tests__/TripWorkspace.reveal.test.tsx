@@ -20,16 +20,20 @@ const { MapCtor, mapInstance, mapProps, toolProps } = vi.hoisted(() => {
   }
   return {
     MapCtor: vi.fn(() => mapInstance), mapInstance,
-    mapProps: { current: null as null | { onSelectPlace: (id: string) => void; show3dNonce?: number; mode3d?: boolean } },
+    mapProps: { current: null as null | {
+      onSelectPlace: (id: string) => void; show3dNonce?: number; mode3d?: boolean
+      card?: { nonce: number; node: unknown } | null; cards?: { onFallback: (n: number) => void }
+    } },
     toolProps: { current: null as null | Record<string, unknown> },
   }
 })
 
 vi.mock('@/lib/trip/supabase-api', () => ({ getTrip: vi.fn() }))
 vi.mock('@/components/map/TripMap', () => ({
-  default: (props: { onSelectPlace: (id: string) => void }) => {
-    mapProps.current = props
-    return <div data-testid="trip-map" />
+  default: (props: { onSelectPlace: (id: string) => void; card?: { node: React.ReactNode } | null }) => {
+    mapProps.current = props as typeof mapProps.current
+    // The desktop place card's content, inline (TripMap portals it into its popup at the pin).
+    return <div data-testid="trip-map">{props.card?.node}</div>
   },
 }))
 vi.mock('mapbox-gl', () => ({
@@ -75,21 +79,35 @@ beforeEach(() => {
 afterEach(() => { delete process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN })
 
 describe('an undayed selected place (fix 1)', () => {
-  it('gets a pinned "Selected place" card with its detail and Show in 3D', async () => {
+  // A10 migration (Codex table, reveal :78): on desktop the undayed place is pinned as a compact
+  // "Selected place" row, and its detail (rationale, Show in 3D) is the place card at its pin;
+  // when the map cannot show it, the same detail expands in the pinned section instead.
+  it('gets a pinned "Selected place" row, with its detail and Show in 3D on the map card', async () => {
     mount()
     await flush()
     expect(screen.queryByRole('region', { name: 'Selected place' })).toBeNull()
     await act(async () => { mapProps.current!.onSelectPlace('pl_hotelbase') })
     const region = screen.getByRole('region', { name: 'Selected place' })
     expect(within(region).getByText('Shinjuku Granbell Hotel')).toBeInTheDocument()
-    // The StopDetail model: the rationale and the 3D button.
-    expect(within(region).getByText(/Central Shinjuku base suggested/)).toBeInTheDocument()
-    const show3d = within(region).getByRole('button', { name: /Show in 3D/ })
-    await act(async () => { show3d.click() })
+    expect(region.querySelector('[data-place-id="pl_hotelbase"]')).toHaveAttribute('aria-current', 'true')
+    const dialog = screen.getByRole('dialog', { name: 'Shinjuku Granbell Hotel' })
+    expect(within(dialog).getByText(/Central Shinjuku base suggested/)).toBeInTheDocument()
+    await act(async () => { within(dialog).getByRole('button', { name: /Show in 3D/ }).click() })
     expect(mapProps.current!.mode3d).toBe(true)
     expect(mapProps.current!.show3dNonce).toBe(1)
     // The day list is unchanged: day 1's stops are still there below it.
     expect(card(placesForDay(TOKYO_TRIP, 1)[0].place_id)).not.toBeNull()
+  })
+
+  it('shows the same detail in the pinned section when the map cannot show it at the pin', async () => {
+    mount()
+    await flush()
+    await act(async () => { mapProps.current!.onSelectPlace('pl_hotelbase') })
+    await act(async () => { mapProps.current!.cards!.onFallback(mapProps.current!.card!.nonce) })
+    const region = screen.getByRole('region', { name: 'Selected place' })
+    expect(within(region).getByText(/Central Shinjuku base suggested/)).toBeInTheDocument()
+    expect(within(region).getByRole('button', { name: /Show in 3D/ })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('is only for a place with no day: a lingering selection from another day is not pinned above it', async () => {

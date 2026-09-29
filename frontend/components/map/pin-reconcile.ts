@@ -32,6 +32,8 @@ export type ReconcileInput = {
   height: number
   /** Controls and the expanded panel, in map-container pixels. */
   obstacles: readonly Rect[]
+  /** The desktop place card is open on the selected pin: its title names the place (A10). */
+  hideSelected?: boolean
 }
 
 const ADDED = 'reconciled'
@@ -67,6 +69,10 @@ export function reconcilePins(entries: readonly PinEntry[], input: ReconcileInpu
     entry.el.classList.toggle(DIMMED, desktop && !selected && entry.tp.day_number !== activeDay)
     const wantsPill = desktop && (selected || (entry.tp.day_number === activeDay && zoom >= LABEL_MIN_ZOOM))
     const pill = pillOf(entry.el)
+    if (wantsPill && selected && input.hideSelected) {
+      if (pill) pill.hidden = true
+      continue
+    }
     if (!wantsPill) {
       // Undo: an added pill goes; the selected pin's own pill returns to its phone placement.
       if (pill?.dataset.origin === ADDED) pill.remove()
@@ -110,7 +116,12 @@ type ReconcileMap = {
 export function reconcileOnMap(
   map: unknown,
   entries: readonly PinEntry[],
-  s: { activeDay: number; selectedPlaceId: string | null; desktop: boolean; controls: readonly Rect[]; panelRight: number },
+  s: {
+    activeDay: number; selectedPlaceId: string | null; desktop: boolean; controls: readonly Rect[]; panelRight: number
+    /** Already in map-container px: the open place card, a local obstacle for the other pills. */
+    card?: Rect | null
+    hideSelected?: boolean
+  },
 ): void {
   const m = map as ReconcileMap
   const canvas = typeof m.getCanvas === 'function' ? m.getCanvas() : null
@@ -127,7 +138,9 @@ export function reconcileOnMap(
     project: (at) => (typeof m.project === 'function' ? m.project(at) : { x: 0, y: 0 }),
     width: canvas?.clientWidth ?? window.innerWidth,
     height,
+    hideSelected: s.hideSelected,
     obstacles: [
+      ...(s.card ? [s.card] : []),
       ...s.controls.map((r) => ({ ...r, x: r.x - left, y: r.y - top })),
       ...(s.panelRight > 0 ? [{ x: 0, y: 0, w: s.panelRight - left, h: height }] : []),
     ],

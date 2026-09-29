@@ -49,16 +49,20 @@ function money(currency: string | null, amount: number | null): string | null {
   return currency ? `${currency} ${rounded.toLocaleString('en-US')}` : String(rounded)
 }
 
-function appendLink(content: HTMLElement, url: string | null, label: string): void {
-  if (!url) return
-  let safe: string
+/** An http(s) URL as written by the parser, or null for anything else (javascript:, junk). */
+export function safeLink(url: string | null | undefined): string | null {
+  if (!url) return null
   try {
     const parsed = new URL(url)
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return
-    safe = parsed.href
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.href : null
   } catch {
-    return
+    return null
   }
+}
+
+function appendLink(content: HTMLElement, url: string | null, label: string): void {
+  const safe = safeLink(url)
+  if (!safe) return
   const a = document.createElement('a')
   a.className = 'evidence-popup__source evidence-popup__source--secondary'
   a.href = safe
@@ -82,21 +86,42 @@ function appendLink(content: HTMLElement, url: string | null, label: string): vo
  *  `distance_m` is deliberately NOT rendered next to the anchor stop's name. It is measured from
  *  the DAY'S CENTROID — the point `suggest_restaurants` searched around — not from `near_place_id`.
  *  Printing "180 m from Nukata Station" would be a precise-sounding falsehood. */
-export function buildEatPopup(r: RestaurantSuggestion, place: Place, nearName?: string | null): HTMLElement {
-  const content = el('article', 'evidence-popup suggestion-popup')
-  content.append(el('p', 'evidence-popup__eyebrow', ['Where to eat', r.cuisine].filter(Boolean).join(' · ')))
-  content.append(el('h3', 'evidence-popup__title', place.name))
+export type EatFacts = {
+  eyebrow: string
+  title: string
+  where: string | null
+  summary: string | null
+  near: string | null
+  hours: string | null
+  /** The details website, else the suggestion's source, and only when it is http(s). */
+  link: string | null
+}
 
+/** The facts an eat card states, shared by this DOM card and the desktop React card. */
+export function eatFacts(r: RestaurantSuggestion, place: Place, nearName?: string | null): EatFacts {
   const address = typeof r.evidence_json.address === 'string' ? r.evidence_json.address : null
-  const where = address || [place.area, place.city].filter(Boolean).join(', ')
-  if (where) content.append(el('p', 'evidence-popup__where', where))
-
-  if (r.summary) content.append(el('p', 'suggestion-popup__body', r.summary))
-  if (nearName) content.append(el('p', 'suggestion-popup__matches', `Near ${nearName}`))
-
   const details = eatDetails(r)
-  if (details.hours) content.append(el('p', 'suggestion-popup__body', details.hours))
-  appendLink(content, details.website ?? r.source_url, 'More about this place ↗')
+  return {
+    eyebrow: ['Where to eat', r.cuisine].filter(Boolean).join(' · '),
+    title: place.name,
+    where: address || [place.area, place.city].filter(Boolean).join(', ') || null,
+    summary: r.summary || null,
+    near: nearName ? `Near ${nearName}` : null,
+    hours: details.hours,
+    link: safeLink(details.website ?? r.source_url),
+  }
+}
+
+export function buildEatPopup(r: RestaurantSuggestion, place: Place, nearName?: string | null): HTMLElement {
+  const f = eatFacts(r, place, nearName)
+  const content = el('article', 'evidence-popup suggestion-popup')
+  content.append(el('p', 'evidence-popup__eyebrow', f.eyebrow))
+  content.append(el('h3', 'evidence-popup__title', f.title))
+  if (f.where) content.append(el('p', 'evidence-popup__where', f.where))
+  if (f.summary) content.append(el('p', 'suggestion-popup__body', f.summary))
+  if (f.near) content.append(el('p', 'suggestion-popup__matches', f.near))
+  if (f.hours) content.append(el('p', 'suggestion-popup__body', f.hours))
+  appendLink(content, f.link, 'More about this place ↗')
   return content
 }
 
@@ -121,37 +146,51 @@ function eatDetails(r: RestaurantSuggestion): { hours: string | null, website: s
  *  a live quote: a trip reopened weeks later can hold a deadline that has already passed, and
  *  printing "Free cancellation until 16 July" in August states something untrue. Past deadlines
  *  degrade to a plainly-worded past-tense line instead. */
-export function buildStayPopup(h: HotelSuggestion, now: number = Date.now()): HTMLElement {
-  const content = el('article', 'evidence-popup suggestion-popup')
-  const eyebrow = ['Where to stay', h.is_recommended ? 'Recommended' : null].filter(Boolean).join(' · ')
-  content.append(el('p', 'evidence-popup__eyebrow', eyebrow))
-  content.append(el('h3', 'evidence-popup__title', h.name))
+export type StayFacts = {
+  eyebrow: string
+  title: string
+  area: string | null
+  stars: string | null
+  guest: string | null
+  price: string | null
+  cancellation: string | null
+  note: string
+}
 
-  if (h.area) content.append(el('p', 'evidence-popup__where', h.area))
-
-  if (h.star_rating !== null) {
-    // Rounded to whole stars: a hotel class is 1–5, and "4.0" reads like a review score.
-    content.append(el('p', 'suggestion-popup__stars', `${'★'.repeat(Math.round(h.star_rating))} ${h.star_rating} star`))
-  }
-
-  // Travala's guest score is 0–10 and is a DIFFERENT measure from the star class. Labelled so the
-  // two never read as one number — "4 star · 9.4" alone invites reading 9.4 as nine stars.
-  if (h.guest_rating !== null) {
-    content.append(el('p', 'suggestion-popup__body', `${h.guest_rating}/10 guest score`))
-  }
-
+/** The facts a stay card states, shared by this DOM card and the desktop React card. */
+export function stayFacts(h: HotelSuggestion, now: number = Date.now()): StayFacts {
   const currency = typeof h.price_snapshot.currency === 'string' ? h.price_snapshot.currency : null
   const nightly = money(currency, num(h.price_snapshot, 'pricePerNight'))
   const total = money(currency, num(h.price_snapshot, 'totalPrice'))
   const price = [nightly && `${nightly} / night`, total && `${total} total`].filter(Boolean).join(' · ')
-  if (price) content.append(el('p', 'suggestion-popup__body', price))
+  return {
+    eyebrow: ['Where to stay', h.is_recommended ? 'Recommended' : null].filter(Boolean).join(' · '),
+    title: h.name,
+    area: h.area || null,
+    // Rounded to whole stars: a hotel class is 1–5, and "4.0" reads like a review score.
+    stars: h.star_rating !== null ? `${'★'.repeat(Math.round(h.star_rating))} ${h.star_rating} star` : null,
+    // Travala's guest score is 0–10 and is a DIFFERENT measure from the star class. Labelled so the
+    // two never read as one number — "4 star · 9.4" alone invites reading 9.4 as nine stars.
+    guest: h.guest_rating !== null ? `${h.guest_rating}/10 guest score` : null,
+    price: price || null,
+    cancellation: cancellationLine(h, now),
+    // Search results, not an offer. Prices move and availability lapses, so the card says where
+    // the number came from rather than implying we are holding it.
+    note: 'Search result from Travala — prices change; Astrail does not book.',
+  }
+}
 
-  const cancellation = cancellationLine(h, now)
-  if (cancellation) content.append(el('p', 'suggestion-popup__body', cancellation))
-
-  // Search results, not an offer. Prices move and availability lapses, so the popup says where
-  // the number came from rather than implying we are holding it.
-  content.append(el('p', 'suggestion-popup__note', 'Search result from Travala — prices change; Astrail does not book.'))
+export function buildStayPopup(h: HotelSuggestion, now: number = Date.now()): HTMLElement {
+  const f = stayFacts(h, now)
+  const content = el('article', 'evidence-popup suggestion-popup')
+  content.append(el('p', 'evidence-popup__eyebrow', f.eyebrow))
+  content.append(el('h3', 'evidence-popup__title', f.title))
+  if (f.area) content.append(el('p', 'evidence-popup__where', f.area))
+  if (f.stars) content.append(el('p', 'suggestion-popup__stars', f.stars))
+  if (f.guest) content.append(el('p', 'suggestion-popup__body', f.guest))
+  if (f.price) content.append(el('p', 'suggestion-popup__body', f.price))
+  if (f.cancellation) content.append(el('p', 'suggestion-popup__body', f.cancellation))
+  content.append(el('p', 'suggestion-popup__note', f.note))
   return content
 }
 

@@ -26,6 +26,10 @@ import MapDayChip from '@/components/map/MapDayChip'
 import { planReveal, type RevealPlace } from '@/lib/trip/reveal'
 import { useTripTab } from '@/lib/trip/use-trip-tab'
 import TripTabUrl from './TripTabUrl'
+import { useOpenCard } from './use-open-card'
+import { openCardEntity, type CardOpener } from '@/lib/trip/place-card'
+import StopPlaceCard from './card/StopPlaceCard'
+import { EatPlaceCard, HotelPlaceCard } from './card/SuggestionPlaceCards'
 
 function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
@@ -51,7 +55,7 @@ export default function TripWorkspace({
   bundle?: TripBundle
   readOnly?: boolean
 }) {
-  const { acquire, release, getMap } = useSharedMap()
+  const { acquire, release, getMap, hasToken } = useSharedMap()
   /**
    * Did the run the shell just finished produce THIS trip?
    *
@@ -142,6 +146,16 @@ export default function TripWorkspace({
   /* A reveal to bring into view once the Trip tab's list has mounted: a counter, so revealing the
      same place again (a second pin click) scrolls again even though nothing else changed. */
   const [revealRequest, setRevealRequest] = useState<{ placeId: string; nonce: number } | null>(null)
+  /* The desktop place card (A10): one open card, separate from selection, and where its detail
+     is shown (at the pin, or in the sidebar). */
+  const cards = useOpenCard()
+  const { openCard, close: closeCard } = cards
+  // An edit that removed the open card's place closes it: content is read from the latest bundle.
+  useEffect(() => {
+    if (!bundle || !openCard) return
+    const gone = openCard.kind === 'stop' ? !findTripPlace(bundle, openCard.id) : !openCardEntity(bundle, openCard)
+    if (gone) closeCard()
+  }, [bundle, openCard, closeCard])
 
   useEffect(() => {
     // A seeded bundle is already the answer, and there is nothing to read: the fixture has no
@@ -241,10 +255,13 @@ export default function TripWorkspace({
      so a Day 3 pin must open Day 3; an undayed stop (the base hotel) keeps the day and is pinned
      above the list. Every setter runs in one handler, so the tab, the day, the list and the
      selection arrive on the same render; the scroll waits for that render (revealRequest). */
-  const revealPlace: RevealPlace = (placeId) => {
+  const revealWith = (placeId: string, opener: CardOpener) => {
     if (!bundle) return
     const plan = planReveal(bundle, placeId, { activeDayNumber, tab, panelOpen, listView: mobileList })
     if (!plan) return
+    // Desktop shows the detail as the place card (at the pin, or in the sidebar when it cannot);
+    // the phone's sheet card is the detail there, and a rotation carries the open card across.
+    cards.open('stop', placeId, opener)
     setActiveDayNumber(plan.activeDayNumber)
     if (plan.tab !== tab) setTab(plan.tab)
     setPanelOpen(plan.panelOpen)
@@ -254,11 +271,61 @@ export default function TripWorkspace({
     setExpanded(false)
     setRevealRequest((r) => ({ placeId, nonce: (r?.nonce ?? 0) + 1 }))
   }
+  const revealPlace: RevealPlace = (placeId) => revealWith(placeId, 'other')
 
   function selectPlaceFromList(placeId: string) {
     if (placeId === selectedPlaceId) setFocusNonce((n) => n + 1)
     else setSelectedPlaceId(placeId)
+    cards.open('stop', placeId, 'row')
   }
+
+  /* A suggestion to eat or a hotel as its place card; the eat one also stays selected in the
+     list, so the map and the sidebar agree on which suggestion is current. */
+  const openEat = (placeId: string, opener: CardOpener) => {
+    setSelectedRestaurantPlaceId(placeId)
+    cards.open('eat', placeId, opener)
+  }
+
+  /* The map card's links into the Trip tab: that day, its overview or its places to eat. */
+  function showInPanel(target: 'overview' | 'eats', day: number) {
+    setPanelOpen(true)
+    if (tab !== 'trip') setTab('trip')
+    setMobileList('stops')
+    setLayerMode('route')
+    setActiveDayNumber(day)
+    cards.requestPanel(target, day)
+  }
+
+  /* Where the open stop's detail is shown on desktop: at its pin, unless the map is unavailable,
+     the place has no location, nothing fits at the pin (the map said so for THIS request), or the
+     user asked for the sidebar. The phone never uses this: its sheet card is the detail. */
+  const cardEntity = openCard ? openCardEntity(bundle, openCard) : null
+  const openStop = openCard?.kind === 'stop' ? findTripPlace(bundle, openCard.id) : null
+  const detailPlaceId = layout !== 'mobile' && openCard && openStop
+    && (cards.detailsHere || !hasToken || !cardEntity || cards.fallbackNonce === openCard.nonce)
+    ? openStop.place_id : null
+  const mapCardNode = !openCard || !cardEntity || detailPlaceId ? null
+    : openCard.kind === 'stop' ? (
+      <StopPlaceCard
+        bundle={bundle}
+        placeId={openCard.id}
+        onClose={(reason) => closeCard(reason)}
+        onNavigate={(id) => revealWith(id, openCard.opener ?? 'other')}
+        onShow3d={() => { setMode3d(true); setShow3dNonce((n) => n + 1) }}
+        onSelectEat={(id) => openEat(id, 'other')}
+        onSeeAllEats={(day) => showInPanel('eats', day)}
+        onDayOverview={(day) => showInPanel('overview', day)}
+        onDetailsHere={() => {
+          cards.setDetailsHere(true)
+          cards.focusAfterCommit([`[data-trip-scroll] [data-place-id="${CSS.escape(openCard.id)}"]`])
+        }}
+      />
+    ) : openCard.kind === 'eat' ? (
+      <EatPlaceCard bundle={bundle} placeId={openCard.id} onClose={(reason) => closeCard(reason)}
+        onOpenStop={(id) => revealWith(id, 'other')} />
+    ) : (
+      <HotelPlaceCard bundle={bundle} hotelId={openCard.id} onClose={(reason) => closeCard(reason)} />
+    )
 
   const sheetState: SheetState = !panelOpen ? 'hidden' : expanded ? 'expanded' : 'compact'
 
@@ -270,7 +337,9 @@ export default function TripWorkspace({
     days,
     activeDay,
     activeDayNumber,
-    onSelectDay: (n) => { setActiveDayNumber(n); setMobileList('stops'); setLayerMode('route') },
+    // Choosing a day is navigation away from the open card: it closes (a prev/next that crosses
+    // into another day goes through revealWith, not here, so its card stays).
+    onSelectDay: (n) => { setActiveDayNumber(n); setMobileList('stops'); setLayerMode('route'); closeCard() },
     dayPlaces,
     dayLegs,
     dayRestaurants,
@@ -284,7 +353,7 @@ export default function TripWorkspace({
     tab,
     onTab: setTab,
     selectedRestaurantPlaceId,
-    onSelectRestaurant: setSelectedRestaurantPlaceId,
+    onSelectRestaurant: (id) => openEat(id, 'row'),
     hotels,
     selectedHotelId,
     onSelectHotel: setSelectedHotelId,
@@ -309,6 +378,9 @@ export default function TripWorkspace({
     onReopenSheet: () => { setExpanded(false); setPanelOpen(true) },
     summaryRewriting,
     feedback,
+    detailPlaceId,
+    onDetailOnMap: hasToken && cardEntity ? () => { cards.setDetailsHere(false); cards.fallBack(null) } : null,
+    panelRequest: cards.panelRequest,
   }
 
   return (
@@ -320,8 +392,9 @@ export default function TripWorkspace({
         key={tripId}
         bundle={bundle}
         showDay={(n) => { setActiveDayNumber(n); setMobileList('stops') }}
-        // A place goes through the reveal (its day, the Trip tab, its card in view); null clears.
-        selectPlace={(id) => { if (id) revealPlace(id); else setSelectedPlaceId(null) }}
+        // A place goes through the reveal (its day, the Trip tab, its card); null clears it and
+        // closes the card (show_on_map's day and trip targets).
+        selectPlace={(id) => { if (id) revealPlace(id); else { setSelectedPlaceId(null); closeCard() } }}
         setLayerMode={setLayerMode}
         // show_on_map's day, trip and hotel targets open the Trip tab too (amendment 10).
         openPanel={() => { setPanelOpen(true); setTab('trip') }}
@@ -350,13 +423,20 @@ export default function TripWorkspace({
           selectedPlaceId={selectedPlaceId}
           selectedRestaurantPlaceId={selectedRestaurantPlaceId}
           onSelectRestaurant={setSelectedRestaurantPlaceId}
-          onSelectPlace={revealPlace}
+          onSelectPlace={(id) => revealWith(id, 'pin')}
           selectedHotelId={selectedHotelId}
           layerMode={layerMode}
           focusNonce={focusNonce}
           fitNonce={fitNonce}
           mode3d={mode3d}
           show3dNonce={show3dNonce}
+          card={mapCardNode && cardEntity && openCard ? { nonce: openCard.nonce, at: cardEntity.at, node: mapCardNode } : null}
+          cards={{
+            onFallback: (nonce) => cards.fallBack(nonce),
+            onDismiss: () => closeCard(),
+            onOpenEat: (id) => openEat(id, 'pin'),
+            onOpenHotel: (id) => cards.open('hotel', id, 'pin'),
+          }}
         />
       </div>
 

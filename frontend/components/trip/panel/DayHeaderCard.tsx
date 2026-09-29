@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import type { TripDay } from '@/lib/trip/backend-types'
 import { dayLabel } from '@/lib/trip/day-labels'
 import { weatherChip, type WeatherIcon } from '@/lib/trip/weather-chip'
@@ -10,9 +11,15 @@ import { weatherChip, type WeatherIcon } from '@/lib/trip/weather-chip'
  * weather-chip); without a code the chip is text alone, and without any weather there is none.
  * A heading block, not a control.
  */
-export default function DayHeaderCard({ day }: { day: TripDay }) {
+export default function DayHeaderCard({ day, rewriting = false }: {
+  day: TripDay
+  /** A summary rewrite is running for this trip: the prose below describes it BEFORE the edit. */
+  rewriting?: boolean
+}) {
   const label = dayLabel(day)
   const weather = weatherChip(day)
+  const [more, setMore] = useState(false)
+  const summary = day.summary?.trim() || null
   return (
     <div data-testid="day-header-card" className="m-card mb-3 flex flex-col gap-2 px-4 py-3">
       <div className="flex min-w-0 items-center gap-2">
@@ -39,6 +46,24 @@ export default function DayHeaderCard({ day }: { day: TripDay }) {
       </div>
       {day.title ? (
         <p className="type-body text-[length:var(--t-body)] leading-snug text-[var(--m-text-muted)]">{day.title}</p>
+      ) : null}
+      {/* The day's story in two lines (A10), with "More" for the rest. While a rewrite runs the
+          old prose stays, marked, and dimmed: true text about an itinerary that just changed. */}
+      {rewriting ? (
+        <p role="status" data-testid="day-header-rewriting" className="t-label text-[var(--m-accent)]">
+          Updating this day&apos;s summary
+        </p>
+      ) : null}
+      {summary ? (
+        <div className={['flex flex-col items-start', rewriting ? 'opacity-70' : ''].join(' ')}>
+          <p data-day-summary className={['t-body leading-snug text-[var(--m-text)]', more ? '' : 'line-clamp-2'].join(' ')}>{summary}</p>
+          {summary.length > 110 ? (
+            <button type="button" onClick={() => setMore((v) => !v)} aria-expanded={more}
+              className="t-meta -ml-2 min-h-11 rounded-full px-2 font-semibold text-[var(--m-accent)] focus-visible:outline-none focus-visible:shadow-[var(--m-focus)]">
+              {more ? 'Less' : 'More'}
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </div>
   )

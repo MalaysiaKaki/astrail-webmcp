@@ -113,6 +113,7 @@ function KitHotels({ hotels, selectedHotelId, onSelectHotel, layerMode }: {
               >
                 <button
                   type="button"
+                  data-hotel-id={h.id}
                   onClick={() => onSelectHotel(h.id)}
                   aria-pressed={selected}
                   className="flex min-h-14 w-full items-center gap-3 rounded-[var(--m-r-card)] px-4 py-3.5 focus-visible:outline-none"

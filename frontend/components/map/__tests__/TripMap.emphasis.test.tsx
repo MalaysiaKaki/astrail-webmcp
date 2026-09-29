@@ -245,38 +245,19 @@ describe('desktop hover preview', () => {
   const enter = (el: HTMLElement) => act(() => { el.dispatchEvent(new MouseEvent('mouseenter')) })
   const leave = (el: HTMLElement) => act(() => { el.dispatchEvent(new MouseEvent('mouseleave')) })
 
-  it('shows name, stop and day on hover and goes on leave; no popup on click', async () => {
+  // A10 (brief item 6, Codex §5): the hover card is removed on desktop. The active day's name
+  // pills name the pins, and the click opens the place card at the pin; a hover card would only
+  // compete with it. Replaces the A9 "shows on hover / removed on redraw" tests.
+  it('opens no hover card on desktop: a pin under the pointer shows nothing extra; a click selects', async () => {
     const onSelectPlace = vi.fn()
     await loaded({ onSelectPlace })
     const stop = placesForDay(TOKYO_TRIP, 2)[0]
     enter(pin(stop.place.name))
-    const card = hoverPopups().at(-1)!
-    expect(card.el!.textContent).toContain(stop.place.name)
-    expect(card.el!.textContent).toMatch(/Stop \d+ · Day 2/)
-    expect(card.el!.textContent).toContain('Click to open')
+    expect(popups).toHaveLength(0)
     leave(pin(stop.place.name))
-    expect(card.removed).toBe(true)
-    enter(pin(stop.place.name))
     act(() => { pin(stop.place.name).click() })
-    expect(hoverPopups().every((p) => p.removed)).toBe(true)
+    expect(popups).toHaveLength(0)
     expect(onSelectPlace).toHaveBeenCalledWith(stop.place_id)
-  })
-
-  it('is removed when the markers are replaced, on a layout change and on unmount', async () => {
-    const v = await loaded()
-    const name = placesForDay(TOKYO_TRIP, 1)[0].place.name
-    enter(pin(name))
-    v.update({ selectedPlaceId: placesForDay(TOKYO_TRIP, 1)[1].place_id })
-    await flush()
-    expect(hoverPopups().every((p) => p.removed)).toBe(true)
-    enter(pin(name))
-    setMobile(true)
-    expect(hoverPopups().every((p) => p.removed)).toBe(true)
-    setMobile(false)
-    enter(pin(name))
-    expect(hoverPopups().some((p) => !p.removed)).toBe(true)
-    v.leave()
-    expect(hoverPopups().every((p) => p.removed)).toBe(true)
   })
 
   it('never coexists with an open eat popup, and never shows on a phone', async () => {

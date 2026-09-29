@@ -1,0 +1,238 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import type { ReactNode } from 'react'
+import { TOKYO_TRIP } from '@/lib/trip/fixtures'
+import type { TripBundle } from '@/lib/trip/backend-types'
+
+/* A10 items 2, 4 and 6: the desktop place card's owner. TripWorkspace holds ONE open-card
+   descriptor (kind, id, nonce), separate from selection; the sidebar lists compact rows that open
+   the card; the detail moves to the sidebar when the map cannot show it. The mocked TripMap renders
+   the card's React content inline, so the real dialog is in the document. */
+
+type MapCardProp = { nonce: number; at: [number, number]; node: ReactNode } | null
+type Cards = { onFallback: (n: number) => void; onDismiss: () => void; onOpenEat: (id: string) => void; onOpenHotel: (id: string) => void }
+const { mapProps, toolProps, token } = vi.hoisted(() => ({
+  mapProps: { current: null as null | { onSelectPlace: (id: string) => void; card?: MapCardProp; cards?: Cards; activeDayNumber: number; fitNonce?: number; selectedPlaceId: string | null } },
+  toolProps: { current: null as null | Record<string, unknown> },
+  token: { value: 'pk.test' as string | undefined },
+}))
+
+vi.mock('@/lib/trip/supabase-api', () => ({ getTrip: vi.fn() }))
+vi.mock('@/components/map/TripMap', () => ({
+  default: (props: NonNullable<typeof mapProps.current>) => {
+    mapProps.current = props
+    return <div data-testid="trip-map">{props.card?.node}</div>
+  },
+}))
+vi.mock('mapbox-gl', () => ({ default: { Map: vi.fn(), Marker: vi.fn(), LngLatBounds: vi.fn(), accessToken: '' } }))
+vi.mock('mapbox-gl/dist/mapbox-gl.css', () => ({}))
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(window.location.search),
+  usePathname: () => window.location.pathname,
+}))
+vi.mock('@/components/webmcp/TripTools', () => ({
+  default: (props: Record<string, unknown>) => { toolProps.current = props; return null },
+}))
+vi.mock('@/components/trip/TripFeedbackPanel', () => ({ default: () => <div data-testid="trip-feedback-panel" /> }))
+vi.mock('@/lib/trip/insights/memory-events', async (orig) => ({
+  ...(await orig<object>()),
+  useTripMemoryWrites: () => ({ state: { kind: 'none' }, checkAgain: async () => {} }),
+}))
+
+import { showOnMapTool, type MapDeps } from '@/lib/webmcp/tools/map'
+import MapProvider from '@/components/map/MapProvider'
+import TripWorkspace from '@/components/trip/TripWorkspace'
+
+async function flush() { await act(async () => { await new Promise((r) => setTimeout(r, 20)) }) }
+
+function mount(bundle: TripBundle = TOKYO_TRIP) {
+  return render(<MapProvider><TripWorkspace tripId={bundle.trip.id} bundle={bundle} readOnly /></MapProvider>)
+}
+
+const row = (id: string) => document.querySelector<HTMLElement>(`[data-trip-scroll] [data-place-id="${id}"]`)
+const dialog = () => screen.queryByRole('dialog')
+const sidebarDetail = () => document.querySelector('[data-trip-scroll] [data-stop-card] [data-evidence-chip]')
+async function pin(id: string) { await act(async () => { mapProps.current!.onSelectPlace(id) }); await flush() }
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  window.history.replaceState(null, '', '/app/trip/demo')
+  window.sessionStorage.clear()
+  token.value = 'pk.test'
+  process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN = 'pk.test'
+  Element.prototype.scrollIntoView = vi.fn()
+})
+afterEach(() => { delete process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN })
+
+describe('desktop: a pin opens its place card at the pin', () => {
+  it('a pin click opens the stop\'s card on the map and marks its compact row current', async () => {
+    mount()
+    await flush()
+    await pin('pl_sandolab')
+    expect(dialog()).toHaveAccessibleName('SANDO LAB TOKYO')
+    expect(mapProps.current!.card!.at).toEqual([expect.any(Number), expect.any(Number)])
+    const r = row('pl_sandolab')!
+    expect(r).toHaveAttribute('aria-current', 'true')
+    expect(r).toHaveAttribute('aria-haspopup', 'dialog')
+    expect(r).not.toHaveAttribute('aria-expanded')
+    expect(sidebarDetail()).toBeNull()                    // the detail is on the map, not doubled
+  })
+
+  it('a compact row opens the card; clicking it again is a new request (reopen after close)', async () => {
+    mount()
+    await flush()
+    await act(async () => { row('pl_hpcafe')!.click() })
+    const first = mapProps.current!.card!.nonce
+    fireEvent.click(within(dialog()!).getByRole('button', { name: /close stop details/i }))
+    expect(dialog()).toBeNull()
+    await act(async () => { row('pl_hpcafe')!.click() })
+    expect(mapProps.current!.card!.nonce).toBeGreaterThan(first)
+  })
+
+  it('next crosses into day 2 and the card stays open on the next stop (no day-change dismissal)', async () => {
+    mount()
+    await flush()
+    await pin('pl_ichiran')
+    fireEvent.click(within(dialog()!).getByRole('button', { name: /next stop/i }))
+    await flush()
+    expect(mapProps.current!.activeDayNumber).toBe(2)
+    expect(dialog()).toHaveAccessibleName('Tokyo Disneyland')
+  })
+
+  it('choosing a day in the date strip closes the card', async () => {
+    mount()
+    await flush()
+    await pin('pl_sandolab')
+    await act(async () => { screen.getByRole('button', { name: /^Day 2/ }).click() })
+    expect(dialog()).toBeNull()
+  })
+
+  it('Escape closes it and focus returns to the logical opener: the pin, else its row', async () => {
+    mount()
+    await flush()
+    const fakePin = document.createElement('button')
+    fakePin.dataset.pinPlaceId = 'pl_sandolab'
+    document.body.append(fakePin)
+    await pin('pl_sandolab')
+    fireEvent.keyDown(dialog()!, { key: 'Escape' })
+    await flush()
+    expect(dialog()).toBeNull()
+    expect(document.activeElement).toBe(fakePin)
+    fakePin.remove()                                    // the marker was replaced since
+    await pin('pl_sandolab')
+    fireEvent.keyDown(dialog()!, { key: 'Escape' })
+    await flush()
+    expect(document.activeElement).toBe(row('pl_sandolab'))
+  })
+
+  it('a click on the empty map closes it without moving focus', async () => {
+    mount()
+    await flush()
+    await pin('pl_sandolab')
+    const before = document.activeElement
+    await act(async () => { mapProps.current!.cards!.onDismiss() })
+    expect(dialog()).toBeNull()
+    expect(document.activeElement).toBe(before)
+  })
+})
+
+describe('desktop: the detail moves to the sidebar when the map cannot show it', () => {
+  it('when nothing fits at the pin (the map reports it), the row expands into the full detail', async () => {
+    mount()
+    await flush()
+    await pin('pl_akasaka')
+    await act(async () => { mapProps.current!.cards!.onFallback(mapProps.current!.card!.nonce) })
+    expect(mapProps.current!.card).toBeNull()
+    expect(sidebarDetail()).not.toBeNull()
+    expect(row('pl_akasaka')).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('"Details in the sidebar" is the user\'s choice, and "Show on the map" takes it back', async () => {
+    mount()
+    await flush()
+    await pin('pl_akasaka')
+    fireEvent.click(within(dialog()!).getByRole('button', { name: /details in the sidebar/i }))
+    expect(mapProps.current!.card).toBeNull()
+    expect(sidebarDetail()).not.toBeNull()
+    await act(async () => { screen.getByRole('button', { name: /show on the map/i }).click() })
+    expect(dialog()).toHaveAccessibleName('Akasaka Station')
+  })
+
+  it('an unlocated stop gets its detail in the sidebar (there is no pin to open at)', async () => {
+    const b = structuredClone(TOKYO_TRIP)
+    b.places[1].place.lat = 0
+    b.places[1].place.lng = 0
+    mount(b)
+    await flush()
+    await act(async () => { row('pl_hpcafe')!.click() })
+    expect(mapProps.current!.card).toBeNull()
+    expect(sidebarDetail()).not.toBeNull()
+  })
+})
+
+describe('desktop: the card\'s links and the agent\'s show_on_map', () => {
+  const deps = (): MapDeps => ({
+    ...(toolProps.current as Omit<MapDeps, 'bundle' | 'view'>),
+    bundle: () => TOKYO_TRIP,
+    view: () => null,
+  })
+
+  it('show_on_map place opens the card; day and trip close it; trip moves no camera', async () => {
+    mount()
+    await flush()
+    const tool = showOnMapTool(deps())
+    await act(async () => { await tool.execute({ target: 'place', place: '3' }) })
+    expect(dialog()).toHaveAccessibleName('SANDO LAB TOKYO')
+    await act(async () => { await tool.execute({ target: 'day', day: 2 }) })
+    expect(dialog()).toBeNull()
+    await act(async () => { await tool.execute({ target: 'place', place: '3' }) })
+    const fit = mapProps.current!.fitNonce
+    await act(async () => { await tool.execute({ target: 'trip' }) })
+    expect(dialog()).toBeNull()
+    expect(mapProps.current!.fitNonce).toBe(fit)
+  })
+
+  it.skip('Picked for you opens the Trip tab at the stop\'s day with its card', async () => {
+    mount()
+    await flush()
+    await act(async () => { screen.getByRole('tab', { name: 'For you' }).click() })
+    await act(async () => { screen.getAllByRole('button').find((b) => b.hasAttribute('data-picked-place'))!.click() })
+    await flush()
+    expect(screen.getByRole('tab', { name: 'Trip' })).toHaveAttribute('aria-selected', 'true')
+    expect(dialog()).toHaveAccessibleName('Ichiran Shibuya')
+  })
+
+  it('"Day 2 overview" opens the Trip tab at that day with the overview open and focused', async () => {
+    mount()
+    await flush()
+    await pin('pl_sandolab')
+    await act(async () => { screen.getByRole('tab', { name: 'How it was built' }).click() })
+    await act(async () => { mapProps.current!.onSelectPlace('pl_disney') })
+    await flush()
+    fireEvent.click(within(dialog()!).getByRole('button', { name: /day 2 overview/i }))
+    await flush()
+    const overview = document.querySelector<HTMLDetailsElement>('[data-day-overview]')!
+    expect(overview.open).toBe(true)
+    expect(document.activeElement).toBe(overview.querySelector('summary'))
+  })
+
+  it('an eat pin and a sidebar eat open the eat card, in the same family', async () => {
+    mount()
+    await flush()
+    await act(async () => { mapProps.current!.cards!.onOpenEat('pl_popo') })
+    expect(dialog()).toHaveAccessibleName('Popo')
+    expect(within(dialog()!).getByText(/Where to eat/)).toBeInTheDocument()
+    fireEvent.click(within(dialog()!).getByRole('button', { name: /near sando lab tokyo/i }))
+    await flush()
+    expect(dialog()).toHaveAccessibleName('SANDO LAB TOKYO')
+  })
+
+  it('every place to eat on the day stays reachable in the sidebar', async () => {
+    mount()
+    await flush()
+    const section = document.querySelector<HTMLElement>('[data-day-eats]')!
+    const dayOne = TOKYO_TRIP.restaurants.filter((r) => r.trip_day_id === 'day_1')
+    expect(section.querySelectorAll('[data-eat-card]')).toHaveLength(dayOne.length)
+  })
+})

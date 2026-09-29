@@ -5,6 +5,7 @@ import type { Place, TripBundle, TripPlace } from '@/lib/trip/backend-types'
 import { stopProvenance } from '@/lib/trip/stop-provenance'
 import { buildPopupModel, thumbnailFor } from '@/components/map/popup-model'
 import StopCard from './StopCard'
+import CompactStopRow from './CompactStopRow'
 
 /**
  * The detail of a selected place with no day, so on no day's list (Codex final-review fix 1).
@@ -19,7 +20,7 @@ import StopCard from './StopCard'
  */
 export default function SelectedPlaceCard({
   bundle, tp, trailNumbers, placeIndex, onSelectPlace, onShow3d, showConfidence = false,
-  selectedRestaurantPlaceId, onSelectRestaurant,
+  selectedRestaurantPlaceId, onSelectRestaurant, compact = false, footer = null,
 }: {
   bundle: TripBundle
   tp: TripPlace
@@ -30,6 +31,10 @@ export default function SelectedPlaceCard({
   showConfidence?: boolean
   selectedRestaurantPlaceId: string | null
   onSelectRestaurant: (placeId: string) => void
+  /** Desktop (A10): its detail is the place card on the map; only the compact row stays here. */
+  compact?: boolean
+  /** Under the sidebar detail: the way back to the map card. */
+  footer?: React.ReactNode
 }) {
   const ref = useRef<HTMLElement>(null)
   useEffect(() => {
@@ -42,6 +47,18 @@ export default function SelectedPlaceCard({
       <h3 id="selected-place-heading" className="type-label mb-2 text-[length:var(--t-label)] font-semibold uppercase tracking-[0.06em] text-[var(--m-text-muted)]">
         Selected place
       </h3>
+      {compact ? (
+        <CompactStopRow
+          tp={tp}
+          pin={trailNumbers.get(tp.id)}
+          total={trailNumbers.size}
+          provenance={stopProvenance(tp)}
+          thumbnail={thumbnailFor(bundle, tp)}
+          selected
+          onTap={() => onSelectPlace(tp.place_id)}
+        />
+      ) : (
+      <>
       <StopCard
         tp={tp}
         pin={trailNumbers.get(tp.id)}
@@ -59,6 +76,9 @@ export default function SelectedPlaceCard({
         showConfidence={showConfidence}
         onShow3d={onShow3d ? () => onShow3d(tp.place_id) : undefined}
       />
+      {footer}
+      </>
+      )}
     </section>
   )
 }

@@ -96,17 +96,3 @@
   .shared-map .mapboxgl-ctrl-bottom-left,
   .shared-map .mapboxgl-ctrl-bottom-right { transition: none; }
 }
-
-/* The desktop pin hover preview (components/map/hover-preview): the same light card, smaller, and
-   never interactive — it follows the pointer's pin and is not a place to click. */
-.astrail-evidence-popup.pin-hover-popup { pointer-events: none; }
-.astrail-evidence-popup.pin-hover-popup .mapboxgl-popup-content { padding: 8px; }
-.pin-hover { display: flex; align-items: center; gap: 10px; max-width: 260px; }
-.pin-hover__cover { width: 52px; height: 52px; flex: none; border-radius: 12px; object-fit: cover; }
-.pin-hover__text { min-width: 0; padding-right: 4px; }
-.pin-hover__name {
-  margin: 0; color: var(--m-text); font: 600 15px/1.25 var(--font-ui), system-ui, sans-serif;
-  letter-spacing: -0.01em; overflow-wrap: anywhere;
-}
-.pin-hover__meta { margin: 2px 0 0; color: var(--m-text-muted); font: 500 13px/1.35 var(--font-ui), system-ui, sans-serif; }
-.pin-hover__hint { margin: 2px 0 0; color: var(--m-accent); font: 600 12px/1.35 var(--font-ui), system-ui, sans-serif; }

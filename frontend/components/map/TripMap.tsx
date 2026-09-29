@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import mapboxgl from 'mapbox-gl'
 import { thumbnailFor } from './popup-model'
 import { buildEatPopup, buildStayPopup } from './suggestion-popup'
@@ -25,9 +26,23 @@ import {
   addBuildingLayer, BUILDING_LAYER_ID, buildEatPin, dayTrailFeatureCollection, safeWebUrl, shortPlaceName,
 } from './trail-features'
 import { useSharedMap } from '@/components/map/MapProvider'
+import { addSpokeLayers, addTrailLayers } from './route-layers'
 import { addDayEmphasisLayers, applyDayEmphasis, removeChevronImage } from './day-emphasis'
 import { reconcileOnMap, type PinEntry } from './pin-reconcile'
-import { buildHoverCard, canHover, createHoverPreview } from './hover-preview'
+import { usePlaceCard, type MapCard } from './use-place-card'
+import './place-card.css'
+import { usePlacementObstacles } from '@/lib/trip/placement-obstacles'
+import { useOptionalWebMcpRegistry } from '@/components/webmcp/WebMcpRegistry'
+
+/** The desktop place card's owner callbacks (A10). Omitted: every width keeps the DOM cards. */
+export type MapCardHandlers = {
+  /** Nothing fits at the pin: show this request's detail in the sidebar. */
+  onFallback: (nonce: number) => void
+  /** A click on the empty map. */
+  onDismiss: () => void
+  onOpenEat: (restaurantPlaceId: string) => void
+  onOpenHotel: (hotelId: string) => void
+}
 
 export default function TripMap({
   bundle, activeDayNumber, selectedPlaceId, onSelectPlace,
@@ -38,6 +53,8 @@ export default function TripMap({
   fitNonce = 0,
   mode3d = false,
   show3dNonce = 0,
+  card = null,
+  cards,
 }: {
   bundle: TripBundle
   activeDayNumber: number
@@ -66,6 +83,10 @@ export default function TripMap({
   /** Bumped by a stop card's "Show in 3D" (the old popup's "Zoom in for 3D"): fly to the selected
    *  stop at street level. The owner turns the mode on in the same update. */
   show3dNonce?: number
+  /** Desktop: the one open place card (its request, where it points, its React content), shown
+   *  at the pin in a Mapbox Popup this component owns. Ignored on a phone. */
+  card?: (MapCard & { node: ReactNode }) | null
+  cards?: MapCardHandlers
 }) {
   const { hasToken, ready, getMap, acquire, release, setMarkers } = useSharedMap()
   const routeIdsRef = useRef<string[]>([])
@@ -107,7 +128,7 @@ export default function TripMap({
   const pending3dFlyRef = useRef<[number, number] | null>(null)
   const controlRects = useControlRects()
   // Desktop day emphasis (plan v2): the drawn stop pins, reconciled in place (dimming, name pills)
-  // on day, zoom, selection, layout and camera changes, and the one hover preview.
+  // on day, zoom, selection, layout, camera and place-card changes.
   const pinEntriesRef = useRef<PinEntry[]>([])
   const activeDayRef = useRef(activeDayNumber)
   activeDayRef.current = activeDayNumber
@@ -116,14 +137,26 @@ export default function TripMap({
   // The moveend listener is registered once, so everything reconcile() reads comes through refs.
   const layerModeRef = useRef(layerMode)
   layerModeRef.current = layerMode
-  const hoverRef = useRef<ReturnType<typeof createHoverPreview> | null>(null)
-  if (!hoverRef.current) {
-    hoverRef.current = createHoverPreview(() => new mapboxgl.Popup({
-      className: 'astrail-evidence-popup phone-popup pin-hover-popup',
-      closeButton: false, closeOnClick: false, offset: 30, maxWidth: '280px',
-    }))
-  }
-  const hover = hoverRef.current
+  // The desktop place card (A10). Its shell, placement and one bounded camera correction live in
+  // usePlaceCard; this component stays the only thing that moves the camera for a selection.
+  const placementObstacles = usePlacementObstacles()
+  const registry = useOptionalWebMcpRegistry()
+  const pendingRef = useRef(false)
+  pendingRef.current = Boolean(registry?.pending)
+  const cardsRef = useRef(cards)
+  cardsRef.current = cards
+  /** Desktop with an owner for the cards: eat and stay open as place cards, not DOM popups. */
+  const desktopCards = () => layoutRef.current === 'desktop' && Boolean(cardsRef.current)
+  const shownCard = layout === 'desktop' && cards ? card : null
+  const placeCard = usePlaceCard({
+    getMap, ready,
+    card: shownCard ? { nonce: shownCard.nonce, at: shownCard.at } : null,
+    onFallback: (n) => cardsRef.current?.onFallback(n),
+    onDismiss: () => cardsRef.current?.onDismiss(),
+    mayTakeFocus: () => !pendingRef.current,
+    onLayout: () => reconcile(),
+    deps: [panelObstruction, controlRects, placementObstacles, layout],
+  })
 
   /* One reconcile for the desktop emphasis: the route's filters and paint, and the pins' dimming
      and name pills. No marker is rebuilt and the camera never moves. On a phone it undoes every
@@ -136,6 +169,8 @@ export default function TripMap({
     reconcileOnMap(map, pinEntriesRef.current, {
       activeDay: activeDayRef.current, selectedPlaceId: selectedRef.current, desktop,
       controls: getControlRects(), panelRight: getPanelObstruction(),
+      card: desktop ? placeCard.cardRect() : null,
+      hideSelected: desktop && placeCard.isOpen(),
     })
   }
 
@@ -169,14 +204,13 @@ export default function TripMap({
     const map = getMap()
     if (!map) return
     activePopupRef.current?.remove()
-    hover.hide()   // the hover preview never coexists with an eat or stay card
     const popup = new mapboxgl.Popup({
       // The light kit card (phone-map-cards.css) at every width since plan A6.
       className: 'astrail-evidence-popup phone-popup',
       closeButton: true, closeOnClick: true, offset: 16, maxWidth: '300px',
     }).setLngLat(at).setDOMContent(content).addTo(map)
     activePopupRef.current = popup
-    // Closed by its ✕ or a map click: forget it, so hover previews can return.
+    // Closed by its ✕ or a map click: forget it.
     popup.on?.('close', () => { if (activePopupRef.current === popup) activePopupRef.current = null })
   }
 
@@ -206,7 +240,6 @@ export default function TripMap({
     return () => {
       activePopupRef.current?.remove()
       activePopupRef.current = null
-      hover.hide()
       markerLabelsRef.current = []
       pinEntriesRef.current = []
       clearRoutes()
@@ -237,7 +270,6 @@ export default function TripMap({
   function drawMarkers() {
     const map = getMap()
     if (!map) return
-    hover.hide()   // its marker is about to be replaced
     const entries: PinEntry[] = []
     // Global trail numbers: every stop across the whole trip is numbered 1..N in journey
     // order (Day 1's first stop = 1, the last day's final stop = N), so the numbered pins
@@ -273,22 +305,18 @@ export default function TripMap({
           selected: tp.place_id === selectedPlaceId,
           photoUrl,
         })
+        // Read by the card's logical-opener lookup (focus goes back to this pin on close).
+        pinEl.dataset.pinPlaceId = tp.place_id
         pinEl.addEventListener('click', (e) => {
           e.stopPropagation()
-          hover.hide()
+          // The owner reveals the stop: on a phone its expanded sheet card is the detail, on
+          // desktop its place card opens here at the pin. Never a DOM evidence popup.
           onSelectPlace(tp.place_id)
-          // No evidence popup: the selected, expanded, scrolled-to card in the panel IS the detail.
           activePopupRef.current?.remove()
           activePopupRef.current = null
         })
-        // Desktop, pointer devices: a light preview of the stop. Read at event time, so a rotation
-        // or an eat card opened since the pins were drawn is honoured.
+        // No hover preview (A10): the active day's pills name the pins, and the card is the detail.
         const at: [number, number] = [tp.place.lng, tp.place.lat]
-        pinEl.addEventListener('mouseenter', () => {
-          if (layoutRef.current !== 'desktop' || !canHover() || activePopupRef.current) return
-          hover.show(map, at, buildHoverCard({ name: tp.place.name, cover: photoUrl, stop: number, day: tp.day_number }))
-        })
-        pinEl.addEventListener('mouseleave', () => hover.hide())
         entries.push({ el: pinEl, tp, lngLat: at, label: shortPlaceName(tp.place.name) })
         return new mapboxgl.Marker({ element: pinEl, anchor: 'center' })
           .setLngLat([tp.place.lng, tp.place.lat]).addTo(map)
@@ -310,7 +338,8 @@ export default function TripMap({
         const at: [number, number] = [hub.lng, hub.lat]
         el.addEventListener('click', (e) => {
           e.stopPropagation()
-          openSuggestionPopup(at, buildStayPopup(hub))
+          if (desktopCards()) cardsRef.current!.onOpenHotel(hub.id)
+          else openSuggestionPopup(at, buildStayPopup(hub))
         })
         markers.push(new mapboxgl.Marker({ element: el }).setLngLat(at).addTo(map))
       }
@@ -333,7 +362,8 @@ export default function TripMap({
         el.addEventListener('click', (e) => {
           e.stopPropagation()
           onSelectRestaurant?.(place.id)      // keep the sidebar strip in step with the map
-          openSuggestionPopup([place.lng, place.lat], buildEatPopup(r, place, nearName(r)))
+          if (desktopCards()) cardsRef.current!.onOpenEat(place.id)
+          else openSuggestionPopup([place.lng, place.lat], buildEatPopup(r, place, nearName(r)))
         })
         return new mapboxgl.Marker({ element: el }).setLngLat([place.lng, place.lat]).addTo(map)
       })
@@ -359,33 +389,7 @@ export default function TripMap({
     clearRoutes()
     const trail = dayTrailFeatureCollection(bundle)
     if (trail.features.length === 0) return // one stop (or none) has nothing to connect
-    const id = 'trip-trail'
-    const casingId = `${id}-casing`
-    const coreId = `${id}-core`
-    map.addSource(id, {
-      type: 'geojson',
-      data: trail,
-    })
-    map.addLayer({
-      id: casingId,
-      type: 'line',
-      source: id,
-      layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': '#C9974E', 'line-width': 9, 'line-opacity': 0.18 },
-    })
-    map.addLayer({
-      id: coreId,
-      type: 'line',
-      source: id,
-      layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: {
-        'line-color': ['get', 'color'],
-        'line-width': 2.6,
-        'line-opacity': 0.95,
-        'line-dasharray': [0.1, 1.6],
-      },
-    })
-    routeIdsRef.current.push(id, casingId, coreId)
+    routeIdsRef.current.push(...addTrailLayers(map, trail))
     // The active day's casing, solid core and chevrons, on this same source (plan v2 amendment 6).
     // Tracked with the trail, so every route cleanup removes them; reconcile() shows them on desktop.
     if (typeof map.setFilter === 'function') {
@@ -418,25 +422,7 @@ export default function TripMap({
     clearRoutes()
     const spokes = hubSpokeFeatures(selectedHotel(bundle, selectedHotelId), bundle)
     if (spokes.features.length === 0) return
-    const id = 'hotel-spokes'
-    const casingId = `${id}-casing`
-    const coreId = `${id}-core`
-    map.addSource(id, { type: 'geojson', data: spokes })
-    map.addLayer({
-      id: casingId,
-      type: 'line',
-      source: id,
-      layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': '#C9974E', 'line-width': 6, 'line-opacity': 0.12 },
-    })
-    map.addLayer({
-      id: coreId,
-      type: 'line',
-      source: id,
-      layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': '#C9974E', 'line-width': 1.6, 'line-opacity': 0.7 },
-    })
-    routeIdsRef.current.push(id, casingId, coreId)
+    routeIdsRef.current.push(...addSpokeLayers(map, spokes))
   }
 
   // The map shows the itinerary trail OR the hotel hub-and-spokes, never both at once (decision #3).
@@ -632,7 +618,8 @@ export default function TripMap({
     if (!place || !hasRealCoords(place.lng, place.lat)) return false
     map.flyTo({
       center: [place.lng, place.lat], zoom: 14, pitch: cameraPitch(mode3dRef.current),
-      padding: framePadding({ popupRoom: true }), duration, essential: true,
+      // Reduced motion lands immediately (A10): the card's placement then follows in the same frame.
+      padding: framePadding({ popupRoom: true }), duration: reducedMotion() ? 0 : duration, essential: true,
     })
     return true
   }
@@ -648,7 +635,6 @@ export default function TripMap({
   // layout change also drops a hover card (a phone has no hover). Filters and classes only.
   useEffect(() => {
     if (!ready || !framedRef.current) return
-    hover.hide()
     reconcile()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDayNumber, layout])
@@ -749,7 +735,8 @@ export default function TripMap({
       padding: framePadding({ popupRoom: true }), duration: 1200, essential: true,
     })
     const suggestion = bundle.restaurants.find((r) => r.restaurant_place_id === selectedRestaurantPlaceId)
-    if (suggestion) {
+    // Desktop: the owner opens the eat's place card (A10); the phone keeps its DOM card.
+    if (suggestion && !desktopCards()) {
       openSuggestionPopup([place.lng, place.lat], buildEatPopup(suggestion, place, nearName(suggestion)))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -777,7 +764,8 @@ export default function TripMap({
       center: [hub.lng, hub.lat], zoom: 14, pitch: cameraPitch(mode3dRef.current),
       padding: framePadding({ popupRoom: true }), duration: 1200, essential: true,
     })
-    openSuggestionPopup([hub.lng, hub.lat], buildStayPopup(hub))
+    if (desktopCards()) cardsRef.current!.onOpenHotel(hub.id)
+    else openSuggestionPopup([hub.lng, hub.lat], buildStayPopup(hub))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedHotelId, layerMode])
 
@@ -788,6 +776,12 @@ export default function TripMap({
       </div>
     )
   }
-  // The canvas itself is the shell's fixed layer; this component only drives it.
-  return null
+  // The canvas itself is the shell's fixed layer; this component only drives it, and portals the
+  // desktop place card's content into the popup host it owns.
+  return shownCard && placeCard.host ? createPortal(shownCard.node, placeCard.host) : null
+}
+
+function reducedMotion(): boolean {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }

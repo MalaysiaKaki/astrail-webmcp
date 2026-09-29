@@ -1,0 +1,24 @@
+/* The desktop place card's Mapbox shell (A10). The card is the React content (an m-card); the
+   popup contributes only its position and pointer, so its own chrome is stripped. */
+.place-card-popup { z-index: 5; }                         /* over pins (the selected one is 3) */
+.place-card-popup .mapboxgl-popup-content {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  border-radius: var(--m-r-card);
+}
+.place-card-popup.mapboxgl-popup-anchor-top .mapboxgl-popup-tip,
+.place-card-popup.mapboxgl-popup-anchor-top-left .mapboxgl-popup-tip,
+.place-card-popup.mapboxgl-popup-anchor-top-right .mapboxgl-popup-tip { border-bottom-color: var(--m-card); }
+.place-card-popup.mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip,
+.place-card-popup.mapboxgl-popup-anchor-bottom-left .mapboxgl-popup-tip,
+.place-card-popup.mapboxgl-popup-anchor-bottom-right .mapboxgl-popup-tip { border-top-color: var(--m-card); }
+.place-card-popup.mapboxgl-popup-anchor-left .mapboxgl-popup-tip { border-right-color: var(--m-card); }
+.place-card-popup.mapboxgl-popup-anchor-right .mapboxgl-popup-tip { border-left-color: var(--m-card); }
+/* Hidden (not display:none, so it still measures) until the placement has chosen its anchor. */
+.place-card-popup--measuring { visibility: hidden; }
+.place-card-host { display: flex; }
+@media (prefers-reduced-motion: no-preference) {
+  .place-card-popup:not(.place-card-popup--measuring) .place-card { animation: place-card-in 160ms ease-out; }
+}
+@keyframes place-card-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }

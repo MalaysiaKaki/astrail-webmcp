@@ -1,6 +1,8 @@
 // components/map/__tests__/suggestion-popup.test.ts
 import { describe, it, expect } from 'vitest'
 import { buildStayPopup, buildEatPopup } from '@/components/map/suggestion-popup'
+import { TOKYO_TRIP } from '@/lib/trip/fixtures'
+import { TOKYO_TRIP_WITH_HOTELS } from '@/lib/trip/fixtures/tokyo-hotels'
 import type { HotelSuggestion, Place, RestaurantSuggestion } from '@/lib/trip/backend-types'
 
 const hotel = (over: Partial<HotelSuggestion> = {}): HotelSuggestion => ({
@@ -113,5 +115,30 @@ describe('buildEatPopup', () => {
     const hostile = buildEatPopup(suggestion({ source_url: 'javascript:alert(1)' }), place)
     expect(hostile.querySelector('a')).toBeNull()
     expect(hostile.innerHTML).not.toContain('javascript:')
+  })
+})
+
+/* A10: the desktop eat and hotel cards are React, in the stop card's family. They read the SAME
+   facts as these DOM cards, so honesty rules live once. */
+describe('suggestion facts shared with the desktop cards', () => {
+  it('eatFacts: cuisine eyebrow, address first, summary, near stop, hours and a safe website', async () => {
+    const { eatFacts } = await import('@/components/map/suggestion-popup')
+    const r = TOKYO_TRIP.restaurants[0]
+    const place = TOKYO_TRIP.suggestion_places.find((p) => p.id === r.restaurant_place_id)!
+    const f = eatFacts({ ...r, evidence_json: { ...r.evidence_json, details: { opening_hours: 'Daily 11:00-23:00', website: 'javascript:alert(1)' } } }, place, 'Sando Lab')
+    expect(f.eyebrow).toBe(['Where to eat', r.cuisine].filter(Boolean).join(' · '))
+    expect(f.title).toBe(place.name)
+    expect(f.near).toBe('Near Sando Lab')
+    expect(f.hours).toBe('Daily 11:00-23:00')
+    expect(f.link).toBeNull()                       // a hostile website is dropped, not linked
+  })
+
+  it('stayFacts: a lapsed deadline is past tense, and the search-result note is always there', async () => {
+    const { stayFacts } = await import('@/components/map/suggestion-popup')
+    const h = TOKYO_TRIP_WITH_HOTELS.hotels[0]
+    const f = stayFacts(h, Date.parse('2027-01-01'))
+    expect(f.cancellation).toBe('Was refundable when we searched — check current terms')
+    expect(f.note).toMatch(/Search result from Travala/)
+    expect(f.price).toMatch(/\/ night/)
   })
 })

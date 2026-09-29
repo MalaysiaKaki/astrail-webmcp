@@ -18,8 +18,12 @@ import DayHeaderCard from '../panel/DayHeaderCard'
 import { dayLabel } from '@/lib/trip/day-labels'
 import type { FitTarget } from '@/lib/trip/fit-target'
 import type { RevealPlace, TripTab } from '@/lib/trip/reveal'
+import { useEffect, useRef } from 'react'
 
 export type MobileListView = 'stops' | 'stay'
+
+/** Desktop (A10): a map card link asking the Trip tab to show part of a day. */
+export type PanelRequest = { target: 'overview' | 'eats'; day: number; nonce: number }
 
 export type MobileTripViewProps = {
   bundle: TripBundle
@@ -72,6 +76,13 @@ export type MobileTripViewProps = {
   summaryRewriting: boolean
   /** Owned by TripWorkspace so a draft survives the phone/desktop switch. */
   feedback: FeedbackComposer
+  /** Desktop (A10): the stop whose detail is in the sidebar instead of on the map card (the map
+   *  cannot show it, or the user chose "Details in the sidebar"); null when it is on the map. */
+  detailPlaceId?: string | null
+  /** Desktop: bring that detail back to the map card. Null when the map cannot show it. */
+  onDetailOnMap?: (() => void) | null
+  /** Desktop: the day overview or the day's places to eat, asked for by the map card. */
+  panelRequest?: PanelRequest | null
 }
 
 /** The sheet's title block: serif trip name, then the date range and the Sample tag. */
@@ -206,10 +217,20 @@ function StaySubHeader({ count }: { count: number }) {
   )
 }
 
-function DayDisclosure({ day, rewriting }: { day: TripDay; rewriting: boolean }) {
+function DayDisclosure({ day, rewriting, request }: { day: TripDay; rewriting: boolean; request?: PanelRequest | null }) {
+  const ref = useRef<HTMLDetailsElement>(null)
+  // The map card's "Day N overview" (A10): opened, brought into view and focused once mounted.
+  useEffect(() => {
+    if (!request || request.target !== 'overview' || request.day !== day.day_number || !ref.current) return
+    const el = ref.current
+    el.open = true
+    el.scrollIntoView?.({ block: 'start', behavior: reduceMotion() ? 'auto' : 'smooth' })
+    el.querySelector<HTMLElement>('summary')?.focus({ preventScroll: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request?.nonce])
   if (!rewriting && !day.summary && !day.weather_summary) return null
   return (
-    <details className="group mt-4">
+    <details ref={ref} data-day-overview className="group mt-4 scroll-mt-3">
       <summary className="m-card-link list-none [&::-webkit-details-marker]:hidden">
         <span className="type-body min-w-0 truncate text-[15px] font-medium text-[var(--m-text)]">
           Day {day.day_number} overview
@@ -232,6 +253,25 @@ function DayDisclosure({ day, rewriting }: { day: TripDay; rewriting: boolean })
   )
 }
 
+function reduceMotion(): boolean {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+/** The map card's "See all N places to eat" (A10): the day's list brought into view and focused. */
+function useEatsRequest(request: PanelRequest | null | undefined, day: number | null) {
+  useEffect(() => {
+    if (!request || request.target !== 'eats' || request.day !== day) return
+    const frame = requestAnimationFrame(() => {
+      const section = document.querySelector<HTMLElement>('[data-trip-scroll] [data-day-eats]')
+      section?.scrollIntoView?.({ block: 'start', behavior: reduceMotion() ? 'auto' : 'smooth' })
+      section?.querySelector<HTMLElement>('h3')?.focus({ preventScroll: true })
+    })
+    return () => cancelAnimationFrame(frame)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request?.nonce])
+}
+
 /**
  * What the list shows under the date strip — the day's stops or the Stay view, then About this
  * trip. Shared by the phone sheet and the desktop floating panel (FloatingTripPanel), so the two
@@ -243,6 +283,14 @@ export function TripPanelBody(p: MobileTripViewProps & {
   dayHeader?: 'sub' | 'card'
 }) {
   useRevealScroll(p.revealRequest)
+  useEatsRequest(p.panelRequest, p.activeDay?.day_number ?? null)
+  const desktop = p.dayHeader === 'card'
+  // The way back from the sidebar detail to the map card (desktop, A10).
+  const detailFooter = desktop && p.detailPlaceId && p.onDetailOnMap ? (
+    <button type="button" onClick={p.onDetailOnMap} className="m-btn-secondary mt-2 w-full">
+      Show on the map
+    </button>
+  ) : null
   return (
     <>
       {p.listView === 'stay' ? (
@@ -271,9 +319,13 @@ export function TripPanelBody(p: MobileTripViewProps & {
               showConfidence={p.showConfidence}
               selectedRestaurantPlaceId={p.selectedRestaurantPlaceId}
               onSelectRestaurant={p.onSelectRestaurant}
+              compact={desktop && p.detailPlaceId !== p.selectedTripPlace.place_id}
+              footer={desktop ? detailFooter : null}
             />
           ) : null}
-          {p.activeDay ? (p.dayHeader === 'card' ? <DayHeaderCard day={p.activeDay} /> : <DaySubHeader day={p.activeDay} />) : null}
+          {p.activeDay ? (desktop
+            ? <DayHeaderCard day={p.activeDay} rewriting={p.summaryRewriting} />
+            : <DaySubHeader day={p.activeDay} />) : null}
           <StopTimeline
             bundle={p.bundle}
             onShow3d={p.onShow3d}
@@ -287,10 +339,13 @@ export function TripPanelBody(p: MobileTripViewProps & {
             onSelectPlace={p.onSelectPlace}
             selectedRestaurantPlaceId={p.selectedRestaurantPlaceId}
             onSelectRestaurant={p.onSelectRestaurant}
+            variant={desktop ? 'rows' : 'cards'}
+            detailPlaceId={desktop ? p.detailPlaceId ?? null : null}
+            detailFooter={detailFooter}
           />
           {/* After the stops, not above them: the first screen of a compact sheet is for the
               route; the day's prose is context. */}
-          {p.activeDay ? <DayDisclosure day={p.activeDay} rewriting={p.summaryRewriting} /> : null}
+          {p.activeDay ? <DayDisclosure day={p.activeDay} rewriting={p.summaryRewriting} request={p.panelRequest} /> : null}
         </>
       )}
       <AboutThisTrip bundle={p.bundle} readOnly={p.readOnly} feedback={p.feedback} />

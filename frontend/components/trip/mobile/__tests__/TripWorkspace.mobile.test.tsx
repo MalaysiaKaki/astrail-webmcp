@@ -625,13 +625,19 @@ describe('TripWorkspace — the phone branch', () => {
     }
   })
 
-  it('desktop: a pin selects its card and opens it as the detail, with the confidence chip', () => {
+  // A10 migration (Codex table, :628): on desktop a pin marks its COMPACT row current and opens
+  // the place card at the pin (the detail and confidence chip are asserted in
+  // TripWorkspace.place-card.test). The sidebar expands the detail only as the fallback.
+  it('desktop: a pin marks its compact row current and opens its place card on the map', () => {
     h.mobile = false
     renderSeeded()
     act(() => { h.mapProps!.onSelectPlace('pl_akasaka') })
-    const card = document.querySelector<HTMLElement>('#trip-details-panel [data-place-id="pl_akasaka"]')!
-    expect(card).toHaveAttribute('aria-expanded', 'true')
-    expect(card.closest('[data-stop-card]')!.querySelector('[data-evidence-chip]')).not.toBeNull()
+    const row = document.querySelector<HTMLElement>('#trip-details-panel [data-place-id="pl_akasaka"]')!
+    expect(row).toHaveAttribute('aria-current', 'true')
+    expect(row).toHaveAttribute('aria-haspopup', 'dialog')
+    expect(row).not.toHaveAttribute('aria-expanded')
+    expect((h.mapProps as unknown as { card: { nonce: number } | null }).card).not.toBeNull()
+    expect(document.querySelector('#trip-details-panel [data-evidence-chip]')).toBeNull()
   })
 
   it('desktop: collapse and reopen hand keyboard focus to each other, never to <body>', () => {
