@@ -56,6 +56,9 @@ export function buildPhonePin({ name, label, placeType, sourceType, number, sele
   const el = document.createElement('button')
   el.type = 'button'
   el.setAttribute('aria-label', name)
+  // Explicit: Mapbox's Marker gives any element without a role role="img", which would hide this
+  // button from assistive tech now that the trip map is exposed (A10).
+  el.setAttribute('role', 'button')
   el.className = [
     'phone-pin',
     `phone-pin--${sourceType}`,

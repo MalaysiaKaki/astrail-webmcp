@@ -36,9 +36,8 @@ export default function DesktopAbout({ bundle, readOnly, feedback }: {
           <MissingDetails bundle={bundle} />
         </div>
       ) : null}
-      <div className="m-card px-4 py-3.5">
-        <OrchestratorSummary bundle={bundle} hideGapsBadge />
-      </div>
+      {/* Its own card already: not wrapped in another. */}
+      <OrchestratorSummary bundle={bundle} hideGapsBadge />
       {showFeedback ? (
         <div className="m-card flex flex-col gap-2 px-4 py-3.5">
           <h4 className="t-card-title text-[var(--m-text)]">How was this trail?</h4>

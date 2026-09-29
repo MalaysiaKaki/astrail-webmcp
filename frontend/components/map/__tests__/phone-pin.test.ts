@@ -62,3 +62,17 @@ describe('buildPhonePin', () => {
     expect(el.querySelector('.phone-pin__name')!.textContent).toBe(evil)
   })
 })
+
+/* A10 item 1: the trip map is exposed to assistive tech now, and Mapbox's Marker sets role="img"
+   on any element without a role, which hid every pin's button semantics. Pins say they are buttons. */
+describe('map pins keep their button role under a Mapbox Marker', () => {
+  it('a stop pin and an eat pin carry role="button" explicitly', async () => {
+    const { buildEatPin } = await import('@/components/map/trail-features')
+    const { TOKYO_TRIP } = await import('@/lib/trip/fixtures')
+    const pin = buildPhonePin({ name: 'A', label: 'A', placeType: 'restaurant', sourceType: 'reel_extracted', number: 1, selected: false, photoUrl: null })
+    expect(pin.getAttribute('role')).toBe('button')
+    const r = TOKYO_TRIP.restaurants[0]
+    const place = TOKYO_TRIP.suggestion_places.find((p) => p.id === r.restaurant_place_id)!
+    expect(buildEatPin(r, place, false).el.getAttribute('role')).toBe('button')
+  })
+})

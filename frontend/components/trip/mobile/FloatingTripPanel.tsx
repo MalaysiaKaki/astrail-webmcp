@@ -63,6 +63,10 @@ export default function FloatingTripPanel(p: FloatingTripPanelProps) {
         id="trip-details-panel"
         aria-label="Trip details"
         inert={!p.open}
+        // The panel clips (the kit's overflow:hidden); it never scrolls. A descendant's
+        // scrollIntoView that its own scroller cannot satisfy (a short list of compact rows) would
+        // otherwise scroll THIS box and slide the hero out of sight (A10 runtime finding).
+        onScroll={(e) => { const el = e.currentTarget; if (el.scrollTop || el.scrollLeft) { el.scrollTop = 0; el.scrollLeft = 0 } }}
         className={[
           'ui-floating-panel pointer-events-auto absolute bottom-4 left-4 top-4 z-10 flex flex-col',
           'w-[clamp(340px,34vw,440px)]',

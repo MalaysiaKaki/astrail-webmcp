@@ -142,11 +142,19 @@ function shifts(view: { w: number; h: number }): Array<[number, number]> {
   return out.sort((a, b) => Math.hypot(a[0], a[1]) - Math.hypot(b[0], b[1]))
 }
 
+/**
+ * Whether the map right of the panel can ever hold the card and still show map: a question about
+ * the viewport alone, answerable before any camera move (the sidebar gets the detail at once).
+ */
+export function mapHasCardRoom(viewW: number, panelRight: number, cardW: number): boolean {
+  return viewW - panelRight >= cardW + MIN_MAP_BESIDE_CARD
+}
+
 export function solveCardPlacement(s: PlacementInput): Placement {
   if (!usable(s.pin) || s.card.w <= 0 || s.card.natural <= 0) return { kind: 'none' }
   // Measured capacity, not a breakpoint: the map right of the panel must hold the card AND still
   // show some map. At 768 with the panel open it does not, whatever the camera does.
-  if (s.view.w - (s.panelRight ?? 0) < s.card.w + MIN_MAP_BESIDE_CARD) return { kind: 'none' }
+  if (!mapHasCardRoom(s.view.w, s.panelRight ?? 0, s.card.w)) return { kind: 'none' }
   const pin = s.pin
   if (pinClear(pin, s)) {
     const here = best(pin, s, s.minHeight)

@@ -297,3 +297,28 @@ describe('desktop: For you, How it was built and the About redistribution', () =
     expect(screen.getByRole('list', { name: /stops missing details/i })).toHaveTextContent(b.places[1].place.name)
   })
 })
+
+/* A10 runtime finding: with compact rows the list is often too short for a row's
+   scrollIntoView({block:'start'}) to be satisfied inside [data-trip-scroll], and the browser then
+   scrolled the next ancestor, the overflow-hidden floating panel: its hero slid out of sight and an
+   empty band showed at the bottom. The panel only clips; it never keeps a scroll offset. */
+describe('the floating panel never keeps a scroll offset', () => {
+  it('snaps itself back when a descendant\'s scrollIntoView scrolls it', async () => {
+    mount()
+    await flush()
+    const aside = document.getElementById('trip-details-panel')!
+    aside.scrollTop = 180
+    fireEvent.scroll(aside)
+    expect(aside.scrollTop).toBe(0)
+  })
+})
+
+describe('the way back to the map card', () => {
+  it('is not offered after an automatic fallback (it would only fall back again)', async () => {
+    mount()
+    await flush()
+    await pin('pl_akasaka')
+    await act(async () => { mapProps.current!.cards!.onFallback(mapProps.current!.card!.nonce) })
+    expect(screen.queryByRole('button', { name: /show on the map/i })).toBeNull()
+  })
+})

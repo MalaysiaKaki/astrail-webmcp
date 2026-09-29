@@ -274,3 +274,28 @@ describe('TripMap desktop place card', () => {
     expect(c.onOpenEat).not.toHaveBeenCalled()
   })
 })
+
+describe('TripMap desktop place card: capacity known before the flight', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    h.popups.length = 0
+    h.layer.replaceChildren()
+    document.body.append(h.layer)
+    h.listeners.clear()
+    h.onceListeners.clear()
+    layout.value = 'desktop'
+    process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN = 'pk.test'
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1 })
+    vi.stubGlobal('cancelAnimationFrame', () => {})
+  })
+  afterEach(() => { vi.unstubAllGlobals(); setPanelObstruction(0); h.state.width = 1440; h.state.moving = false })
+
+  it('hands a 768-wide map\'s detail to the sidebar at once, not after the selection flight', async () => {
+    h.state.width = 768
+    h.state.moving = true                 // the selection flight is still in the air
+    setPanelObstruction(356)
+    const c = cards()
+    await open({ selectedPlaceId: 'pl_sandolab', card: { nonce: 4, at: [139.77, 35.7], node: <Card /> }, cards: c })
+    expect(c.onFallback).toHaveBeenCalledWith(4)
+  })
+})

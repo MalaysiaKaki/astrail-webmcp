@@ -5,7 +5,7 @@ import mapboxgl from 'mapbox-gl'
 import { getControlRects } from '@/lib/trip/control-obstruction'
 import { getPanelObstruction } from '@/lib/trip/panel-obstruction'
 import { getPlacementObstacles } from '@/lib/trip/placement-obstacles'
-import { solveCardPlacement, type Box, type CardAnchor } from './card-placement'
+import { mapHasCardRoom, solveCardPlacement, type Box, type CardAnchor } from './card-placement'
 
 /**
  * The desktop place card's Mapbox shell (A10; Codex map-card review §1–§2), owned by the trip
@@ -180,6 +180,15 @@ export function usePlaceCard({ getMap, ready, card, onFallback, onDismiss, mayTa
     }
     const nonce = card.nonce
     placedRef.current = null
+    // A map too narrow for any card (768 with the panel open) is known now: no reason to make the
+    // reader wait out the selection's flight before the sidebar shows the detail.
+    const canvas = typeof map.getCanvas === 'function' ? map.getCanvas() : null
+    const left = map.getContainer?.()?.getBoundingClientRect?.().left ?? 0
+    if (!mapHasCardRoom(canvas?.clientWidth || window.innerWidth, Math.max(0, getPanelObstruction() - left), EST.w)) {
+      removePopup()
+      cbRef.current.onFallback(nonce)
+      return
+    }
     shell(map, card.at, anchorRef.current ?? 'top', true)
     let cancelled = false
     const settle = () => { if (!cancelled && cardRef.current?.nonce === nonce) place(true) }

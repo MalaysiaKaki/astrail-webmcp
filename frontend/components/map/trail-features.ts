@@ -137,6 +137,7 @@ export function addBuildingLayer(map: mapboxgl.Map): boolean {
 export function buildEatPin(r: RestaurantSuggestion, place: Place, selected: boolean): { el: HTMLButtonElement; label: HTMLElement } {
   const el = document.createElement('button')
   el.type = 'button'
+  el.setAttribute('role', 'button')   // not Mapbox's default role="img" (see phone-pin)
   el.setAttribute('aria-label', `${place.name}${r.cuisine ? `, ${r.cuisine}` : ''}`)
   el.className = ['eat-pin', selected ? 'eat-pin--selected' : '', 'phone-hit'].filter(Boolean).join(' ')
   const chip = document.createElement('span')

@@ -333,6 +333,7 @@ export default function TripMap({
         const el = document.createElement('button')
         el.type = 'button'
         el.setAttribute('aria-label', hub.name)
+        el.setAttribute('role', 'button')   // not Mapbox's default role="img"
         el.className = 'hotel-hub-pin phone-hit'
         el.textContent = '🏨'
         const at: [number, number] = [hub.lng, hub.lat]

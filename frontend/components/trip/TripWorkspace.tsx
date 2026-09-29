@@ -393,7 +393,8 @@ export default function TripWorkspace({
     summaryRewriting,
     feedback,
     detailPlaceId,
-    onDetailOnMap: hasToken && cardEntity ? () => { cards.setDetailsHere(false); cards.fallBack(null) } : null,
+    // Offered only after the user chose the sidebar: an automatic fallback would just repeat.
+    onDetailOnMap: hasToken && cardEntity && cards.detailsHere ? () => { cards.setDetailsHere(false); cards.fallBack(null) } : null,
     panelRequest: cards.panelRequest,
   }
 
