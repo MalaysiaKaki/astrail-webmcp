@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import * as ui from '@/lib/shell/ui'
 
-const recipes = Object.entries(ui).filter((e): e is [string, string] => typeof e[1] === 'string')
+const recipes: [string, string][] = Object.entries(ui as Record<string, unknown>).flatMap(([k, v]) =>
+  typeof v === 'string' ? [[k, v] as [string, string]] : [],
+)
 
 describe('/app class recipes', () => {
   it('never set a literal font size under 12px', () => {
