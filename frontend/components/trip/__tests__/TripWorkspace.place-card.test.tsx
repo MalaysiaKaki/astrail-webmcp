@@ -322,3 +322,109 @@ describe('the way back to the map card', () => {
     expect(screen.queryByRole('button', { name: /show on the map/i })).toBeNull()
   })
 })
+
+/* Codex final review (A11): #2, #3, #7, #8 on the owner side. */
+describe('Codex final: where the detail goes when the map cannot show it', () => {
+  const cardsOf = () => mapProps.current!.cards! as Cards & { onAvailability?: (a: boolean) => void }
+  const HOTELS = async () => (await import('@/lib/trip/fixtures/tokyo-hotels')).TOKYO_TRIP_WITH_HOTELS
+
+  // #2: a token, but the map never loaded: the row's detail stays in the sidebar, and the card
+  // appears once (if ever) the map can present it.
+  it('keeps the stop detail in the sidebar while the map is unavailable, then moves it to the card', async () => {
+    mount()
+    await flush()
+    await act(async () => { cardsOf().onAvailability!(false) })
+    await act(async () => { row('pl_sandolab')!.click() })
+    expect(mapProps.current!.card).toBeNull()
+    expect(sidebarDetail()).not.toBeNull()
+    await act(async () => { cardsOf().onAvailability!(true) })
+    expect(dialog()).toHaveAccessibleName('SANDO LAB TOKYO')
+  })
+
+  // #3: an eat card that cannot be placed (768 with the panel open) shows its WHOLE detail in the
+  // sidebar (hours, website), revealed on the Trip tab, focused, even from another tab.
+  it('an eat card that falls back shows its full detail in the sidebar, focused, from another tab', async () => {
+    const b = structuredClone(TOKYO_TRIP)
+    const r = b.restaurants.find((x) => x.restaurant_place_id === 'pl_popo')!
+    r.evidence_json = { ...r.evidence_json, details: { opening_hours: 'Daily 10:00-18:00', website: 'https://popo.example/' } }
+    mount(b)
+    await flush()
+    await act(async () => { screen.getByRole('tab', { name: 'For you' }).click() })
+    await act(async () => { cardsOf().onOpenEat('pl_popo') })
+    await act(async () => { cardsOf().onFallback(mapProps.current!.card!.nonce) })
+    await flush()
+    expect(dialog()).toBeNull()
+    expect(screen.getByRole('tab', { name: 'Trip' })).toHaveAttribute('aria-selected', 'true')
+    const detail = screen.getByRole('region', { name: 'Popo' })
+    expect(within(detail).getByText('Daily 10:00-18:00')).toBeInTheDocument()
+    expect(within(detail).getByRole('link', { name: /more about this place/i })).toHaveAttribute('href', 'https://popo.example/')
+    expect(detail.contains(document.activeElement)).toBe(true)
+  })
+
+  it('a hotel card that falls back shows its full detail in the Stay view, with the panel reopened', async () => {
+    const b = await HOTELS()
+    mount(b)
+    await flush()
+    await act(async () => { screen.getByRole('button', { name: 'Hide trip details and show the full map' }).click() })
+    await act(async () => { cardsOf().onOpenHotel('hotel_1') })
+    await act(async () => { cardsOf().onFallback(mapProps.current!.card!.nonce) })
+    await flush()
+    const panel = document.getElementById('trip-details-panel')!
+    expect(panel).not.toHaveAttribute('inert')
+    expect(screen.getByRole('button', { name: 'Stay' })).toHaveAttribute('aria-current', 'true')
+    const detail = screen.getByRole('region', { name: b.hotels[0].name })
+    expect(within(detail).getByText(/guest score/)).toBeInTheDocument()
+    expect(within(detail).getByText(/Search result from Travala/)).toBeInTheDocument()
+  })
+
+  // #7: "Details in the sidebar" from another tab or a collapsed panel reveals where it went.
+  it('"Details in the sidebar" from For you switches to the Trip tab and focuses the detail', async () => {
+    mount()
+    await flush()
+    await pin('pl_sandolab')
+    await act(async () => { screen.getByRole('tab', { name: 'For you' }).click() })
+    fireEvent.click(within(dialog()!).getByRole('button', { name: /details in the sidebar/i }))
+    await flush()
+    expect(screen.getByRole('tab', { name: 'Trip' })).toHaveAttribute('aria-selected', 'true')
+    expect(sidebarDetail()).not.toBeNull()
+    expect(document.activeElement).toBe(row('pl_sandolab'))
+  })
+
+  it('"Details in the sidebar" with the panel collapsed reopens it first', async () => {
+    mount()
+    await flush()
+    await pin('pl_sandolab')
+    await act(async () => { screen.getByRole('button', { name: 'Hide trip details and show the full map' }).click() })
+    fireEvent.click(within(dialog()!).getByRole('button', { name: /details in the sidebar/i }))
+    await flush()
+    expect(document.getElementById('trip-details-panel')).not.toHaveAttribute('inert')
+    expect(document.activeElement).toBe(row('pl_sandolab'))
+  })
+
+  it('an automatic fallback does not pull focus off the map canvas (keyboard panning)', async () => {
+    mount()
+    await flush()
+    await pin('pl_sandolab')
+    const canvas = document.createElement('div')
+    canvas.className = 'mapboxgl-canvas-container'
+    canvas.tabIndex = 0
+    document.body.append(canvas)
+    canvas.focus()
+    await act(async () => { cardsOf().onFallback(mapProps.current!.card!.nonce) })
+    await flush()
+    expect(sidebarDetail()).not.toBeNull()
+    expect(document.activeElement).toBe(canvas)
+    canvas.remove()
+  })
+
+  // #8: revealing the stop that is already selected (show_on_map after a pan) asks for the flight
+  // again; the trip target stays camera-free.
+  it('a repeated reveal of the selected stop requests the selection flight again', async () => {
+    mount()
+    await flush()
+    await pin('pl_sandolab')
+    const before = (mapProps.current as unknown as { focusNonce: number }).focusNonce
+    await pin('pl_sandolab')
+    expect((mapProps.current as unknown as { focusNonce: number }).focusNonce).toBe(before + 1)
+  })
+})

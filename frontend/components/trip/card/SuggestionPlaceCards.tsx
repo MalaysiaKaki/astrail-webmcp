@@ -13,9 +13,11 @@ const EXTERNAL = 'M14 5h5v5M19 5l-8 8M18 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 
  * phone's DOM card states (suggestion-popup's eatFacts): no invented hours, no centroid distance
  * dressed as distance from the stop. "Near" is the stop it was anchored to, and opens that stop.
  */
-export function EatPlaceCard({ bundle, placeId, onClose, onOpenStop }: {
+export function EatPlaceCard({ bundle, placeId, onClose, onOpenStop, inline = false }: {
   bundle: TripBundle
   placeId: string
+  /** Shown in the sidebar instead of at the pin. */
+  inline?: boolean
   onClose: (reason: CardCloseReason) => void
   onOpenStop: (placeId: string) => void
 }) {
@@ -26,7 +28,7 @@ export function EatPlaceCard({ bundle, placeId, onClose, onOpenStop }: {
   const f = eatFacts(r, e.place, null)
   const evidence = r.source_url && r.source_url !== f.link ? eatFacts({ ...r, evidence_json: {} }, e.place).link : null
   return (
-    <PlaceCardShell label="place to eat" meta={f.eyebrow} title={f.title} subtitle={f.where} onClose={onClose}>
+    <PlaceCardShell inline={inline} label="place to eat" meta={f.eyebrow} title={f.title} subtitle={f.where} onClose={onClose}>
       {f.summary ? <p className="t-body leading-snug text-[var(--m-text)]">{f.summary}</p> : null}
       {f.hours ? <p className="t-meta">{f.hours}</p> : null}
       {f.link || evidence ? (
@@ -41,9 +43,11 @@ export function EatPlaceCard({ bundle, placeId, onClose, onOpenStop }: {
 }
 
 /** A hotel hub at its pin: class, guest score, price, cancellation, and that it is not an offer. */
-export function HotelPlaceCard({ bundle, hotelId, onClose }: {
+export function HotelPlaceCard({ bundle, hotelId, onClose, inline = false }: {
   bundle: TripBundle
   hotelId: string
+  /** Shown in the Stay view instead of at the pin. */
+  inline?: boolean
   onClose: (reason: CardCloseReason) => void
 }) {
   const e = openCardEntity(bundle, { kind: 'hotel', id: hotelId, nonce: 0 })
@@ -51,7 +55,7 @@ export function HotelPlaceCard({ bundle, hotelId, onClose }: {
   const f = stayFacts(e.hotel)
   const base = e.hotel.base_place_id ? buildPlaceIndex(bundle).get(e.hotel.base_place_id) : null
   return (
-    <PlaceCardShell label="hotel" meta={f.eyebrow} title={f.title} subtitle={f.area ?? base?.area ?? null} onClose={onClose}>
+    <PlaceCardShell inline={inline} label="hotel" meta={f.eyebrow} title={f.title} subtitle={f.area ?? base?.area ?? null} onClose={onClose}>
       <ul className="flex flex-col gap-1">
         {[f.stars, f.guest, f.price, f.cancellation].filter(Boolean).map((line) => (
           <li key={line} className="t-body text-[var(--m-text)]">{line}</li>

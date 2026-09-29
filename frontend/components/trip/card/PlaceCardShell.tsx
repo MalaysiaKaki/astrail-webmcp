@@ -15,7 +15,7 @@ export type CardCloseReason = 'escape' | 'button'
  * approval card owns Escape (it declines), and one key press must never dismiss both.
  */
 export default function PlaceCardShell({
-  meta, title, subtitle, nav, onClose, children, label = 'place',
+  meta, title, subtitle, nav, onClose, children, label = 'place', inline = false,
 }: {
   /** "Stop 3 of 5 · Day 1", "Where to eat · Ramen". */
   meta: string | null
@@ -27,22 +27,29 @@ export default function PlaceCardShell({
   children: React.ReactNode
   /** For the close button's name: "Close stop details". */
   label?: string
+  /** In the sidebar (the map cannot show it, Codex final #3): a region in the list, not a dialog;
+   *  full width, no height budget, and no Escape (nothing floats over the page). */
+  inline?: boolean
 }) {
   const headingId = useId()
   const pending = useOptionalWebMcpRegistry()?.pending ?? null
   return (
     <div
-      role="dialog"
+      role={inline ? 'region' : 'dialog'}
       aria-labelledby={headingId}
       tabIndex={-1}
-      data-place-card
-      onKeyDown={(e) => {
+      data-place-card={inline ? undefined : ''}
+      data-sidebar-detail={inline ? '' : undefined}
+      onKeyDown={inline ? undefined : (e) => {
         if (e.key !== 'Escape' || pending) return
         e.stopPropagation()
         onClose('escape')
       }}
-      className="place-card m-card flex w-[360px] max-w-full flex-col overflow-hidden text-left outline-none"
-      style={{ maxHeight: 'var(--place-card-max-h, 70vh)', boxShadow: 'var(--m-shadow-2)' }}
+      className={[
+        'm-card flex flex-col overflow-hidden text-left outline-none',
+        inline ? 'mb-4 w-full scroll-mt-3 focus-visible:shadow-[var(--m-focus)]' : 'place-card w-[360px] max-w-full',
+      ].join(' ')}
+      style={inline ? undefined : { maxHeight: 'var(--place-card-max-h, 70vh)', boxShadow: 'var(--m-shadow-2)' }}
     >
       <div data-card-header className="flex shrink-0 flex-col gap-1 px-4 pb-3 pt-2">
         <div className="-mr-2 flex min-h-11 items-center gap-1">

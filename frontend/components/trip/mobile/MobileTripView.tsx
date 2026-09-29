@@ -84,6 +84,9 @@ export type MobileTripViewProps = {
   onDetailOnMap?: (() => void) | null
   /** Desktop: the day overview or the day's places to eat, asked for by the map card. */
   panelRequest?: PanelRequest | null
+  /** Desktop: an eat or hotel card's detail when the map cannot show it (Codex final #3), shown
+   *  at the top of the list it belongs to. */
+  sidebarDetail?: React.ReactNode
 }
 
 /** The sheet's title block: serif trip name, then the date range and the Sample tag. */
@@ -294,6 +297,7 @@ export function TripPanelBody(p: MobileTripViewProps & {
   ) : null
   return (
     <>
+      {desktop ? p.sidebarDetail : null}
       {p.listView === 'stay' ? (
         <div className="flex flex-col gap-3">
           <StaySubHeader count={p.hotels.length} />

@@ -27,7 +27,7 @@ import { planReveal, type RevealPlace } from '@/lib/trip/reveal'
 import { useTripTab } from '@/lib/trip/use-trip-tab'
 import TripTabUrl from './TripTabUrl'
 import { useOpenCard } from './use-open-card'
-import { openCardEntity, type CardOpener } from '@/lib/trip/place-card'
+import { openCardEntity, type CardOpener, type OpenCard } from '@/lib/trip/place-card'
 import StopPlaceCard from './card/StopPlaceCard'
 import { EatPlaceCard, HotelPlaceCard } from './card/SuggestionPlaceCards'
 
@@ -98,7 +98,8 @@ export default function TripWorkspace({
    * Optional registry: this component renders outside the /app shell too, and null means no agent
    * can have started anything.
    */
-  const summaryRewriting = (useOptionalWebMcpRegistry()?.activity ?? []).some(
+  const registry = useOptionalWebMcpRegistry()
+  const summaryRewriting = (registry?.activity ?? []).some(
     (e) => e.tool === 'replan_trip' && e.status === 'running' && e.subject === tripId,
   )
   const [bundle, setBundle] = useState<TripBundle | null>(seeded ?? null)
@@ -153,6 +154,9 @@ export default function TripWorkspace({
   // Crossing to the phone with focus in the place card: the card unmounts, so focus follows the
   // selection to the phone sheet's card for the same stop (Codex review §4), never to <body>.
   const cardFocusRef = useRef(false)
+  /* Whether the map can present a card at all (Codex final #2): TripMap reports false until the
+     shared map has loaded, and for good if it never does (a rejected style, no WebGL). */
+  const [mapAvailable, setMapAvailable] = useState(true)
   useEffect(() => {
     const track = () => { cardFocusRef.current = Boolean(document.activeElement?.closest?.('[data-place-card]')) }
     document.addEventListener('focusin', track)
@@ -276,6 +280,9 @@ export default function TripWorkspace({
     // Desktop shows the detail as the place card (at the pin, or in the sidebar when it cannot);
     // the phone's sheet card is the detail there, and a rotation carries the open card across.
     cards.open('stop', placeId, opener)
+    // The same stop again (show_on_map after a pan, a second pin click): the flight is asked for
+    // again too, not only the card (Codex final #8). The trip target never comes through here.
+    if (placeId === selectedPlaceId) setFocusNonce((n) => n + 1)
     setActiveDayNumber(plan.activeDayNumber)
     if (plan.tab !== tab) setTab(plan.tab)
     setPanelOpen(plan.panelOpen)
@@ -310,15 +317,52 @@ export default function TripWorkspace({
     cards.requestPanel(target, day)
   }
 
+  /* A detail that cannot stay at its pin moves to the sidebar, and the sidebar is made to show it:
+     the panel reopened, the Trip tab, the stop's day or the eat's day, or the Stay view for a hotel
+     (Codex final #3, #4, #7). Focus follows it unless an approval or a text field holds focus. */
+  function revealDetail(card: OpenCard, withFocus: boolean) {
+    setPanelOpen(true)
+    if (tab !== 'trip') setTab('trip')
+    if (card.kind === 'hotel') {
+      setMobileList('stay')
+    } else {
+      setMobileList('stops')
+      const day = card.kind === 'stop'
+        ? findTripPlace(bundle!, card.id)?.day_number
+        : days.find((d) => d.id === bundle!.restaurants.find((r) => r.restaurant_place_id === card.id)?.trip_day_id)?.day_number
+      if (typeof day === 'number') setActiveDayNumber(day)
+    }
+    const active = document.activeElement
+    const typing = !!active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')
+    if (!withFocus || registry?.pending || typing) return
+    cards.focusAfterCommit(card.kind === 'stop'
+      ? [`[data-trip-scroll] [data-place-id="${CSS.escape(card.id)}"]`]
+      : ['[data-trip-scroll] [data-sidebar-detail]'])
+  }
+  const onCardFallback = (nonce: number) => {
+    cards.fallBack(nonce)
+    // Focus follows unless the user is on the map itself (panning it away with the keyboard).
+    const onMap = !!document.activeElement?.closest?.('.mapboxgl-canvas-container')
+    if (openCard && openCard.nonce === nonce) revealDetail(openCard, !onMap)
+  }
+
   /* Where the open stop's detail is shown on desktop: at its pin, unless the map is unavailable,
      the place has no location, nothing fits at the pin (the map said so for THIS request), or the
      user asked for the sidebar. The phone never uses this: its sheet card is the detail. */
   const cardEntity = openCard ? openCardEntity(bundle, openCard) : null
   const openStop = openCard?.kind === 'stop' ? findTripPlace(bundle, openCard.id) : null
   const detailPlaceId = layout !== 'mobile' && openCard && openStop
-    && (cards.detailsHere || !hasToken || !cardEntity || cards.fallbackNonce === openCard.nonce)
+    && (cards.detailsHere || !hasToken || !mapAvailable || !cardEntity || cards.fallbackNonce === openCard.nonce)
     ? openStop.place_id : null
-  const mapCardNode = layout !== 'desktop' || !openCard || !cardEntity || detailPlaceId ? null
+  // The same for an eat or a hotel card (Codex final #3): its WHOLE detail, inline in the sidebar.
+  const suggestionInSidebar = layout !== 'mobile' && !!openCard && openCard.kind !== 'stop' && !!cardEntity
+    && (!hasToken || !mapAvailable || cards.fallbackNonce === openCard.nonce)
+  const sidebarDetail = !suggestionInSidebar || !openCard ? null
+    : openCard.kind === 'eat' ? (
+      <EatPlaceCard inline bundle={bundle} placeId={openCard.id} onClose={() => closeCard()}
+        onOpenStop={(id) => revealWith(id, 'other')} />
+    ) : <HotelPlaceCard inline bundle={bundle} hotelId={openCard.id} onClose={() => closeCard()} />
+  const mapCardNode = layout !== 'desktop' || !openCard || !cardEntity || detailPlaceId || suggestionInSidebar ? null
     : openCard.kind === 'stop' ? (
       <StopPlaceCard
         bundle={bundle}
@@ -331,7 +375,7 @@ export default function TripWorkspace({
         onDayOverview={(day) => showInPanel('overview', day)}
         onDetailsHere={() => {
           cards.setDetailsHere(true)
-          cards.focusAfterCommit([`[data-trip-scroll] [data-place-id="${CSS.escape(openCard.id)}"]`])
+          revealDetail(openCard, true)
         }}
       />
     ) : openCard.kind === 'eat' ? (
@@ -394,8 +438,9 @@ export default function TripWorkspace({
     feedback,
     detailPlaceId,
     // Offered only after the user chose the sidebar: an automatic fallback would just repeat.
-    onDetailOnMap: hasToken && cardEntity && cards.detailsHere ? () => { cards.setDetailsHere(false); cards.fallBack(null) } : null,
+    onDetailOnMap: hasToken && mapAvailable && cardEntity && cards.detailsHere ? () => { cards.setDetailsHere(false); cards.fallBack(null) } : null,
     panelRequest: cards.panelRequest,
+    sidebarDetail,
   }
 
   return (
@@ -447,11 +492,14 @@ export default function TripWorkspace({
           show3dNonce={show3dNonce}
           card={mapCardNode && cardEntity && openCard ? { nonce: openCard.nonce, at: cardEntity.at, node: mapCardNode } : null}
           cards={{
-            onFallback: (nonce) => cards.fallBack(nonce),
+            onFallback: onCardFallback,
+            onAvailability: setMapAvailable,
             onDismiss: () => closeCard(),
             onOpenEat: (id) => openEat(id, 'pin'),
             onOpenHotel: (id) => cards.open('hotel', id, 'pin'),
           }}
+          // The open eat or hotel at every width: TripMap carries it across the breakpoint (#6).
+          openSuggestion={openCard && openCard.kind !== 'stop' ? { kind: openCard.kind, id: openCard.id } : null}
         />
       </div>
 

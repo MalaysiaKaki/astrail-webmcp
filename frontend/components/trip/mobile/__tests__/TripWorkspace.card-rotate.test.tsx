@@ -10,7 +10,7 @@ import { TOKYO_TRIP } from '@/lib/trip/fixtures'
 const h = vi.hoisted(() => ({
   mobile: false,
   listeners: new Set<() => void>(),
-  mapProps: null as null | { onSelectPlace: (id: string) => void; card?: { node: ReactNode } | null },
+  mapProps: null as null | { onSelectPlace: (id: string) => void; card?: { node: ReactNode } | null; openSuggestion?: unknown; cards?: { onOpenEat: (id: string) => void } },
 }))
 
 vi.mock('@/lib/trip/supabase-api', () => ({ getTrip: vi.fn() }))
@@ -61,5 +61,22 @@ describe('the place card across the phone breakpoint', () => {
     setMobile(false)
     await flush()
     expect(screen.getByRole('dialog')).toHaveAccessibleName('SANDO LAB TOKYO')
+  })
+
+  // Codex final #6: an eat card's identity crosses the breakpoint, so TripMap can hand it from the
+  // desktop place card to the phone's DOM card and back as one surface.
+  it('keeps the open eat card across the breakpoint in both directions', async () => {
+    render(<MapProvider><TripWorkspace tripId={TOKYO_TRIP.trip.id} bundle={TOKYO_TRIP} readOnly /></MapProvider>)
+    await flush()
+    await act(async () => { h.mapProps!.cards!.onOpenEat('pl_popo') })
+    expect(h.mapProps!.openSuggestion).toEqual({ kind: 'eat', id: 'pl_popo' })
+    expect(h.mapProps!.card).not.toBeNull()
+    setMobile(true)
+    await flush()
+    expect(h.mapProps!.openSuggestion).toEqual({ kind: 'eat', id: 'pl_popo' })
+    expect(h.mapProps!.card ?? null).toBeNull()
+    setMobile(false)
+    await flush()
+    expect(screen.getByRole('dialog')).toHaveAccessibleName('Popo')
   })
 })
