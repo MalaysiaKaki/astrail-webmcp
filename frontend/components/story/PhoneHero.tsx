@@ -4,7 +4,7 @@ import PhoneOnlyPicture from './PhoneOnlyPicture'
 
 /* Phone-only pieces of the hero (Placify-pattern revamp, phase B1). Both render inside the shared
    hero copy block and are hidden at >= 768px by the kit's m-phone-only; desktop keeps its own
-   story-btn CTAs (m-desktop-only) and never sees any of this. FinalCTA reuses the actions. */
+   DesktopHeroActions (m-desktop-only) and never sees any of this. FinalCTA reuses both. */
 
 /* The encoded size of public/landing-mobile/trip-demo.* (a 390x844 DPR2 capture of
    /app/trip/demo, downscaled to 640 wide by the harness's capture-hero.mjs). Regenerating the
@@ -15,6 +15,21 @@ const SHOT_HEIGHT = 1385
 export function PhoneHeroActions() {
   return (
     <div className="story-phone-ctas m-phone-only">
+      <Link href="/sign-in" className="m-btn-primary">
+        Sign in to try it
+      </Link>
+      <a href="#how-it-works" className="m-btn-secondary">
+        See how it works
+      </a>
+    </div>
+  )
+}
+
+/* Desktop (>= 768px, phase B6): the same two actions side by side, in the same kit buttons. The
+   sample trip is the pill above the headline at every width, so it is not repeated here. */
+export function DesktopHeroActions() {
+  return (
+    <div className="story-desk-ctas m-desktop-only">
       <Link href="/sign-in" className="m-btn-primary">
         Sign in to try it
       </Link>

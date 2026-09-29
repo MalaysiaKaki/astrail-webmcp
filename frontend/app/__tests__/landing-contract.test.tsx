@@ -23,7 +23,7 @@ vi.mock('@/components/story/PlayOnceVideo', () => ({ default: () => null }))
 import LandingPage, { metadata as pageMetadata } from '../page'
 import { metadata } from '../layout'
 import AgentSection from '@/components/story/sections/AgentSection'
-import { SampleTrailButton, SampleTrailPill } from '@/components/story/SampleTrailLink'
+import { SampleTrailPill } from '@/components/story/SampleTrailLink'
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8')
 
@@ -87,31 +87,22 @@ describe('landing contract', () => {
 
 /*
  * The no-account route in. `/app/trip/demo` is the only /app path a signed-out visitor can open.
- * It moved from the retired sticky notice into the hero: a pill above the headline on phones and
- * a secondary action beside the sign-in on desktop.
+ * It moved from the retired sticky notice into the hero: the pill above the headline, at every
+ * width since B6 (desktop previously had a secondary button instead).
  */
 describe('the no-account sample trail, in the hero', () => {
   const HERO_NAME = /see a finished trip,? .*no account needed/i
 
-  it('offers it on phones as a kit pill badge, and on desktop as a secondary action', () => {
-    render(
-      <>
-        <SampleTrailPill />
-        <SampleTrailButton />
-      </>,
-    )
-    const [pill, button] = screen.getAllByRole('link', { name: HERO_NAME })
-    expect(pill).toHaveClass('m-pill-badge', 'm-phone-only')
-    expect(button).toHaveClass('story-btn', 'm-desktop-only')
+  it('offers it as a kit pill badge, shown at every width', () => {
+    render(<SampleTrailPill />)
+    const pill = screen.getByRole('link', { name: HERO_NAME })
+    expect(pill).toHaveClass('m-pill-badge')
+    expect(pill).not.toHaveClass('m-phone-only')
+    expect(pill).not.toHaveClass('m-desktop-only')
   })
 
-  it('points both at exactly the path middleware allowlists', () => {
-    render(
-      <>
-        <SampleTrailPill />
-        <SampleTrailButton />
-      </>,
-    )
+  it('points at exactly the path middleware allowlists', () => {
+    render(<SampleTrailPill />)
     // EXACT match, never a prefix or a suffix: middleware.ts allowlists the literal string
     // '/app/trip/demo'. A suffix or a query string is a different string to that guard and would
     // bounce a signed-out visitor to /sign-in.
@@ -145,7 +136,7 @@ describe('the no-account sample trail, in the hero', () => {
     const heroStart = stage.indexOf('className="story-hero')
     const heroEnd = stage.indexOf('</section>', heroStart)
     const fineprint = stage.indexOf('story-hero__fineprint')
-    for (const tag of ['<SampleTrailPill />', '<SampleTrailButton />']) {
+    for (const tag of ['<SampleTrailPill />']) {
       const at = stage.indexOf(tag)
       expect(at, `${tag} is not rendered`).toBeGreaterThan(heroStart)
       expect(at, `${tag} left the hero`).toBeLessThan(heroEnd)
@@ -218,7 +209,6 @@ describe('no competition framing survives on the story surfaces', () => {
       <>
         <StoryNav />
         <SampleTrailPill />
-        <SampleTrailButton />
         <AgentSection />
         <FAQ />
         <FinalCTA />

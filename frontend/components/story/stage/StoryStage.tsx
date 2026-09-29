@@ -1,13 +1,12 @@
 'use client'
 
-import Link from 'next/link'
-
 import '../story.css'
+import '../story-desktop.css'
 
 import StoryNav from '../StoryNav'
-import { PhoneHeroActions, PhoneHeroDevice } from '../PhoneHero'
-import { SampleTrailButton, SampleTrailPill } from '../SampleTrailLink'
-import Beat0Layer from './Beat0Layer'
+import DesktopHeroShot from '../DesktopHeroShot'
+import { DesktopHeroActions, PhoneHeroActions, PhoneHeroDevice } from '../PhoneHero'
+import { SampleTrailPill } from '../SampleTrailLink'
 import AsterStory from '../sections/AsterStory'
 import HowItWorks from '../sections/HowItWorks'
 import LiveMapDemo from '../sections/LiveMapDemo'
@@ -41,13 +40,13 @@ export default function StoryStage() {
       {/* First in <main>: on phones the nav is sticky in normal flow at the top of the page
           (story.css). Desktop positions it fixed, where DOM order does not move it. */}
       <StoryNav />
-      {/* ---- HERO: Aster walks in and idles. No metaphor transition. ---- */}
+      {/* ---- HERO: the pill, the promise, two actions, then the real product in a frame with
+           Aster leaning on it (a phone frame < 768px, a browser frame >= 768px). The walk-in
+           video layer (Beat0Layer) is no longer mounted: phones hid it in B1, and the B6 desktop
+           hero is centred copy over the framed product, where the clip had no place. ---- */}
       <section className="story-hero relative h-[100dvh] min-h-[640px] overflow-hidden bg-[color:var(--story-ivory)]">
-        <Beat0Layer />
-        <div className="story-wash-left" />
-
         <div className="story-copy story-copy--center" style={{ zIndex: 40 }}>
-          {/* Phones only: the no-account way in, as the pill above the headline. */}
+          {/* The no-account way in, as the pill above the headline. */}
           <SampleTrailPill />
           <p className="story-eyebrow text-[color:var(--story-teal-ink)]">
             AI-native trip planning &middot; works with your agent
@@ -61,20 +60,15 @@ export default function StoryStage() {
             a map, where every stop says where it came from. It speaks WebMCP, so an
             agent can plan and edit the trip with you, on the page you are looking at.
           </p>
-          <div className="story-hero__ctas m-desktop-only mt-8 flex flex-wrap items-center gap-4">
-            <Link href="/sign-in" className="story-btn story-btn--primary">
-              Sign in to try it
-            </Link>
-            {/* The secondary action is the no-account sample trip; "How it works" stays one
-                click away in the nav and under the scroll hint. */}
-            <SampleTrailButton />
-          </div>
-          {/* Phones (< 768px) get the kit's pills instead of the story buttons above. */}
+          {/* The same two kit actions: side by side on desktop, stacked full-width on phones. */}
+          <DesktopHeroActions />
           <PhoneHeroActions />
           {/* Phones only: a framed screenshot of the real trip view, with Aster on its corner.
               Before the fine print, so the CTAs lead straight into the product (Placify's
               order); desktop renders nothing here. */}
           <PhoneHeroDevice />
+          {/* Desktop only: the sample trip in a browser frame, Aster on its corner. */}
+          <DesktopHeroShot />
           <p className="story-sub story-hero__fineprint mt-7 text-[15px] text-[color:var(--ink-600)]">
             The tools live in the app, not on this page, which is just the pitch.
             Open Astrail in ChatGPT&rsquo;s built-in browser and ask what you can do

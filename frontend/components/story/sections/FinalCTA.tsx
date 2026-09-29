@@ -1,9 +1,7 @@
 'use client'
 
-import Link from 'next/link'
-
 import PlayOnceVideo from '../PlayOnceVideo'
-import { PhoneHeroActions } from '../PhoneHero'
+import { DesktopHeroActions, PhoneHeroActions } from '../PhoneHero'
 import { CLIPS, STILLS } from '../story-config'
 
 /* The warm bookend — the mech lands and waves. The message is the product, not a beta: the
@@ -25,11 +23,13 @@ export default function FinalCTA() {
       {/* Phones only (CSS): the 16:9 clip composes the mech in the right
           third, so a portrait cover-crop deletes him entirely. Swap to a
           centered mech cutout under the copy — same pattern as the hero. */}
+      {/* Lazy: hidden on desktop, where a lazy image that never renders is never fetched. */}
       <img
         className="story-cta-mech-mobile"
         src="/landing/cta-mech-mobile.webp"
         alt=""
         aria-hidden="true"
+        loading="lazy"
       />
 
       <div className="story-cta__copy story-copy story-copy--center" style={{ zIndex: 40 }}>
@@ -50,15 +50,8 @@ export default function FinalCTA() {
           a stop stops for a card on the page first.
         </p>
 
-        <div className="m-desktop-only mt-8 flex flex-wrap items-center gap-4">
-          <Link href="/sign-in" className="story-btn story-btn--primary">
-            Sign in to try it
-          </Link>
-          <a href="#how-it-works" className="story-btn story-btn--ghost">
-            See how it works
-          </a>
-        </div>
-        {/* Phones: the same two actions as the hero, in the kit's pills. */}
+        {/* The same two actions as the hero, in the kit's buttons at both widths. */}
+        <DesktopHeroActions />
         <PhoneHeroActions />
 
         <p className="story-cta__fine mt-5 text-[13px] text-[color:var(--ink-400)]">

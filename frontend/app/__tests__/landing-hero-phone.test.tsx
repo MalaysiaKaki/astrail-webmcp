@@ -33,13 +33,6 @@ describe('phone header', () => {
     expect(signIn).toHaveClass('m-btn-primary')
   })
 
-  it('leaves the desktop nav as it was, hidden only below 768px', () => {
-    render(<StoryNav />)
-    const desktop = document.querySelector('nav.story-nav')!
-    expect(desktop).toHaveClass('m-desktop-only')
-    expect(desktop.closest('.story-phone-header')).toBeNull()
-  })
-
   it('is flat at the top and floats once the page scrolls past 8px', () => {
     render(<StoryNav />)
     expect(phoneHeader()).toHaveAttribute('data-floating', 'false')

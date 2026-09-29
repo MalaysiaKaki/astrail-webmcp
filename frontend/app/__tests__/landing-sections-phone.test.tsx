@@ -114,14 +114,14 @@ describe('How it works on phones: step cards with phone-only crops', () => {
 })
 
 describe('closing CTA on phones', () => {
-  it('uses the kit pills on phones and keeps the story buttons for desktop', async () => {
+  it('uses the kit pills on phones, and a separate desktop-only row on desktop', async () => {
     const { default: FinalCTA } = await import('@/components/story/sections/FinalCTA')
     render(<FinalCTA />)
     const phone = document.querySelector('.story-cta .story-phone-ctas')!
     expect(phone).toHaveClass('m-phone-only')
     expect(within(phone as HTMLElement).getByRole('link', { name: 'Sign in to try it' }))
       .toHaveClass('m-btn-primary')
-    const desktop = document.querySelector('.story-cta .story-btn--primary')!.parentElement!
+    const desktop = document.querySelector('.story-cta .story-desk-ctas')!
     expect(desktop).toHaveClass('m-desktop-only')
   })
 })

@@ -1,0 +1,508 @@
+/* ============================================================
+   Placify-pattern revamp, phase B6: the landing page at >= 768px.
+   Plan docs/superpowers/plans/2026-09-29-placify-web-revamp.md (B6).
+
+   Placify's site language on the shared kit: a flat header that floats as a white card on scroll,
+   a centred serif hero with the pill badge, two kit buttons and the product in a browser frame,
+   sections as white cards on warm paper (dark cards on the night band), the FAQ as cards, and the
+   footer as card links. Type comes from the shared scale (--t-*); 12px is the floor.
+
+   EVERY rule here is inside a min-width media block (a test enforces it), so the phone layout in
+   story.css is untouched. Selectors start at `.story` to outrank story.css's own desktop rules,
+   including its 768-820px band, which was written when that band was treated as a phone.
+   ============================================================ */
+
+@media (min-width: 768px) {
+  /* ---- Header: flat at the top, a floating white card after 8px of scroll ---- */
+  .story-desk-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 120;
+    height: 84px;
+    pointer-events: none;
+  }
+  .story-desk-header__bar {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    width: min(100% - 48px, 1152px);
+    height: 64px;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 0 4px;
+    border-radius: var(--m-r-card);
+    background: transparent;
+    box-shadow: none;
+    pointer-events: auto;
+    transition:
+      width var(--m-dur-sheet) var(--m-ease),
+      padding var(--m-dur-sheet) var(--m-ease),
+      background-color var(--m-dur-sheet) var(--m-ease),
+      box-shadow var(--m-dur-sheet) var(--m-ease);
+  }
+  .story-desk-header[data-floating='true'] .story-desk-header__bar {
+    width: min(100% - 32px, 1120px);
+    padding: 0 8px 0 18px;
+    background: var(--m-card);
+    box-shadow: var(--m-shadow-2);
+  }
+  .story-desk-header__home {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 0 6px;
+    border-radius: 12px;
+    color: var(--m-text);
+    text-decoration: none;
+  }
+  .story-desk-header__name {
+    font-family: var(--font-fraunces), serif;
+    font-size: var(--t-title);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  .story-desk-header__links {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .story-desk-header__link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 14px;
+    border-radius: var(--m-r-pill);
+    color: var(--m-text-muted);
+    font-size: var(--t-body);
+    font-weight: 500;
+    text-decoration: none;
+    transition: background-color var(--m-dur-press) var(--m-ease), color var(--m-dur-press) var(--m-ease);
+  }
+  .story-desk-header__link:hover { background: rgba(28, 23, 16, 0.05); color: var(--m-text); }
+  .story-desk-header__link:active { background: rgba(28, 23, 16, 0.09); }
+  .story-desk-header__home:focus-visible,
+  .story-desk-header__link:focus-visible { outline: none; box-shadow: var(--m-focus); }
+  .story-desk-header__cta { padding: 0 22px; font-size: var(--t-body); white-space: nowrap; text-decoration: none; }
+
+  /* ---- Hero: centred pill, headline, lead, two kit buttons, then the framed product ---- */
+  .story .story-hero {
+    height: auto;
+    min-height: 0;
+    overflow: clip;
+  }
+  .story .story-hero .story-copy--center {
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    transform: none;
+    max-width: none;
+    margin: 0 auto;
+    padding: 132px 48px 96px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .story .story-hero .story-hero-pill {
+    gap: 10px;
+    margin-bottom: 28px;
+    padding: 0 14px 0 16px;
+    font-size: var(--t-meta);
+    font-weight: 600;
+    text-decoration: none;
+    transition: transform var(--m-dur-press) var(--m-ease), box-shadow var(--m-dur-press) var(--m-ease);
+  }
+  .story-hero-pill:hover { box-shadow: var(--m-shadow-2); }
+  .story-hero-pill:active { transform: scale(0.97); }
+  .story-hero-pill .m-chevron { width: 16px; height: 16px; margin-left: 0; }
+  .story-hero-pill__dot {
+    width: 8px;
+    height: 8px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--spruce-bright);
+    box-shadow: 0 0 0 3px rgba(111, 201, 180, 0.28);
+  }
+  /* The pill takes the eyebrow's slot, as on phones. Kept for assistive tech. */
+  .story .story-hero .story-eyebrow {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  /* The one heading above the display step: 1.4x the shared display size. */
+  .story .story-hero .story-h {
+    max-width: 16ch;
+    margin: 0 0 20px;
+    font-size: calc(var(--t-display) * 1.4);
+    line-height: 1.04;
+    text-wrap: balance;
+  }
+  .story .story-hero .story-sub {
+    max-width: 34em;
+    margin-inline: auto;
+    font-size: calc(var(--t-body-lg) * 1.125);
+    line-height: 1.55;
+    text-wrap: pretty;
+  }
+  .story-desk-ctas {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 32px;
+  }
+  .story-desk-ctas > a { min-width: 180px; padding: 0 26px; text-decoration: none; }
+  .story .story-hero .story-hero__fineprint {
+    max-width: 40em;
+    margin: 28px auto 0;
+    font-size: var(--t-meta);
+    line-height: 1.55;
+    color: var(--m-text-muted);
+  }
+  .story .story-hero .story-scroll-hint { display: none; }
+
+  /* The browser frame. Aster leans on its bottom-left corner, past the frame's edge; the hero
+     clips horizontally so he can never cause a page scroll. */
+  .story-desk-shot {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    margin-top: 56px;
+  }
+  .story-desk-shot__figure { margin: 0; width: min(100%, 1080px); }
+  .story-desk-shot__frame {
+    position: relative;
+    border-radius: var(--m-r-card);
+    background: var(--m-card);
+    box-shadow: 0 0 0 1px rgba(28, 23, 16, 0.08), var(--m-shadow-2), 0 40px 80px rgba(28, 23, 16, 0.12);
+  }
+  .story-desk-shot__chrome {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: 44px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--paper-line);
+  }
+  .story-desk-shot__dots { display: flex; gap: 7px; }
+  .story-desk-shot__dots > span {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--paper-line-2);
+  }
+  .story-desk-shot__url {
+    flex: 0 1 360px;
+    margin: 0 auto;
+    padding: 5px 14px;
+    border-radius: var(--m-r-pill);
+    background: var(--m-subcard);
+    color: var(--m-text-muted);
+    font-size: var(--t-label);
+    line-height: 1.3;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .story-desk-shot__frame picture {
+    display: block;
+    overflow: hidden;
+    border-radius: 0 0 var(--m-r-card) var(--m-r-card);
+  }
+  .story-desk-shot__img { display: block; width: 100%; height: auto; }
+  .story-desk-shot__aster {
+    position: absolute;
+    z-index: 1;
+    left: calc(clamp(96px, 11vw, 160px) * -0.55);
+    bottom: -18px;
+    width: clamp(96px, 11vw, 160px);
+    height: auto;
+    filter: drop-shadow(0 14px 18px rgba(28, 23, 16, 0.22));
+  }
+  .story-desk-shot__caption { margin-top: 14px; color: var(--m-text-muted); font-weight: 500; }
+
+  /* ---- Shared section rhythm: sentence-case eyebrows, the display step, the lead ---- */
+  .story :is(.story-chapters, .story-how, .story-live, .story-watch, .story-agent, #faq) {
+    padding: 120px 48px;
+  }
+  .story :is(.story-chapters, .story-how, .story-live, .story-watch, .story-agent, #faq, .story-cta) .story-eyebrow {
+    margin-bottom: 12px;
+    font-size: var(--t-meta);
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .story :is(.story-chapters, .story-how, .story-live, .story-watch, .story-agent, #faq) > div > .story-h {
+    max-width: 22ch;
+    margin-bottom: 16px;
+    font-size: var(--t-display);
+    line-height: 1.12;
+    text-wrap: balance;
+  }
+  .story :is(.story-chapters, .story-how, .story-live, .story-watch, .story-agent, #faq) > div > .story-sub {
+    max-width: 38em;
+    font-size: var(--t-body-lg);
+    line-height: 1.6;
+    text-wrap: pretty;
+  }
+  .story .story-cards { margin-top: 48px; gap: 20px; }
+
+  /* ---- The story band: each chapter a dark card, art in a rounded frame ---- */
+  .story .story-chapter {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-content: start;
+    align-items: start;
+    gap: 24px;
+    padding: 20px;
+    border: 1px solid var(--night-line);
+    border-radius: var(--m-r-sheet);
+    background: rgba(247, 243, 232, 0.04);
+  }
+  .story .story-chapter__text,
+  .story .story-chapter__art { width: auto; }
+  .story .story-chapter__text { padding: 4px 12px 12px; }
+  /* Art first, so the two cards' frames line up whatever their text lengths. */
+  .story .story-chapter__art { order: -1; border-radius: var(--m-r-card); }
+  .story .story-chapter .story-h { margin-bottom: 10px; font-size: var(--t-title); line-height: 1.2; }
+  .story .story-chapter .story-sub { font-size: var(--t-body); line-height: 1.6; }
+  .story .story-chapters__handoff { margin-top: 40px; font-size: var(--t-body-lg); }
+
+  /* ---- How it works: one white step card each, text beside a framed capture ---- */
+  /* Below 1024 the capture stacks under the text; side by side it would squeeze both. */
+  .story .story-step {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 32px;
+    padding: 32px;
+    border-radius: var(--m-r-sheet);
+    background: var(--m-card);
+    box-shadow: var(--m-shadow-1);
+  }
+  .story .story-step > * { width: auto; }
+  .story .story-step .story-h { margin-bottom: 12px; font-size: var(--t-title); line-height: 1.2; }
+  .story .story-step .story-sub { font-size: var(--t-body); line-height: 1.6; }
+  .story .story-step__note { font-size: var(--t-meta); line-height: 1.5; }
+  .story .story-step__badge {
+    display: inline-block;
+    border: 0;
+    padding: 2px 8px;
+    background: rgba(26, 107, 94, 0.1);
+    font-size: var(--t-label);
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .story .story-shot {
+    border-radius: var(--m-r-card);
+    border-color: rgba(28, 23, 16, 0.08);
+    box-shadow: var(--m-shadow-1);
+  }
+  .story .story-shot__chrome > span:last-child,
+  .story .story-watch__chrome > span:last-child { font-size: var(--t-label); }
+
+  /* ---- Live map: a dark card on the night band ---- */
+  .story .story-live__map {
+    margin-top: 48px;
+    border-radius: var(--m-r-sheet);
+  }
+
+  /* ---- Watch it work: the video in a white card, the YouTube link as a secondary pill ---- */
+  .story .story-watch__card {
+    border: 0;
+    border-radius: var(--m-r-sheet);
+    box-shadow: var(--m-shadow-2);
+  }
+  .story .story-watch__yt {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 20px;
+    font-size: var(--t-meta);
+    color: var(--m-text-muted);
+  }
+  .story .story-watch__yt-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 20px;
+    border-radius: var(--m-r-pill);
+    background: var(--m-card);
+    color: var(--m-text);
+    font-size: var(--t-body);
+    font-weight: 600;
+    text-decoration: none;
+    box-shadow: var(--m-shadow-1);
+    transition: transform var(--m-dur-press) var(--m-ease);
+  }
+  .story .story-watch__yt-link:active { transform: scale(0.97); }
+  .story .story-watch__yt-link:focus-visible { outline: none; box-shadow: var(--m-focus); }
+
+  /* ---- FAQ: every item a white card, every answer shown (desktop has no toggles) ---- */
+  .story #faq > div { max-width: 1152px; }
+  .story #faq .story-faq {
+    margin-top: 48px;
+    border-top: 0;
+    columns: 2 380px;
+    column-gap: 20px;
+  }
+  .story #faq .story-faq__item {
+    break-inside: avoid;
+    margin-bottom: 20px;
+    padding: 28px;
+    border-bottom: 0;
+    border-radius: var(--m-r-card);
+    background: var(--m-card);
+    box-shadow: var(--m-shadow-1);
+  }
+  .story #faq .story-faq__item > dt { font-size: var(--t-title); line-height: 1.25; }
+  .story #faq .story-faq__a {
+    margin-top: 12px;
+    font-size: var(--t-body);
+    line-height: 1.6;
+  }
+
+  /* ---- Closing CTA: the copy as a white card, the kit buttons, the mech beside or below ---- */
+  .story .story-cta {
+    min-height: 0;
+    padding: 120px 48px 320px;
+  }
+  .story .story-cta .story-video { display: none; }
+  .story .story-cta .story-wash-left { display: none; }
+  .story .story-cta .story-copy--center {
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    transform: none;
+    max-width: 38rem;
+    margin: 0 auto;
+    padding: 40px;
+    border-radius: var(--m-r-sheet);
+    background: var(--m-card);
+    box-shadow: var(--m-shadow-2);
+    text-align: left;
+  }
+  .story .story-cta .story-h { font-size: var(--t-display); line-height: 1.12; text-wrap: balance; }
+  .story .story-cta .story-sub { font-size: var(--t-body-lg); line-height: 1.6; }
+  .story .story-cta .story-desk-ctas { justify-content: flex-start; }
+  .story .story-cta .story-cta__fine { font-size: var(--t-meta); color: var(--m-text-muted); }
+  .story .story-cta .story-copy--center > p:last-of-type {
+    display: block;
+    font-size: var(--t-label);
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--m-text-muted);
+  }
+  .story .story-cta .story-cta-mech-mobile {
+    display: block;
+    position: absolute;
+    left: 50%;
+    bottom: 32px;
+    transform: translateX(-50%);
+    width: auto;
+    height: auto;
+    max-width: 60%;
+    max-height: 260px;
+    z-index: 1;
+    filter: drop-shadow(0 16px 22px rgba(28, 23, 16, 0.18));
+  }
+
+  /* ---- Footer: the columns as dark cards of 48px rows with chevrons ---- */
+  .story .story-footer { padding: 72px 48px 48px; }
+  .story .story-footer .story-footer__grid { gap: 16px; align-items: start; }
+  .story .story-footer .story-footer__brand { grid-column: 1 / -1; margin-bottom: 8px; }
+  .story .story-footer__brand > p:last-child,
+  .story .story-footer .story-footer__title {
+    font-size: var(--t-label);
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .story .story-footer .story-footer__title { padding: 16px 18px 6px; color: var(--starlight-70); font-weight: 600; }
+  .story .story-footer__col {
+    overflow: hidden;
+    border: 1px solid var(--night-line);
+    border-radius: var(--m-r-card);
+    background: var(--night-800);
+  }
+  .story .story-footer .story-footer__list { margin-top: 0; gap: 0; }
+  .story .story-footer__list > li + li { border-top: 1px solid var(--night-line); }
+  .story .story-footer .story-footer__list .story-footer__link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 48px;
+    padding: 0 18px;
+    color: var(--starlight);
+    font-size: var(--t-body);
+    text-decoration: none;
+    transition: background-color var(--m-dur-press) var(--m-ease);
+  }
+  .story .story-footer__list .story-footer__link::after {
+    content: '';
+    flex: none;
+    width: 16px;
+    height: 16px;
+    background: var(--starlight-70);
+    -webkit-mask: var(--story-chevron) center / contain no-repeat;
+    mask: var(--story-chevron) center / contain no-repeat;
+  }
+  .story .story-footer__list .story-footer__link:hover { background: rgba(247, 243, 232, 0.04); }
+  .story .story-footer__list .story-footer__link:active { background: rgba(247, 243, 232, 0.08); }
+  .story .story-footer__list .story-footer__link:focus-visible {
+    outline: 2px solid var(--brass-bright);
+    outline-offset: -2px;
+  }
+  .story .story-footer .story-footer__legal { margin-top: 32px; font-size: var(--t-label); }
+}
+
+@media (min-width: 1024px) {
+  /* Two chapter cards side by side, text under the art. */
+  .story .story-chapters .story-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  /* Step cards put the capture beside the text, alternating sides. */
+  .story .story-step { flex-direction: row; align-items: center; padding: 40px; gap: 48px; }
+  .story .story-step:nth-child(even) { flex-direction: row-reverse; }
+  .story .story-step__text { flex: 2 1 0; }
+  .story .story-step .story-shot { flex: 3 1 0; }
+  /* The footer: brand then three card columns in one row. */
+  .story .story-footer .story-footer__grid { grid-template-columns: repeat(3, 1fr); }
+  /* The mech stands beside the CTA card rather than under it. */
+  .story .story-cta { padding: 140px 48px; }
+  .story .story-cta .story-copy--center { margin: 0 auto 0 max(0px, calc(50% - 576px)); }
+  .story .story-cta .story-cta-mech-mobile {
+    left: auto;
+    right: max(48px, calc(50% - 576px));
+    bottom: 50%;
+    transform: translateY(50%);
+    max-width: 36%;
+    max-height: 440px;
+  }
+}
+
+@media (min-width: 768px) and (prefers-reduced-motion: reduce) {
+  .story-desk-header__bar,
+  .story-desk-header__link,
+  .story .story-hero .story-hero-pill,
+  .story .story-watch__yt-link,
+  .story .story-footer__list .story-footer__link { transition: none; }
+  .story-hero-pill:active,
+  .story .story-watch__yt-link:active { transform: none; }
+}

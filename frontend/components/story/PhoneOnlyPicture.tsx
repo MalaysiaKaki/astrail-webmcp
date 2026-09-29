@@ -7,6 +7,8 @@
    `width`/`height` are the encoded file's real pixel size, so the box is reserved before load. */
 
 export const PHONE_MEDIA = '(max-width: 767.98px)'
+/* The mirror image (phase B6): an image only a desktop downloads, e.g. the hero's framed trip. */
+export const DESKTOP_MEDIA = '(min-width: 768px)'
 
 const NOTHING = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
 
@@ -17,6 +19,7 @@ export default function PhoneOnlyPicture({
   alt,
   className,
   priority = false,
+  media = PHONE_MEDIA,
 }: {
   base: string
   width: number
@@ -24,11 +27,13 @@ export default function PhoneOnlyPicture({
   alt: string
   className?: string
   priority?: boolean
+  /** Which widths may fetch the file; defaults to phones. Other widths get the 1x1 fallback. */
+  media?: string
 }) {
   return (
     <picture>
-      <source media={PHONE_MEDIA} type="image/avif" srcSet={`${base}.avif`} />
-      <source media={PHONE_MEDIA} type="image/webp" srcSet={`${base}.webp`} />
+      <source media={media} type="image/avif" srcSet={`${base}.avif`} />
+      <source media={media} type="image/webp" srcSet={`${base}.webp`} />
       {/* eslint-disable-next-line @next/next/no-img-element -- next/image cannot express a
           media-gated <picture>; the phone-only fetch is the point of this markup. */}
       <img

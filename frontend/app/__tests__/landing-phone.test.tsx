@@ -21,8 +21,8 @@ describe('landing on phones', () => {
   it('gives phones the sample trail as a one-line hero pill whose name keeps "no account"', () => {
     render(<SampleTrailPill />)
     const link = screen.getByRole('link')
-    // The whole pill is the link: a kit pill badge, shown on phones only.
-    expect(link).toHaveClass('m-pill-badge', 'm-phone-only', 'story-hero-pill')
+    // The whole pill is the link: a kit pill badge (every width since B6).
+    expect(link).toHaveClass('m-pill-badge', 'story-hero-pill')
     expect(link).toHaveAccessibleName(/^see a finished trip, no account needed/i)
     expect(within(link).getByText(/no account needed/i)).toBeInTheDocument()
   })
