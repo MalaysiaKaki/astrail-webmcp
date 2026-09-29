@@ -2,24 +2,26 @@
    people to /app/trip/demo — and until now nothing in the running app linked to it. It lives in
    the persistent rail rather than on a page, so it is reachable from every /app route. */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import Sidebar from '@/components/dashboard/Sidebar'
 import type { Entitlement } from '@/lib/entitlement'
 
 const path = { value: '/app' }
+const trips: { value: Array<{ id: string; title: string }> } = { value: [] }
+const { push, signOut } = vi.hoisted(() => ({ push: vi.fn(), signOut: vi.fn() }))
 // null = the own-row read fails (the rail's fail-open path); otherwise the plan it resolves to.
 const entitlement: { value: Entitlement | null } = { value: null }
 
 vi.mock('next/navigation', () => ({
   usePathname: () => path.value,
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push }),
 }))
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
-    auth: { getUser: async () => ({ data: { user: null } }), signOut: async () => {} },
+    auth: { getUser: async () => ({ data: { user: { email: 'traveler@example.com' } } }), signOut },
   }),
 }))
-vi.mock('@/lib/trip/supabase-api', () => ({ listTrips: async () => [] }))
+vi.mock('@/lib/trip/supabase-api', () => ({ listTrips: async () => trips.value }))
 vi.mock('@/lib/entitlement', async (orig) => ({
   ...(await orig<typeof import('@/lib/entitlement')>()),
   readEntitlement: async () => {
@@ -44,7 +46,14 @@ const current = (name: string) => screen.getByRole('link', { name }).getAttribut
 beforeEach(() => {
   path.value = '/app'
   entitlement.value = null
+  trips.value = []
+  push.mockReset()
+  signOut.mockReset()
+  signOut.mockResolvedValue({ error: null })
 })
+
+// The plan pill, found by its role marker rather than by styling (C3 restyled it as a kit badge).
+const planPill = (container: HTMLElement) => container.querySelector('[data-plan-pill]')
 
 describe('Sidebar sample-trail link', () => {
   it('offers the sample trail from every /app route', async () => {
@@ -97,15 +106,15 @@ describe('Sidebar plan pill', () => {
     entitlement.value = { plan: 'beta', lifetimeTripCount: 12, seatRequestedAt: null }
     const { container } = await show('/app')
     expect(screen.queryByText(/beta/i)).toBeNull()
-    // ...and no empty bordered container left floating where the text used to be.
-    expect(container.querySelector('.border-dashed')).toBeNull()
+    // ...and no empty badge left floating where the text used to be.
+    expect(planPill(container)).toBeNull()
   })
 
   it('still shows a fresh trial its remaining generation', async () => {
     entitlement.value = { plan: 'trial', lifetimeTripCount: 0, seatRequestedAt: null }
     const { container } = await show('/app')
     expect(screen.getByText('Free trial · 1 of 1 trip generation left')).toBeInTheDocument()
-    expect(container.querySelector('.border-dashed')).not.toBeNull()
+    expect(planPill(container)).not.toBeNull()
   })
 
   it('still shows an exhausted trial its zero, in brass', async () => {
@@ -119,7 +128,42 @@ describe('Sidebar plan pill', () => {
   it('renders nothing when the entitlement read fails', async () => {
     entitlement.value = null
     const { container } = await show('/app')
-    expect(container.querySelector('.border-dashed')).toBeNull()
+    expect(planPill(container)).toBeNull()
     expect(screen.queryByText(/trial/i)).toBeNull()
+  })
+})
+
+describe('Sidebar rail contents', () => {
+  it('shows the signed-in email', async () => {
+    await show('/app')
+    expect(await screen.findByText('traveler@example.com')).toBeInTheDocument()
+  })
+
+  it('keeps New trail pointing at /app', async () => {
+    await show('/app/settings')
+    expect(screen.getByRole('link', { name: /new trail/i })).toHaveAttribute('href', '/app')
+  })
+
+  it('lists recent trails as links and marks the open one current', async () => {
+    trips.value = [{ id: 't1', title: 'Kyoto in autumn' }, { id: 't2', title: 'Penang food run' }]
+    await show('/app/trip/t2')
+    const recent = await screen.findByRole('navigation', { name: 'Recent trails' })
+    expect(recent).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Kyoto in autumn' })).toHaveAttribute('href', '/app/trip/t1')
+    expect(current('Kyoto in autumn')).toBeNull()
+    expect(current('Penang food run')).toBe('page')
+  })
+
+  it('marks Settings current on /app/settings', async () => {
+    await show('/app/settings')
+    expect(current('Settings')).toBe('page')
+    expect(current('Home')).toBeNull()
+  })
+
+  it('logs out and leaves for /sign-in', async () => {
+    await show('/app')
+    fireEvent.click(screen.getByRole('button', { name: /log out/i }))
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/sign-in'))
+    expect(signOut).toHaveBeenCalledTimes(1)
   })
 })
