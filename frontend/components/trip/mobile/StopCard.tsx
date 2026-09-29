@@ -191,7 +191,7 @@ function StopDetail({
         </p>
       ) : null}
       {confidence !== null ? (
-        <p data-evidence-chip className="type-body self-start rounded-full bg-[var(--m-subcard)] px-3 py-1 text-[13px] text-[var(--m-text-muted)]">
+        <p data-evidence-chip className="type-body self-start rounded-full bg-[var(--m-subcard)] px-3 py-1 text-[var(--m-text-muted)] text-[length:var(--t-meta)] leading-[1.45]">
           <span className="font-semibold text-[var(--m-accent)]">{evidenceKindLabel(ev.evidence_kind)}</span>
           <span aria-hidden> · </span>
           {confidence}% confidence
@@ -223,7 +223,7 @@ function StopDetail({
       ) : null}
       {onShow3d && located ? (
         <button type="button" onClick={onShow3d} className="m-btn-secondary">
-          <span aria-hidden className="text-[13px] font-bold tracking-[0.02em]">3D</span>
+          <span aria-hidden className="font-bold tracking-[0.02em] text-[length:var(--t-meta)] leading-[1.45]">3D</span>
           Show in 3D
         </button>
       ) : null}

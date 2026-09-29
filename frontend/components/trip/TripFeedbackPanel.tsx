@@ -82,20 +82,10 @@ function StarIcon({ filled }: { filled: boolean }) {
   )
 }
 
-// Thumb pill — brass fill when selected, muted default; mirrors segClass tone in TripWorkspace.
-function pillClass(active: boolean): string {
-  return [
-    'type-label inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] uppercase tracking-wide transition-colors disabled:cursor-not-allowed disabled:opacity-40',
-    active
-      ? 'border-[var(--brass-bright)] bg-[var(--brass-soft)] text-[var(--brass-bright)]'
-      : 'border-[var(--line)] text-[var(--muted)] hover:text-[var(--starlight)]',
-  ].join(' ')
-}
-
-/* Phone variant (About this trip on phones): the phone kit's controls. The pressed state stays on
-   aria-pressed, which the kit's .m-btn-icon draws as an ink fill. 16px note text so iOS Safari does
-   not zoom the page on focus. The default variant is untouched. */
-const PHONE = {
+/* The kit's controls (About this trip; the failed-trip screen) at every width since plan A8, which
+   retired the desktop rail's pills. The pressed state stays on aria-pressed, which the kit's
+   .m-btn-icon draws as an ink fill. 16px note text so iOS Safari does not zoom the page on focus. */
+const KIT = {
   row: 'flex flex-wrap items-center gap-2',
   thumb: 'm-btn-icon disabled:cursor-not-allowed disabled:opacity-40',
   star: (filled: boolean) => [
@@ -108,20 +98,14 @@ const PHONE = {
   confirmed: 'type-body text-[14px] text-[var(--m-text-muted)]',
 }
 
-const SEND_BTN =
-  'self-start rounded-lg border border-[var(--line)] bg-[var(--brass-soft)] px-3 py-2 text-[12px] font-semibold uppercase tracking-wide text-[var(--brass-bright)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40'
-
 /**
  * @param composer  State owned by a parent that outlives this panel (TripWorkspace, across the
  *                  phone/desktop switch). Omitted, the panel holds its own, as it always did.
  */
-export default function TripFeedbackPanel({ tripId, composer, variant = 'default' }: {
+export default function TripFeedbackPanel({ tripId, composer }: {
   tripId: string
   composer?: FeedbackComposer
-  /** 'phone' draws the phone kit's controls; the default is the desktop rail's (and failed screen's). */
-  variant?: 'default' | 'phone'
 }) {
-  const phone = variant === 'phone'
   const own = useFeedbackComposer(tripId)
   const c = composer ?? own
   const { signal, note, confirmed, lastSent, pending, status, inFlight } = c
@@ -187,14 +171,14 @@ export default function TripFeedbackPanel({ tripId, composer, variant = 'default
 
   return (
     <div aria-busy={pending} className="trip-feedback flex flex-col gap-3">
-      <div className={phone ? PHONE.row : 'flex items-center gap-2'}>
+      <div className={KIT.row}>
         <button
           type="button"
           aria-label="Thumbs up"
           aria-pressed={signal === 'thumbs_up'}
           disabled={pending}
           onClick={() => toggleThumb('thumbs_up')}
-          className={phone ? PHONE.thumb : pillClass(signal === 'thumbs_up')}
+          className={KIT.thumb}
         >
           <ThumbIcon />
         </button>
@@ -204,7 +188,7 @@ export default function TripFeedbackPanel({ tripId, composer, variant = 'default
           aria-pressed={signal === 'thumbs_down'}
           disabled={pending}
           onClick={() => toggleThumb('thumbs_down')}
-          className={phone ? PHONE.thumb : pillClass(signal === 'thumbs_down')}
+          className={KIT.thumb}
         >
           <ThumbIcon down />
         </button>
@@ -221,10 +205,7 @@ export default function TripFeedbackPanel({ tripId, composer, variant = 'default
                 aria-label={`${n} star${n === 1 ? '' : 's'}`}
                 disabled={pending}
                 onClick={() => setSignal({ rating: n })}
-                className={phone ? PHONE.star(filled) : [
-                  'rounded p-1 transition-colors disabled:cursor-not-allowed disabled:opacity-40',
-                  filled ? 'text-[var(--brass-bright)]' : 'text-[var(--muted)] hover:text-[var(--starlight)]',
-                ].join(' ')}
+                className={KIT.star(filled)}
               >
                 <StarIcon filled={filled} />
               </button>
@@ -241,20 +222,20 @@ export default function TripFeedbackPanel({ tripId, composer, variant = 'default
         disabled={pending}
         rows={3}
         placeholder="Wrong place, bad route, missing gem — tell us."
-        className={phone ? PHONE.note : 'w-full rounded-lg border border-[var(--line)] bg-transparent px-3 py-2 text-[13px] text-[var(--starlight)] placeholder:text-[var(--muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brass-bright)] disabled:opacity-40'}
+        className={KIT.note}
       />
 
       <div className="flex items-center gap-3">
-        <button type="button" onClick={() => void send()} disabled={!canSend} className={phone ? PHONE.send : SEND_BTN}>
+        <button type="button" onClick={() => void send()} disabled={!canSend} className={KIT.send}>
           {pending ? 'Sending…' : 'Send feedback'}
         </button>
-        <p role="status" className="type-label text-[12px] text-[var(--muted)]">
+        <p role="status" className="type-label text-[12px] text-[var(--m-text-muted)]">
           {status.kind === 'idle' ? '' : status.message}
         </p>
       </div>
 
       {confirmed && (
-        <p className={phone ? PHONE.confirmed : 'type-label text-[11px] uppercase tracking-wide text-[var(--muted)]'}>{confirmed}</p>
+        <p className={KIT.confirmed}>{confirmed}</p>
       )}
     </div>
   )

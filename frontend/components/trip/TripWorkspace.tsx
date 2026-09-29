@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
-import Link from 'next/link'
 import type { TripBundle } from '@/lib/trip/backend-types'
 import { getTrip } from '@/lib/trip/supabase-api'
 import TripTools from '@/components/webmcp/TripTools'
@@ -13,7 +12,6 @@ import {
 import { useSharedMap } from '@/components/map/MapProvider'
 import { useOptionalGeneration } from '@/components/generation/GenerationProvider'
 import { useOptionalWebMcpRegistry } from '@/components/webmcp/WebMcpRegistry'
-import Astronaut from '@/components/mascot/Astronaut'
 import TripFeedbackPanel from './TripFeedbackPanel'
 import { useFeedbackComposer } from './use-feedback-composer'
 import MobileTripView, { type MobileListView, type MobileTripViewProps } from './mobile/MobileTripView'
@@ -203,48 +201,15 @@ export default function TripWorkspace({
     return () => release()
   }, [mapBehind, acquire, release])
 
-  /* Phones get the same states as kit cards (mobile/PhoneStateScreens); a null (SSR/hydration)
-     layout keeps the desktop screens below, as the panel branch does. */
-  const phone = layout === 'mobile'
-  if (status === 'loading') {
-    if (phone) return <PhoneLoading arriving={arrivingFromGeneration} />
-    return (
-      <main className="relative flex h-[100dvh] items-center justify-center p-6">
-        {arrivingFromGeneration ? (
-          /* The arrival, not a new page. The shell pushes here the instant the result frame
-             lands, and everything that framed the wait screen — the narration rail, the sidebar —
-             goes at once, so the bare pill below read to the first user who saw it as being
-             dumped back on the home page before his trip appeared. This carries the rail's last
-             words and its astronaut across the handoff; the dawn map behind it never moved. The
-             dot is live because the page genuinely is still working: the trip is ready, the read
-             is not. Confined to this branch, so it cannot outlive the open outcome — a read that
-             answers not-found or failed falls through to those screens below. */
-          <div data-testid="trip-arrival" className="surface flex items-center gap-3 px-5 py-4">
-            <Astronaut size={40} variant="idle" />
-            <div>
-              <p className="type-display text-[15px] text-[var(--starlight)]">Your trip is ready</p>
-              <p className="type-label flex items-center gap-2 text-xs uppercase tracking-wide text-[var(--muted)]">
-                <span aria-hidden className="pulse-dot pulse-dot--live" />
-                Opening your map…
-              </p>
-            </div>
-          </div>
-        ) : (
-          <p className="surface type-label px-4 py-2.5 text-xs uppercase tracking-wide text-[var(--muted)]">Loading trip…</p>
-        )}
-      </main>
-    )
-  }
-  if (status === 'not_found' || !bundle) {
-    if (phone) return <PhoneNotFound />
-    return (
-      <main className="flex h-[100dvh] items-center justify-center bg-[var(--void)]">
-        <p className="type-body text-sm text-[var(--muted)]">Trip not found.</p>
-      </main>
-    )
-  }
-  if (bundle.trip.status === 'failed' && phone) {
-    // Same gate as below: a seeded bundle has no trip row for feedback to reference.
+  /* The non-trip states — loading, not found, failed, still generating — are kit cards at every
+     width (mobile/PhoneStateScreens; plan A8 retired the night desktop screens). One set of words
+     and gates, so no layout branch is needed and SSR renders the final screen directly. */
+  if (status === 'loading') return <PhoneLoading arriving={arrivingFromGeneration} />
+  if (status === 'not_found' || !bundle) return <PhoneNotFound />
+  if (bundle.trip.status === 'failed') {
+    // Failed trips are where feedback is the most valuable beta signal (HANDOFF.md — "don't hide
+    // the UI on failures"), so the composer mounts here too. A seeded bundle has no trip row for
+    // feedback to reference, so the invitation goes with the composer rather than standing alone.
     return (
       <PhoneFailed
         feedback={readOnly ? null : (
@@ -252,61 +217,13 @@ export default function TripWorkspace({
             <p className="type-body mb-3 text-[15px] text-[var(--m-text-muted)]">
               Tell us what went wrong — it&apos;s the most useful feedback we get.
             </p>
-            <TripFeedbackPanel key={bundle.trip.id} tripId={bundle.trip.id} composer={feedback} variant="phone" />
+            <TripFeedbackPanel key={bundle.trip.id} tripId={bundle.trip.id} composer={feedback} />
           </>
         )}
       />
     )
   }
-  if (bundle.trip.status === 'failed') {
-    // Failed trips are where feedback is the most valuable beta signal (HANDOFF.md — "don't hide
-    // the UI on failures"), so the composer mounts here too. min-h + overflow-y-auto (not a rigid
-    // h-[100dvh] + justify-center) so the composer never clips on short/mobile viewports with the
-    // keyboard open; the screen stays centered when the content fits. Night tokens from :root are
-    // correct here — do NOT wrap in paper-scope.
-    return (
-      <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 overflow-y-auto bg-[var(--void)] p-6">
-        <p className="type-display text-xl text-[var(--starlight)]">Generation failed</p>
-        <p className="type-body max-w-md text-center text-sm text-[var(--muted)]">
-          Astrail couldn&apos;t build this trip. Start a new one — repeat Reels are cached, so retrying is fast.
-        </p>
-        <a href="/app" className="type-label text-xs uppercase tracking-wide text-[var(--brass-bright)] underline-offset-2 hover:underline max-md:inline-flex max-md:min-h-11 max-md:items-center max-md:px-3">
-          Plan a new trip
-        </a>
-        {/* Same gate as the composer in the main return: a seeded bundle has no trip row for
-            feedback to reference, so the invitation goes with it rather than standing alone. */}
-        {!readOnly && (
-          <>
-            <p className="type-body max-w-md text-center text-sm text-[var(--muted)]">
-              Tell us what went wrong — it&apos;s the most useful feedback we get.
-            </p>
-            <div className="w-full max-w-md">
-              <TripFeedbackPanel key={bundle.trip.id} tripId={bundle.trip.id} composer={feedback} />
-            </div>
-          </>
-        )}
-      </main>
-    )
-  }
-  if (bundle.trip.status === 'generating' || bundle.trip.status === 'draft') {
-    if (phone) return <PhoneGenerating />
-    return (
-      <main className="relative flex h-[100dvh] flex-col items-center justify-center p-6">
-        <div className="surface flex flex-col items-center gap-3 px-5 py-4">
-          <p className="type-label text-xs uppercase tracking-wide text-[var(--muted)]">
-            Still generating — refresh in a moment.
-          </p>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="type-label text-xs uppercase tracking-wide text-[var(--brass-bright)] underline-offset-2 hover:underline max-md:min-h-11 max-md:px-3"
-          >
-            Refresh
-          </button>
-        </div>
-      </main>
-    )
-  }
+  if (bundle.trip.status === 'generating' || bundle.trip.status === 'draft') return <PhoneGenerating />
 
   /* The map shows every day's pins, but the itinerary list below shows only the ACTIVE day —
      so selecting a Day 3 pin while Day 1 is open used to open the panel on a list that does not

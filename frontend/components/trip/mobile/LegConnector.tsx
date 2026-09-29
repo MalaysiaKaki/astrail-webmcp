@@ -2,7 +2,7 @@
 
 import type { TransportMode } from '@/lib/trip/backend-types'
 import type { RouteLink } from '@/lib/trip/route-links'
-import { fmtDuration } from '../TransportStrip'
+import { fmtDuration } from '@/lib/trip/leg-format'
 
 /**
  * What joins two stop cards: a dotted connector under the cards' number badges, carrying the

@@ -74,7 +74,7 @@ export default function AboutThisTrip({ bundle, readOnly, feedback }: {
         ) : null}
         {showFeedback ? (
           <Row title="How was this trail?">
-            <TripFeedbackPanel key={bundle.trip.id} tripId={bundle.trip.id} composer={feedback} variant="phone" />
+            <TripFeedbackPanel key={bundle.trip.id} tripId={bundle.trip.id} composer={feedback} />
           </Row>
         ) : null}
       </div>

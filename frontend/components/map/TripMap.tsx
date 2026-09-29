@@ -834,7 +834,7 @@ export default function TripMap({
   if (!hasToken) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-[var(--deep)]">
-        <p className="type-label text-xs uppercase tracking-wide text-[var(--muted)]">Map unavailable — token missing</p>
+        <p className="type-label uppercase tracking-wide text-[var(--muted)] text-[length:var(--t-meta)] leading-[1.45]">Map unavailable — token missing</p>
       </div>
     )
   }

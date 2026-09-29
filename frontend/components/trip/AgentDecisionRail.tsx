@@ -12,7 +12,7 @@ const DOT_COLOR: Record<GenerationEventType, string> = {
 
 export default function AgentDecisionRail({ events }: { events: GenerationEvent[] }) {
   if (events.length === 0) {
-    return <p className="type-body text-xs text-[var(--muted)]">No agent activity recorded.</p>
+    return <p className="type-body text-[var(--muted)] text-[length:var(--t-meta)] leading-[1.45]">No agent activity recorded.</p>
   }
   return (
     <ol className="flex flex-col">
@@ -27,14 +27,14 @@ export default function AgentDecisionRail({ events }: { events: GenerationEvent[
             <div className="flex items-center gap-2">
               {/* Raw enums never render (DESIGN.md §8) — same map as the generation rail,
                   with a humanized fallback for stages the map has not met yet. */}
-              <span className="type-label text-[10px] uppercase tracking-wide text-[var(--faint)]">
+              <span className="type-label text-[length:var(--t-label)] uppercase tracking-wide text-[var(--faint)]">
                 {STAGE_LABEL[ev.stage] ?? ev.stage.replaceAll('_', ' ')}
               </span>
               {ev.event_type === 'warning' ? (
-                <span className="type-label text-[9px] uppercase tracking-wide text-[var(--warn)]">warning</span>
+                <span className="type-label text-[length:var(--t-label)] uppercase tracking-wide text-[var(--warn)]">warning</span>
               ) : null}
             </div>
-            <p className="type-body text-xs text-[var(--muted)]">{ev.message}</p>
+            <p className="type-body text-[var(--muted)] text-[length:var(--t-meta)] leading-[1.45]">{ev.message}</p>
           </div>
         </li>
       ))}

@@ -176,30 +176,26 @@ describe('HotelPanel', () => {
      Both sides are pinned, as in ItineraryCards: the markup must ask for the modifier AND
      globals.css must still define it. A class assertion alone goes green against a stylesheet
      that dropped the rule. */
-  it('paints hover with a modifier the stylesheet actually defines', async () => {
-    const { readFileSync } = await import('node:fs')
-    expect(readFileSync('app/globals.css', 'utf8')).toMatch(/\.surface--hoverable:hover/)
-
-    // Only a PLACED hotel renders as a button, so the fixture gives one — both branches are
-    // covered by rendering it each way rather than by needing two rows.
+  /* A8 migration (was the desktop rail's surface--hoverable / surface--selected modifiers): one kit
+     list at every width. The chosen hub is its card's ink outline; an idle card has none, and both
+     keep the kit card's press feedback. */
+  it('marks the chosen hub with the kit card\'s ink outline, and only the chosen one', () => {
     const view = renderPanel([placed, unresolved], { selectedHotelId: null })
-    const idle = screen.getByRole('button')
-    expect(idle.className).toContain('surface--hoverable')
-    expect(idle.className).not.toContain('hover:border-[var(--brass)]')
-
+    const card = () => screen.getByRole('button').closest<HTMLElement>('[data-hotel-card]')!
+    expect(card().className).toMatch(/\bm-card\b/)
+    expect(card().className).not.toMatch(/outline-\[var\(--m-ink\)\]/)
     view.rerender(
       <HotelPanel hotels={[placed, unresolved]} selectedHotelId={placed.id} onSelectHotel={() => {}} layerMode="route" />,
     )
-    const chosen = screen.getByRole('button')
-    expect(chosen.className).toContain('surface--selected')
-    expect(chosen.className).not.toContain('surface--hoverable')
+    expect(card().className).toMatch(/outline-\[var\(--m-ink\)\]/)
+    expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'true')
   })
 })
 
-/* A4: the Stay list on phones uses the kit. The default (desktop) variant must not change. */
+/* A4: the Stay list uses the kit — at every width since A8, which retired the desktop variant. */
 describe('HotelPanel — phone variant', () => {
   const phone = (props: Partial<Parameters<typeof HotelPanel>[0]> = {}) => render(
-    <HotelPanel hotels={HOTELS} selectedHotelId={placed.id} onSelectHotel={vi.fn()} layerMode="hub" variant="phone" {...props} />,
+    <HotelPanel hotels={HOTELS} selectedHotelId={placed.id} onSelectHotel={vi.fn()} layerMode="hub" {...props} />,
   )
 
   it('draws a selectable hotel as a kit card with an ink outline when it is the chosen hub', () => {
@@ -232,8 +228,10 @@ describe('HotelPanel — phone variant', () => {
     expect(container.innerHTML).not.toMatch(/text-\[(9|10|11)px\]|\btext-xs\b|\buppercase\b/)
   })
 
-  it('leaves the default (desktop) variant free of phone kit classes', () => {
-    const { container } = render(<HotelPanel hotels={HOTELS} selectedHotelId={placed.id} onSelectHotel={vi.fn()} layerMode="hub" />)
-    expect(container.innerHTML).not.toMatch(/\bm-(card|subcard)\b/)
+  it('has one kit skin at every width: no night surface classes', () => {
+    const { container } = render(
+      <HotelPanel hotels={HOTELS} selectedHotelId={null} onSelectHotel={vi.fn()} layerMode="route" />,
+    )
+    expect(container.innerHTML).not.toMatch(/\bsurface--|--starlight|text-\[(9|10|11)px\]|text-xs/)
   })
 })

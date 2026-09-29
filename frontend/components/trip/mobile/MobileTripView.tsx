@@ -229,13 +229,12 @@ export function TripPanelBody(p: MobileTripViewProps) {
       {p.listView === 'stay' ? (
         <div className="flex flex-col gap-3">
           <StaySubHeader count={p.hotels.length} />
-          <TradeoffPanel tradeoffs={p.bundle.trip.tradeoffs} variant="comparisons" tone="phone" />
+          <TradeoffPanel tradeoffs={p.bundle.trip.tradeoffs} variant="comparisons" />
           <HotelPanel
             hotels={p.hotels}
             selectedHotelId={p.selectedHotelId}
             onSelectHotel={p.onSelectHotel}
             layerMode={p.layerMode}
-            variant="phone"
           />
         </div>
       ) : (

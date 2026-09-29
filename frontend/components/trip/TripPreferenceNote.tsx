@@ -28,16 +28,16 @@ export default function TripPreferenceNote({ trip }: { trip: Trip }) {
   const label = fromMemory ? 'Planned around what Astrail remembers' : 'Planned around what you asked for'
 
   return (
-    <p className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-[color:var(--text-muted)]">
+    <p className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[color:var(--text-muted)] text-[length:var(--t-meta)] leading-[1.45]">
       {fromMemory ? (
         /* The same provenance word Settings, the home panel and the evidence chips use. Brass-deep
            rather than brass-bright: this panel is the paper palette, where the bright token is
            the near-white one meant for night surfaces. */
-        <span className="type-evidence inline-flex items-center rounded-[var(--radius-chip)] bg-[var(--chip-bg)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--brass-deep)]">
+        <span className="type-evidence inline-flex items-center rounded-[var(--radius-chip)] bg-[var(--chip-bg)] px-2 py-0.5 text-[length:var(--t-label)] font-semibold uppercase tracking-wide text-[color:var(--brass-deep)]">
           Memory
         </span>
       ) : null}
-      <span className="type-label text-[11px] uppercase tracking-wide text-[color:var(--text-faint)]">{label}</span>
+      <span className="type-label text-[length:var(--t-label)] uppercase tracking-wide text-[color:var(--text-faint)]">{label}</span>
       {/* Plain text: this is the user's own wording round-tripped through a model, and it can
           reach the store through the agent's `preferences` argument (guardrail #11). */}
       <span className="text-[color:var(--text)]">{summary}</span>

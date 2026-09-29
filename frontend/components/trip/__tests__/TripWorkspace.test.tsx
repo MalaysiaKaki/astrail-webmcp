@@ -583,7 +583,8 @@ describe('arriving from a generation the shell just finished', () => {
     expect(arrival).toHaveTextContent(/your trip is ready/i)
     expect(arrival).toHaveTextContent(/opening your map/i)
     expect(arrival.querySelector('[data-mascot="astronaut"]')).not.toBeNull()
-    expect(arrival.querySelector('.pulse-dot--live')).not.toBeNull()
+    // A8: the kit state card's live dot (was the night screen's .pulse-dot--live).
+    expect(arrival.closest('[data-state-card]')!.querySelector('[data-live-dot]')).not.toBeNull()
   })
 
   it('says nothing optimistic when the trip was opened cold', async () => {

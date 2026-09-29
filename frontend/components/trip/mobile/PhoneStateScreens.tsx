@@ -4,12 +4,12 @@ import Link from 'next/link'
 import Astronaut from '@/components/mascot/Astronaut'
 
 /**
- * The trip route's non-trip states on a phone — loading, not found, failed, still generating —
+ * The trip route's non-trip states — loading, not found, failed, still generating — at every width
+ * since plan A8 (the night desktop screens are retired; the `Phone` names are historical),
  * as one kit card each: centred, serif heading, a primary pill action (and a secondary one when
  * there is a second way out), clear of the notch and home indicator.
  *
- * Same words and the same gates as the desktop screens in TripWorkspace; only the surface
- * changes. Loading and generating float over the shared map (it is held on screen behind them for
+ * The gates live in TripWorkspace. Loading and generating float over the shared map (it is held on screen behind them for
  * the dawn relight), so their page is transparent; failed and not-found sit on the paper page.
  */
 export function StateScreen({ overMap = false, children }: { overMap?: boolean; children: React.ReactNode }) {
@@ -38,7 +38,7 @@ function Body({ children }: { children: React.ReactNode }) {
 
 /** A brass dot that breathes while the page is genuinely still working (reduced motion: still). */
 function LiveDot() {
-  return <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-[var(--m-accent)] motion-safe:animate-pulse" />
+  return <span aria-hidden data-live-dot className="h-2.5 w-2.5 rounded-full bg-[var(--m-accent)] motion-safe:animate-pulse" />
 }
 
 export function PhoneLoading({ arriving }: { arriving: boolean }) {

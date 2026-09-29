@@ -342,7 +342,7 @@ describe('TripFeedbackPanel — phone variant', () => {
   const sendBtn = () => screen.getByRole('button', { name: /send feedback/i })
 
   it('uses kit buttons: circular thumbs, 44px stars, a primary Send, and a 16px note', () => {
-    render(<TripFeedbackPanel tripId="trip-1" variant="phone" />)
+    render(<TripFeedbackPanel tripId="trip-1" />)
     for (const t of thumbs()) expect(t.className).toMatch(/\bm-btn-icon\b/)
     for (const s of stars()) expect(s.className).toMatch(/\bh-11\b.*\bw-11\b|\bw-11\b.*\bh-11\b/)
     expect(sendBtn().className).toMatch(/\bm-btn-primary\b/)
@@ -350,13 +350,14 @@ describe('TripFeedbackPanel — phone variant', () => {
   })
 
   it('keeps the pressed state on aria-pressed, where the kit draws it', () => {
-    render(<TripFeedbackPanel tripId="trip-1" variant="phone" />)
+    render(<TripFeedbackPanel tripId="trip-1" />)
     fireEvent.click(thumbs()[0])
     expect(thumbs()[0]).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('leaves the default (desktop) variant without any phone kit class', () => {
+  it('has one kit skin at every width: no night pills or send button', () => {
     const { container } = render(<TripFeedbackPanel tripId="trip-1" />)
-    expect(container.innerHTML).not.toMatch(/\bm-btn-/)
+    expect(container.innerHTML).not.toMatch(/--brass-soft|uppercase|text-\[(9|10|11)px\]/)
+    expect(screen.getByRole('button', { name: 'Thumbs up' }).className).toMatch(/\bm-btn-icon\b/)
   })
 })

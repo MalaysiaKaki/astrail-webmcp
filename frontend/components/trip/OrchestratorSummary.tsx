@@ -4,7 +4,7 @@ function Stat({ value, label }: { value: string | number; label: string }) {
   return (
     <div className="flex flex-col" data-testid={`stat-${label}`}>
       <span className="type-display text-2xl leading-none tabular-nums text-[var(--starlight)]">{value}</span>
-      <span className="type-label text-[10px] uppercase tracking-wide text-[var(--faint)]">{label}</span>
+      <span className="type-label text-[length:var(--t-label)] uppercase tracking-wide text-[var(--faint)]">{label}</span>
     </div>
   )
 }
@@ -53,13 +53,13 @@ export default function OrchestratorSummary({ bundle, hideGapsBadge = false }: {
     <div className="surface rounded-xl p-4">
       <div className="flex items-start justify-between gap-3 max-md:flex-wrap">
         <div className="min-w-0">
-          <h2 className="type-display text-lg text-[var(--starlight)]">
+          <h2 className="type-display text-[length:var(--t-card-title)] text-[var(--starlight)]">
             {trip.title ?? trip.inferred_destination ?? trip.destination_hint ?? 'Your trip'}
           </h2>
-          {where ? <p className="type-body mt-0.5 text-[13px] text-[var(--muted)]">{where}</p> : null}
+          {where ? <p className="type-body mt-0.5 text-[var(--muted)] text-[length:var(--t-meta)] leading-[1.45]">{where}</p> : null}
         </div>
         {withGaps ? (
-          <span className="type-label inline-flex flex-none items-center gap-1.5 rounded-full bg-[var(--brass-soft)] px-2.5 py-1 text-[10.5px] text-[var(--brass-bright)]">
+          <span className="type-label inline-flex flex-none items-center gap-1.5 rounded-full bg-[var(--brass-soft)] px-2.5 py-1 text-[length:var(--t-label)] text-[var(--brass-bright)]">
             <span aria-hidden className="pulse-dot pulse-dot--warn" />
             Saved with gaps
           </span>
@@ -74,8 +74,8 @@ export default function OrchestratorSummary({ bundle, hideGapsBadge = false }: {
 
       {summary ? (
         <div className="mt-4 border-t border-[var(--line)] pt-3">
-          <p className="type-label text-[10px] uppercase tracking-wide text-[var(--faint)]">Astrail’s read</p>
-          <p className="type-body mt-1 text-[13px] leading-relaxed text-[var(--starlight)]">{summary}</p>
+          <p className="type-label text-[length:var(--t-label)] uppercase tracking-wide text-[var(--faint)]">Astrail’s read</p>
+          <p className="type-body mt-1 text-[var(--starlight)] text-[length:var(--t-meta)] leading-[1.45]">{summary}</p>
         </div>
       ) : null}
     </div>
