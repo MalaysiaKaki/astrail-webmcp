@@ -3,10 +3,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { safeReturnPath } from '@/lib/auth/safe-return-path'
 import { DoorBrand, DoorStage, FOCUS_RING } from '@/components/door/DoorChrome'
 
 // Supabase rate-limits OTP sends (~1/min) — surface the wait, don't let users hit the raw error.
 const RESEND_COOLDOWN_S = 60
+
+/* Where to land after signing in: the page the middleware sent us from (`?next=`, e.g. a trip
+   opened from ChatGPT's "Open in Astrail"), or /app. Read from window.location at the moment of
+   signing in, like the ?error read below — not useSearchParams, which would need this whole
+   client page wrapped in a Suspense boundary. Sanitised: only a same-site /app path survives. */
+function returnTarget(): string {
+  return safeReturnPath(new URLSearchParams(window.location.search).get('next'))
+}
 
 function looksLikeEmail(v: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim())
@@ -111,7 +120,7 @@ export default function SignInPage() {
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback?next=/app` },
+      options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(returnTarget())}` },
     })
     // On success the browser is already navigating to Google; only reachable on error.
     if (error) {
@@ -156,7 +165,7 @@ export default function SignInPage() {
         setPasswordError(passwordSignInError(error))
         return
       }
-      router.push('/app')
+      router.push(returnTarget())
     } catch {
       setPasswordError('Password sign-in couldn’t complete. Try again or use an email code.')
     } finally {
@@ -177,7 +186,7 @@ export default function SignInPage() {
       otpRefs.current[0]?.focus()
       return
     }
-    router.push('/app') // middleware routes new users on to /app/onboarding
+    router.push(returnTarget()) // middleware routes new users on to /app/onboarding
   }
 
   function setDigit(i: number, value: string) {

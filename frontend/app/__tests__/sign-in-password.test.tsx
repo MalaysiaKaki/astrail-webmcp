@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
@@ -108,5 +108,53 @@ describe('password sign-in', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'That email or password didn’t match. Check both and try again.',
     )
+  })
+})
+
+/* ChatGPT's "Open in Astrail" → /app/trip/<id> while signed out → /sign-in?next=… → back to the trip. */
+describe('sign-in returns to where the middleware sent the user from', () => {
+  const TRIP = '/app/trip/3f1c9b2e-8d4a-4c7e-9b1a-2e6f0d5c4a7b'
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.signInWithOAuth.mockResolvedValue({ data: { provider: 'google', url: null }, error: null })
+    mocks.signInWithPassword.mockResolvedValue({ data: { user: {}, session: {} }, error: null })
+  })
+  afterEach(() => window.history.replaceState(null, '', '/'))
+
+  async function signInWithPasswordAt(search: string) {
+    window.history.replaceState(null, '', `/sign-in${search}`)
+    const user = userEvent.setup()
+    render(<SignInPage />)
+    await user.click(screen.getByRole('button', { name: 'Have a password? Sign in with it' }))
+    await user.type(screen.getByLabelText('Email'), 'judge@example.com')
+    await user.type(screen.getByLabelText('Password'), 'demo-password')
+    await user.click(screen.getByRole('button', { name: 'Sign in with password' }))
+  }
+
+  it('pushes the trip from ?next= after a password sign-in', async () => {
+    await signInWithPasswordAt(`?next=${encodeURIComponent(`${TRIP}?x=1`)}`)
+    expect(mocks.push).toHaveBeenCalledWith(`${TRIP}?x=1`)
+  })
+
+  it('ignores an off-site ?next= and goes to /app', async () => {
+    await signInWithPasswordAt(`?next=${encodeURIComponent('//evil.com/app')}`)
+    expect(mocks.push).toHaveBeenCalledWith('/app')
+  })
+
+  // The OTP path (the page's default door). The Google button is commented out in the page for
+  // now; its redirectTo carries the same sanitised next for when it returns.
+  it('pushes the trip from ?next= after an email-code sign-in', async () => {
+    mocks.signInWithOtp.mockResolvedValue({ data: { user: null, session: null }, error: null })
+    mocks.verifyOtp.mockResolvedValue({ data: { user: {}, session: {} }, error: null })
+    window.history.replaceState(null, '', `/sign-in?next=${encodeURIComponent(TRIP)}`)
+    const user = userEvent.setup()
+    render(<SignInPage />)
+    await user.type(screen.getByLabelText('Email'), 'judge@example.com')
+    await user.click(screen.getByRole('button', { name: 'Email me a 6-digit code' }))
+    for (let i = 1; i <= 6; i++) await user.type(await screen.findByLabelText(`Digit ${i}`), String(i))
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(mocks.verifyOtp).toHaveBeenCalled()
+    expect(mocks.push).toHaveBeenCalledWith(TRIP)
   })
 })
