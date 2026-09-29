@@ -155,15 +155,11 @@ export function usePlaceCard({ getMap, ready, card, onFallback, onDismiss, mayTa
       }
       return
     }
-    // Placed already and only the camera, the chrome or the content moved. Never another camera
-    // move (a user pan is theirs). While the pin is still on the map the card follows it, even if
-    // chrome now covers part of it; once nothing can fit (the map shrank to 768) or the pin left
-    // the visible map (panned away, behind the camera), the detail moves to the sidebar (#4).
-    if (placedRef.current === c.nonce) {
-      const pinShown = !!pin && Number.isFinite(pin.x) && Number.isFinite(pin.y)
-        && pin.x > panelRight && pin.x < view.w && pin.y > 0 && pin.y < view.h
-      if (result.kind !== 'none' && pinShown) return
-    } else if (result.kind === 'shift' && allowShift && correctedRef.current !== c.nonce) {
+    // Placed already, and the camera, the chrome or the content moved so that no anchor fits where
+    // the pin is now (a fitting one re-anchored above). A placed card never moves the camera again
+    // (a user pan is theirs), so 'shift' is no better than 'none' here: the map shrank, chrome grew
+    // over the card, or the pin left the map. The detail moves to the sidebar (Codex #4, A12).
+    if (placedRef.current !== c.nonce && result.kind === 'shift' && allowShift && correctedRef.current !== c.nonce) {
       correctedRef.current = c.nonce
       const nonce = c.nonce
       const after = () => {

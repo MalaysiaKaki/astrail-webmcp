@@ -502,3 +502,100 @@ describe('TripMap eat and hotel details across the breakpoint (Codex final #6)',
     expect(c.onDismiss).toHaveBeenCalled()
   })
 })
+
+/* A12 (Codex re-check). */
+describe('TripMap place card: A12 re-check', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    h.popups.length = 0
+    h.markers.length = 0
+    h.layer.replaceChildren()
+    document.body.append(h.layer)
+    h.listeners.clear()
+    h.onceListeners.clear()
+    h.state.moving = false
+    h.state.width = 1440
+    h.state.height = 900
+    h.state.pin = { x: 900, y: 270 }
+    layout.value = 'desktop'
+    process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN = 'pk.test'
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1 })
+    vi.stubGlobal('cancelAnimationFrame', () => {})
+    setPanelObstruction(472)
+  })
+  afterEach(async () => {
+    vi.unstubAllGlobals()
+    setPanelObstruction(0)
+    const { clearPlacementObstacles } = await import('@/lib/trip/placement-obstacles')
+    act(() => clearPlacementObstacles('dock'))
+  })
+  const placeCards = () => live().filter((p) => String(p.options.className).includes('place-card'))
+  const phoneCards = () => live().filter((p) => String(p.options.className).includes('phone-popup'))
+
+  // (a) A dock that expands over a PLACED card, leaving no anchor that fits where the pin is: the
+  // solver says 'shift' (a camera move would make room), but a placed card never moves the camera
+  // again, so the detail goes to the sidebar instead of staying covered.
+  it('a dock expanding over a placed card, with no anchor left, hands the detail to the sidebar', async () => {
+    const { setPlacementObstacles } = await import('@/lib/trip/placement-obstacles')
+    const { solveCardPlacement } = await import('@/components/map/card-placement')
+    const c = cards()
+    await open({ selectedPlaceId: 'pl_sandolab', card: { nonce: 5, at: [139.77, 35.7], node: <Card /> }, cards: c })
+    expect(placeCards()).toHaveLength(1)
+    const dock = { x: 520, y: 360, w: 500, h: 300 }   // grown over the card; the pin stays visible
+    // The premise, asserted where it is set up: the solver would ask for a camera shift here.
+    expect(solveCardPlacement({
+      pin: h.state.pin, card: { w: 360, natural: 420 }, view: { w: 1440, h: 900 },
+      obstacles: [{ x: 0, y: 0, w: 472, h: 900 }, dock], offset: 30, margin: 12, minHeight: 260, panelRight: 472,
+    }).kind).toBe('shift')
+    act(() => setPlacementObstacles('dock', [dock]))
+    expect(c.onFallback).toHaveBeenCalledWith(5)
+    expect(placeCards()).toHaveLength(0)
+    expect(h.map.panBy).not.toHaveBeenCalled()
+  })
+
+  it('chrome that covers the placed card but leaves another anchor re-anchors it instead', async () => {
+    const { setPlacementObstacles } = await import('@/lib/trip/placement-obstacles')
+    const c = cards()
+    await open({ selectedPlaceId: 'pl_sandolab', card: { nonce: 6, at: [139.77, 35.7], node: <Card /> }, cards: c })
+    expect(placeCards()[0].options.anchor).toBe('top')          // below the pin
+    act(() => setPlacementObstacles('dock', [{ x: 700, y: 500, w: 400, h: 400 }]))   // covers below only
+    expect(c.onFallback).not.toHaveBeenCalled()
+    expect(placeCards()).toHaveLength(1)
+    expect(placeCards()[0].options.anchor).not.toBe('top')
+  })
+
+  // (b) A hotel chosen in the phone Stay list opens the phone DOM card AND tells the owner, so a
+  // later widening has a descriptor to hand to the place card.
+  it('a phone Stay selection of a hotel reports the open card to the owner', async () => {
+    layout.value = 'mobile'
+    const c = cards()
+    const view = await open({ bundle: TOKYO_TRIP_WITH_HOTELS, layerMode: 'route', selectedHotelId: null, cards: c })
+    view.rerender(<TripMapHarness bundle={TOKYO_TRIP_WITH_HOTELS} layerMode="hub" selectedHotelId="hotel_1" cards={c} />)
+    await flush()
+    expect(phoneCards()).toHaveLength(1)
+    expect(c.onOpenHotel).toHaveBeenCalledWith('hotel_1')
+  })
+
+  // (c) Dismissal names the card it belongs to, and choosing a stop drops a lingering DOM card.
+  it('closing the phone DOM card dismisses THAT suggestion by identity', async () => {
+    layout.value = 'mobile'
+    const c = cards()
+    await open({ cards: c })
+    act(() => { h.markers.find((m) => m.classList.contains('eat-pin'))!.click() })
+    const popup = h.PopupCtor.mock.results.at(-1)!.value as { on: ReturnType<typeof vi.fn> }
+    act(() => { (popup.on.mock.calls.find((x) => x[0] === 'close')![1] as () => void)() })
+    expect(c.onDismiss).toHaveBeenCalledWith({ kind: 'eat', id: 'pl_popo' })
+  })
+
+  it('selecting a stop removes the phone suggestion card without dismissing anything', async () => {
+    layout.value = 'mobile'
+    const c = cards()
+    const view = await open({ cards: c })
+    act(() => { h.markers.find((m) => m.classList.contains('eat-pin'))!.click() })
+    expect(phoneCards()).toHaveLength(1)
+    view.rerender(<TripMapHarness selectedPlaceId="pl_akasaka" cards={c} />)
+    await flush()
+    expect(phoneCards()).toHaveLength(0)
+    expect(c.onDismiss).not.toHaveBeenCalled()
+  })
+})
