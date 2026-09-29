@@ -29,6 +29,7 @@ from pydantic import ConfigDict
 from slowapi.errors import RateLimitExceeded
 
 from api.errors import build_error_response, register_error_handlers
+from api.mcp_read import router as mcp_read_router
 from api.schemas import (
     AccountDeletionCancelResponse,
     AccountDeletionResponse,
@@ -339,6 +340,8 @@ async def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONR
 
 app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 register_error_handlers(app)
+# Remote-MCP reads: delegation-token auth only, mounted on this router alone (PLAN §2.3).
+app.include_router(mcp_read_router)
 
 # The fallback must list every origin the app is actually SERVED from, because it is what applies
 # when ALLOWED_ORIGINS is unset — and a missing origin here fails as a browser CORS block, i.e. trip
