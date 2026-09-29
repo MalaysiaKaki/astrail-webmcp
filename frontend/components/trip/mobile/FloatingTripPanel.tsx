@@ -7,7 +7,7 @@ import { DateStrip, TripPanelBody, type MobileTripViewProps } from './MobileTrip
 import TripHero from '../panel/TripHero'
 import { tripTitle } from '@/lib/trip/trip-presenters'
 import TripTabs, { panelId, tabId } from '../panel/TripTabs'
-import { BuildTimeline, ForYouTab, heroPreferenceBadge } from '../insights'
+import { BuildTimeline, ForYouTab, heroPreferenceItems } from '../insights'
 
 /** Longer than the 300ms slide, so a measurement lands on the settled box. */
 export const PANEL_SETTLE_MS = 340
@@ -107,7 +107,7 @@ export default function FloatingTripPanel(p: FloatingTripPanelProps) {
             </button>
           </div>
           <div className="[@media(max-height:560px)]:sr-only">
-            <TripHero bundle={p.bundle} readOnly={p.readOnly} badge={heroPreferenceBadge(p.bundle)} />
+            <TripHero bundle={p.bundle} readOnly={p.readOnly} preferences={heroPreferenceItems(p.bundle)} />
           </div>
           <TripTabs tab={p.tab} onTab={p.onTab} />
         </header>

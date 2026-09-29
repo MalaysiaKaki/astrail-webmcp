@@ -16,6 +16,7 @@
  *
  * Libraries (lib/trip/insights), for the hero and anything else Tab A needs:
  *   - heroPreferenceBadge(bundle): 'Planned around your taste' | 'Planned with your preferences' | null
+ *   - heroPreferenceItems(bundle): { items, more } | null — the hero's preference chips, same gate
  *   - tripPreferenceModel(bundle), corroboratedPreferenceSource(events)
  *   - reelProvenance(bundle): { behind: {url, thumbnailUrl}[], submittedCount: number | null, fromLibrary }
  *     (`behind` = cover cluster source, canonical-deduped; submittedCount null = not recorded)
@@ -32,7 +33,7 @@ export type { BuildTimelineProps } from './BuildTimeline'
 export type RevealPlace = (placeId: string) => void
 
 export {
-  MEMORY_SUMMARY_PREFIX, corroboratedPreferenceSource, heroPreferenceBadge, tripPreferenceModel,
+  MEMORY_SUMMARY_PREFIX, corroboratedPreferenceSource, heroPreferenceBadge, heroPreferenceItems, tripPreferenceModel,
 } from '@/lib/trip/insights/memory'
 export type { HeroPreferenceBadge, TripPreferenceModel } from '@/lib/trip/insights/memory'
 export { buildSteps, canonicalReelKey, fullLogEvents, reelProvenance } from '@/lib/trip/insights/build-steps'

@@ -1,38 +1,26 @@
 /**
- * The trip hero for the widget: panel/TripHero's markup and classes, as it renders with
- * `readOnly={false}` and `badge={null}`, built on the same props-only helpers (lib/trip/hero).
+ * The trip hero for the widget: panel/TripHero's markup and classes (readOnly={false}), built on
+ * the same props-only helpers (lib/trip/hero) and the same HeroPreferences line. Kept separate
+ * because the widget adds two things TripHero has no reason to know: the host's fullscreen
+ * `action`, and the bounded view's inspiration omission (a trimmed bundle is not "no Reels").
  *
- * Not TripHero itself: it imports `MissingDetails` from mobile/AboutThisTrip, whose module graph
- * reaches TripFeedbackPanel → lib/supabase/session and the feedback composer, none of which may
- * enter the widget bundle. `MissingDetails` is small and props-only, so it is mirrored here too.
- * If it ever moves to its own file, this component can be replaced by TripHero outright.
+ * No "missing details" badge, as in TripHero: in the hero it read as low confidence.
  */
-import { useId, useState } from 'react'
+import { useState } from 'react'
 import type { TripBundle } from '@/lib/trip/backend-types'
 import { heroCovers, heroStats } from '@/lib/trip/hero'
+import { heroPreferenceItems } from '@/lib/trip/insights/memory'
 import { tripDateRange, tripTitle } from '@/lib/trip/trip-presenters'
-import { stopsMissingDetails } from '@/lib/trip/trip-stats'
+import HeroPreferences from '@/components/trip/panel/HeroPreferences'
 
 /* Fixed, not random: a cluster that reshuffles on every render reads as a glitch (as TripHero). */
 const TILT = ['-rotate-6', 'rotate-3', '-rotate-2', 'rotate-6'] as const
 
-const NO_CAPTION = 'no caption evidence'
-
 /** What the bounded view dropped (the response's truncation flags), so the hero never states an
  *  absence that is only an absence from this view (Codex F2). */
-export type HeroOmissions = { inspiration: boolean; quotes: boolean }
+export type HeroOmissions = { inspiration: boolean }
 
-/** TripHero's gaps list, minus what this view cannot know: with quotes cut, a quote-less stop may
- *  still have its caption in the saved trip, so "no caption evidence" is not claimed. */
-function missingDetails(bundle: TripBundle, omitted: HeroOmissions) {
-  const all = stopsMissingDetails(bundle)
-  if (!omitted.quotes) return all
-  return all
-    .map((m) => ({ ...m, lacks: m.lacks.filter((l) => l !== NO_CAPTION) }))
-    .filter((m) => m.lacks.length > 0)
-}
-
-export default function WidgetHero({ bundle, omitted = { inspiration: false, quotes: false }, action }: {
+export default function WidgetHero({ bundle, omitted = { inspiration: false }, action }: {
   bundle: TripBundle
   omitted?: HeroOmissions
   /** Beside the title: the host's fullscreen request, when the host offers it. */
@@ -42,10 +30,9 @@ export default function WidgetHero({ bundle, omitted = { inspiration: false, quo
   const stats = heroStats(bundle)
   const dates = tripDateRange(bundle.trip)
   const origin = bundle.trip.origin_city?.trim() || null
-  const gaps = bundle.trip.status === 'saved_with_gaps'
-  const missing = gaps ? missingDetails(bundle, omitted) : []
-  const [gapsOpen, setGapsOpen] = useState(false)
-  const gapsId = useId()
+  // The MCP bundle carries preference_summary and preference_sources but never events, so this is
+  // the helper's claimed-sources path: the same gate, chips and wording as the web hero.
+  const preferences = heroPreferenceItems(bundle)
   return (
     <div data-testid="trip-hero" className="flex flex-col gap-3">
       <div className="flex min-w-0 items-center gap-4">
@@ -70,58 +57,9 @@ export default function WidgetHero({ bundle, omitted = { inspiration: false, quo
             </li>
           ))}
         </ul>
-        {gaps ? (
-          <button
-            type="button"
-            aria-expanded={gapsOpen}
-            aria-controls={gapsId}
-            onClick={() => setGapsOpen((v) => !v)}
-            className="type-body inline-flex min-h-11 items-center gap-1.5 rounded-full bg-[var(--m-subcard)] px-3 text-[length:var(--t-meta)] font-semibold text-[var(--m-accent)] focus-visible:outline-none focus-visible:shadow-[var(--m-focus)]"
-          >
-            <span aria-hidden className="h-2 w-2 rounded-full bg-[var(--m-accent)]" />
-            {missing.length > 0 ? `${missing.length} ${missing.length === 1 ? 'stop' : 'stops'} missing details` : 'Some details missing'}
-          </button>
-        ) : null}
       </div>
-      {gaps && gapsOpen ? (
-        <div id={gapsId}>
-          <MissingDetails missing={missing} quotesOmitted={omitted.quotes} />
-        </div>
-      ) : null}
+      {preferences ? <HeroPreferences preferences={preferences} /> : null}
     </div>
-  )
-}
-
-/** mobile/AboutThisTrip's MissingDetails, same copy and classes, plus a bounded-view variant. */
-function MissingDetails({ missing, quotesOmitted }: {
-  missing: ReturnType<typeof stopsMissingDetails>
-  quotesOmitted: boolean
-}) {
-  if (missing.length === 0 && quotesOmitted) {
-    return (
-      <p className="type-body text-[14px] leading-snug text-[var(--m-text-muted)]">
-        Every stop here has a map location. Caption quotes are not included in this view, so it
-        cannot list which stops lack caption evidence; open the trip in Astrail for that.
-      </p>
-    )
-  }
-  if (missing.length === 0) {
-    return (
-      <p className="type-body text-[14px] leading-snug text-[var(--m-text-muted)]">
-        Every stop here has a map location and its evidence. What Astrail could not find is elsewhere
-        — the weather, places to eat, or a route between two stops.
-      </p>
-    )
-  }
-  return (
-    <ul aria-label="Stops missing details" className="flex flex-col gap-2">
-      {missing.map((m) => (
-        <li key={m.id} className="m-subcard flex flex-col px-4 py-3">
-          <span className="type-body text-[15px] font-semibold text-[var(--m-text)]">{m.name}</span>
-          <span className="type-body text-[14px] text-[var(--m-text-muted)]">{m.lacks.join(', ')}</span>
-        </li>
-      ))}
-    </ul>
   )
 }
 

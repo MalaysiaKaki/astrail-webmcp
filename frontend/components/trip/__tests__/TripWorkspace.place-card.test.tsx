@@ -239,7 +239,7 @@ describe('desktop: the card\'s links and the agent\'s show_on_map', () => {
 
 /* A10 item 5: Tab B's insights wired in, and About redistributed on desktop (plan v2 §6): the
    summary and feedback stay at the end of the Trip tab, preferences and trade-offs go to For you,
-   decisions to How it was built, missing details to a hero badge. Nothing is lost. */
+   decisions to How it was built. Missing details stay in About (no longer a hero badge). Nothing is lost. */
 describe('desktop: For you, How it was built and the About redistribution', () => {
   it('For you is Tab B\'s tab, mounted only while open', async () => {
     mount()
@@ -261,14 +261,17 @@ describe('desktop: For you, How it was built and the About redistribution', () =
     expect(screen.getByText('Show full log')).toBeInTheDocument()
   })
 
-  it('the hero badge comes from the corroborated preference helper', async () => {
-    const { heroPreferenceBadge } = await import('@/components/trip/insights')
+  it('the hero shows the preferences the trip was planned with, from the corroborated helper', async () => {
+    const { heroPreferenceItems } = await import('@/components/trip/insights')
     mount()
     await flush()
-    const expected = heroPreferenceBadge(TOKYO_TRIP)
+    const expected = heroPreferenceItems(TOKYO_TRIP)
     const badge = screen.queryByTestId('personal-badge')
-    if (expected) expect(badge).toHaveTextContent(expected)
-    else expect(badge).toBeNull()
+    expect(expected).not.toBeNull()   // the fixture must pose the question
+    expect(badge).toHaveAccessibleName('Planned with your preferences: Walkable days, Ramen, Not too rushed, and 1 more')
+    expect(badge).toHaveTextContent('Walkable days')
+    expect(badge).toHaveTextContent('+1')
+    expect(badge).not.toHaveTextContent(/Planned around your taste|Planned with your preferences/)
   })
 
   it('the Trip tab ends with the trip summary and feedback, without the moved sections', async () => {
@@ -283,18 +286,20 @@ describe('desktop: For you, How it was built and the About redistribution', () =
     expect(within(scroll).queryByText('How Astrail built this')).toBeNull()
   })
 
-  it('a trip saved with gaps shows a hero badge that opens the list of stops missing details', async () => {
+  it('a trip saved with gaps keeps its missing-details list in About, and the hero says nothing about it', async () => {
     const b = structuredClone(TOKYO_TRIP)
     b.trip.status = 'saved_with_gaps'
     b.places[1].place.lat = 0
     b.places[1].place.lng = 0
     mount(b)
     await flush()
-    const badge = screen.getByRole('button', { name: /missing details/i })
-    expect(badge).toHaveAttribute('aria-expanded', 'false')
-    await act(async () => { badge.click() })
-    expect(badge).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByRole('list', { name: /stops missing details/i })).toHaveTextContent(b.places[1].place.name)
+    const hero = screen.getByTestId('trip-hero')
+    expect(within(hero).queryByRole('button', { name: /missing details/i })).toBeNull()
+    expect(hero).not.toHaveTextContent(/missing details|details missing/i)
+    const scroll = document.querySelector<HTMLElement>('[data-trip-scroll]')!
+    const about = within(scroll).getByRole('region', { name: 'About this trip' })
+    expect(within(about).getByText('Some stops are missing details')).toBeInTheDocument()
+    expect(about).toHaveTextContent(b.places[1].place.name)
   })
 })
 

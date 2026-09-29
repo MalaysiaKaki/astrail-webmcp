@@ -322,23 +322,38 @@ describe('absence claims from a bounded view (Codex round 4 F2)', () => {
     expect(cluster()).toHaveAccessibleName('No Reels recorded for this trip')
   })
 
-  it('capped quotes: no "No caption evidence", and the gaps badge does not count omitted captions', () => {
+  it('capped quotes: no "No caption evidence"', () => {
     renderWidget(CAPPED_QUOTES_RESPONSE)
     expect(within(cardFor('Sensō-ji')).getByText('Caption not included in this view')).toBeInTheDocument()
     expect(screen.queryByText('No caption evidence')).toBeNull()
-    const gaps = screen.getByRole('button', { name: /missing details|details missing/ })
-    expect(gaps).toHaveTextContent('Some details missing')
-    fireEvent.click(gaps)
-    expect(screen.getByText(/Caption quotes are not included in this view/)).toBeInTheDocument()
   })
 
-  it('complete result with quote-less Reel stops keeps "No caption evidence" and counts them (control)', () => {
+  it('complete result with quote-less Reel stops keeps "No caption evidence" (control)', () => {
     renderWidget(NO_QUOTES_COMPLETE_RESPONSE)
     expect(within(cardFor('Sensō-ji')).getByText('No caption evidence')).toBeInTheDocument()
-    const gaps = screen.getByRole('button', { name: /missing details/ })
-    expect(gaps).toHaveTextContent('2 stops missing details')
-    fireEvent.click(gaps)
-    expect(within(screen.getByRole('list', { name: 'Stops missing details' })).getAllByText('no caption evidence')).toHaveLength(2)
+  })
+})
+
+describe('the hero (preferences, no missing-details badge)', () => {
+  it('a saved-with-gaps trip shows no missing-details badge in the hero', () => {
+    renderWidget(NO_QUOTES_COMPLETE_RESPONSE)   // status saved_with_gaps, two quote-less stops
+    const hero = screen.getByTestId('trip-hero')
+    expect(within(hero).queryByRole('button')).toBeNull()
+    expect(hero).not.toHaveTextContent(/missing details|details missing/i)
+  })
+
+  it('shows the preferences the trip was planned with, as chips', () => {
+    renderWidget()
+    const prefs = within(screen.getByTestId('trip-hero')).getByTestId('personal-badge')
+    expect(prefs).toHaveAccessibleName('Planned with your preferences: Slow mornings, Street food, One big view')
+    expect(prefs).toHaveTextContent('Slow mornings')
+    expect(prefs).not.toHaveTextContent('+')
+  })
+
+  it('shows no preferences line when none were claimed', () => {
+    const none = { ...MULTI_SOURCE_RESPONSE, bundle: { ...MULTI_SOURCE_RESPONSE.bundle, trip: { ...MULTI_SOURCE_RESPONSE.bundle.trip, preference_sources: [] } } }
+    renderWidget(none)
+    expect(screen.queryByTestId('personal-badge')).toBeNull()
   })
 })
 

@@ -1,11 +1,10 @@
 'use client'
 
-import { useId, useState } from 'react'
+import { useState } from 'react'
 import type { TripBundle } from '@/lib/trip/backend-types'
 import { heroCovers, heroStats } from '@/lib/trip/hero'
 import { tripDateRange, tripTitle } from '@/lib/trip/trip-presenters'
-import { stopsMissingDetails } from '@/lib/trip/trip-stats'
-import { MissingDetails } from '../mobile/AboutThisTrip'
+import HeroPreferences, { type HeroPreferenceItems } from './HeroPreferences'
 
 /* Fixed, not random: a cluster that reshuffles on every render reads as a glitch. */
 const TILT = ['-rotate-6', 'rotate-3', '-rotate-2', 'rotate-6'] as const
@@ -13,27 +12,25 @@ const TILT = ['-rotate-6', 'rotate-3', '-rotate-2', 'rotate-6'] as const
 /**
  * The desktop panel's hero (plan v2 §1): the trip as pictures first. A Placify-style stacked
  * cluster of the Reels behind it (up to four covers and "+N"), then the serif title, dates and
- * origin, stat chips, and the personalised badge. The cluster is the one bold element on the
- * panel; everything around it stays quiet.
+ * origin, stat chips, and the preferences it was planned with. The cluster is the one bold element
+ * on the panel; everything around it stays quiet.
+ *
+ * No "missing details" badge here: in the hero it read as low confidence in the whole trip. That
+ * information stays where it is explained, in About this trip.
  *
  * On a short desktop viewport (844x390 landscape) the cluster and the chips give their height
  * back to the list: the title line alone remains.
  */
-export default function TripHero({ bundle, readOnly, badge }: {
+export default function TripHero({ bundle, readOnly, preferences }: {
   bundle: TripBundle
   readOnly: boolean
-  /** "Planned around your taste" / "Planned with your preferences", or null when neither applies. */
-  badge: string | null
+  /** heroPreferenceItems(bundle): the preferences it was planned with, or null (no claim made). */
+  preferences: HeroPreferenceItems | null
 }) {
   const { covers, reels, extra } = heroCovers(bundle)
   const stats = heroStats(bundle)
   const dates = tripDateRange(bundle.trip)
   const origin = bundle.trip.origin_city?.trim() || null
-  // About's "Some stops are missing details" as a hero badge that opens its list (plan v2 §6).
-  const gaps = bundle.trip.status === 'saved_with_gaps'
-  const missing = gaps ? stopsMissingDetails(bundle).length : 0
-  const [gapsOpen, setGapsOpen] = useState(false)
-  const gapsId = useId()
   return (
     <div data-testid="trip-hero" className="flex flex-col gap-3">
       <div className="flex min-w-0 items-center gap-4">
@@ -62,31 +59,10 @@ export default function TripHero({ bundle, readOnly, badge }: {
             </li>
           ))}
         </ul>
-        {badge ? (
-          <p data-testid="personal-badge" className="type-body inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--m-accent-wash)] px-3 text-[length:var(--t-meta)] font-medium text-[var(--m-text)]">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"
-              strokeLinejoin="round" aria-hidden className="h-4 w-4 text-[var(--m-accent)]">
-              <path d="M10 3.5 11.6 8.4 16.5 10l-4.9 1.6L10 16.5l-1.6-4.9L3.5 10l4.9-1.6Z" />
-            </svg>
-            {badge}
-          </p>
-        ) : null}
-        {gaps ? (
-          <button
-            type="button"
-            aria-expanded={gapsOpen}
-            aria-controls={gapsId}
-            onClick={() => setGapsOpen((v) => !v)}
-            className="type-body inline-flex min-h-11 items-center gap-1.5 rounded-full bg-[var(--m-subcard)] px-3 text-[length:var(--t-meta)] font-semibold text-[var(--m-accent)] focus-visible:outline-none focus-visible:shadow-[var(--m-focus)]"
-          >
-            <span aria-hidden className="h-2 w-2 rounded-full bg-[var(--m-accent)]" />
-            {missing > 0 ? `${missing} ${missing === 1 ? 'stop' : 'stops'} missing details` : 'Some details missing'}
-          </button>
-        ) : null}
       </div>
-      {gaps && gapsOpen ? (
-        <div id={gapsId} className="max-h-48 overflow-y-auto overscroll-contain [@media(max-height:560px)]:hidden">
-          <MissingDetails bundle={bundle} label="Stops missing details" />
+      {preferences ? (
+        <div className="[@media(max-height:560px)]:hidden">
+          <HeroPreferences preferences={preferences} />
         </div>
       ) : null}
     </div>

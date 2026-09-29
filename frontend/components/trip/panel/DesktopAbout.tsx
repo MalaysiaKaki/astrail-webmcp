@@ -10,7 +10,8 @@ import { MissingDetails } from '../mobile/AboutThisTrip'
  * The end of the desktop Trip tab (A10 item 5; plan v2 §6, About redistributed): the trip summary
  * and the feedback card, plus the read-only note on the sample. Everything else About held has a
  * home of its own on desktop: preferences and trade-offs in For you, the agent's decisions in How
- * it was built, the stats and the missing-details list in the hero. The phone keeps AboutThisTrip.
+ * it was built, the stats in the hero. The missing-details list stays HERE: the hero no longer
+ * carries it (it read as low confidence there). The phone keeps AboutThisTrip.
  */
 export default function DesktopAbout({ bundle, readOnly, feedback }: {
   bundle: TripBundle
@@ -28,10 +29,10 @@ export default function DesktopAbout({ bundle, readOnly, feedback }: {
           edit an itinerary.
         </p>
       ) : null}
-      {/* The hero's missing-details badge hides with the hero's chips on a short viewport (844x390);
-          the list is here then, so it is never out of reach. */}
+      {/* Shown at every height now that the hero has no missing-details badge (it used to be here
+          only on a short viewport, where the hero's badge was hidden). */}
       {bundle.trip.status === 'saved_with_gaps' ? (
-        <div className="hidden [@media(max-height:560px)]:block">
+        <div>
           <h4 className="t-card-title mb-2 text-[var(--m-accent)]">Some stops are missing details</h4>
           <MissingDetails bundle={bundle} />
         </div>
