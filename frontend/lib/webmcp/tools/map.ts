@@ -20,6 +20,9 @@ export type MapDeps = {
   selectPlace: (placeId: string | null) => void
   setLayerMode: (mode: 'route' | 'hub') => void
   openPanel: () => void
+  /** Which list the panel shows: a day's stops, or the Stay view (amendment 10). Optional: a
+   *  page without a Stay list simply keeps its list. */
+  showList?: (list: 'stops' | 'stay') => void
   /** Camera view, for reporting what the user is actually looking at. */
   view: () => { lng: number; lat: number; zoom: number } | null
 }
@@ -62,6 +65,7 @@ export function showOnMapTool(deps: MapDeps): ToolSpec {
       if (target === 'trip') {
         deps.setLayerMode('route')
         deps.selectPlace(null)
+        deps.showList?.('stops')
         deps.openPanel()
         // None of these three move the camera: the [selectedPlaceId] effect bails on a null id and
         // the [layerMode] effect bails unless the mode is 'hub'. Saying "showing the whole trip"
@@ -82,6 +86,7 @@ export function showOnMapTool(deps: MapDeps): ToolSpec {
           return 'No hotel on this trip has a location, so the hotel hub view has nothing to draw — the map is unchanged. Hotel suggestions are switched off in this build, so trips made now have none at all.'
         }
         deps.setLayerMode('hub')
+        deps.showList?.('stay')
         deps.openPanel()
         return 'Showing the hotel hub view — the map flies to the recommended hotel and draws a straight line out to each stop. The lines carry no distance or time labels; read those from get_itinerary.'
       }

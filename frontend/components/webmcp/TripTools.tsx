@@ -23,6 +23,7 @@ export default function TripTools({
   selectPlace,
   setLayerMode,
   openPanel,
+  showList,
   refresh,
   readOnly = false,
 }: {
@@ -31,6 +32,8 @@ export default function TripTools({
   selectPlace: (placeId: string | null) => void
   setLayerMode: (mode: 'route' | 'hub') => void
   openPanel: () => void
+  /** Show a day's stops or the Stay list (show_on_map's trip and hotel targets). */
+  showList?: (list: 'stops' | 'stay') => void
   /** Re-reads the trip INTO this page's state, so an agent edit shows without a manual reload. */
   refresh: () => Promise<TripBundle | null>
   /**
@@ -69,8 +72,8 @@ export default function TripTools({
   // so a bundle captured at registration would stay first-render data for the whole session.
   const bundleRef = useRef(bundle)
   bundleRef.current = bundle
-  const actionsRef = useRef({ showDay, selectPlace, setLayerMode, openPanel })
-  actionsRef.current = { showDay, selectPlace, setLayerMode, openPanel }
+  const actionsRef = useRef({ showDay, selectPlace, setLayerMode, openPanel, showList })
+  actionsRef.current = { showDay, selectPlace, setLayerMode, openPanel, showList }
 
   const specs = useMemo(
     () =>
@@ -80,6 +83,7 @@ export default function TripTools({
         selectPlace: (id) => actionsRef.current.selectPlace(id),
         setLayerMode: (m) => actionsRef.current.setLayerMode(m),
         openPanel: () => actionsRef.current.openPanel(),
+        showList: (list) => actionsRef.current.showList?.(list),
         view: () => {
           const map = getMap()
           if (!map) return null

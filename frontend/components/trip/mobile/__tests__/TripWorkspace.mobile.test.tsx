@@ -43,7 +43,7 @@ vi.mock('mapbox-gl', () => {
   return { default: { Map: vi.fn(() => map), Marker: vi.fn(), LngLatBounds: vi.fn(), accessToken: '' } }
 })
 vi.mock('mapbox-gl/dist/mapbox-gl.css', () => ({}))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/app/trip/demo' }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/app/trip/demo', useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/components/trip/TripFeedbackPanel', () => ({ default: () => <div data-testid="trip-feedback-panel" /> }))
 
 import MapProvider from '@/components/map/MapProvider'

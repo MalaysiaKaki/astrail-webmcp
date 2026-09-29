@@ -30,7 +30,7 @@ const {
   }
 })
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push }), useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/lib/supabase/session', () => ({ getAccessToken }))
 vi.mock('@/lib/trip/api', () => ({ generateTrip, streamGeneration, submitTripFeedback: vi.fn() }))
 vi.mock('@/lib/trip/supabase-api', () => ({ getTrip }))

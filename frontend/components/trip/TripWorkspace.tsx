@@ -22,6 +22,9 @@ import { useTripLayout } from '@/lib/trip/use-trip-layout'
 import { fitLabel, fitTarget } from '@/lib/trip/fit-target'
 import { PhoneFailed, PhoneGenerating, PhoneLoading, PhoneNotFound } from './mobile/PhoneStateScreens'
 import MapControlStack from '@/components/map/MapControlStack'
+import { planReveal, type RevealPlace } from '@/lib/trip/reveal'
+import { useTripTab } from '@/lib/trip/use-trip-tab'
+import TripTabUrl from './TripTabUrl'
 
 function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
@@ -131,6 +134,13 @@ export default function TripWorkspace({
      swaps the phone tree for the desktop rail, each with its own composer, and a panel-owned
      draft (note, rating, an in-flight send) was lost in the swap. */
   const feedback = useFeedbackComposer(tripId)
+  /* The panel's tab (Trip · For you · How it was built): per trip, per session, `?tab=` wins on
+     load. Owned here, above both layouts, so rotating keeps it; the map and TripTools sit outside
+     every tab-dependent mount, so a tab change never remounts the map or interrupts the camera. */
+  const { tab, setTab, applyUrl } = useTripTab(tripId)
+  /* A reveal to bring into view once the Trip tab's list has mounted: a counter, so revealing the
+     same place again (a second pin click) scrolls again even though nothing else changed. */
+  const [revealRequest, setRevealRequest] = useState<{ placeId: string; nonce: number } | null>(null)
 
   useEffect(() => {
     // A seeded bundle is already the answer, and there is nothing to read: the fixture has no
@@ -225,22 +235,23 @@ export default function TripWorkspace({
   }
   if (bundle.trip.status === 'generating' || bundle.trip.status === 'draft') return <PhoneGenerating />
 
-  /* The map shows every day's pins, but the itinerary list below shows only the ACTIVE day —
-     so selecting a Day 3 pin while Day 1 is open used to open the panel on a list that does not
-     contain it: no card to highlight, and nothing to scroll to. Activating the place's own day
-     is the parent's job, since the day is the parent's state. Both setters run in one handler,
-     so the list and the selection arrive on the same render. An undayed stop (the base hotel)
-     leaves the day alone — there is no day to switch to. */
-  function selectPlaceFromMap(placeId: string) {
-    // Optional chain only to satisfy TS: a hoisted function declaration is not narrowed by the
-    // early return above, though at runtime bundle is non-null by the time this can be called.
-    const day = bundle?.places.find((tp) => tp.place_id === placeId)?.day_number
-    if (typeof day === 'number') setActiveDayNumber(day)
-    setSelectedPlaceId(placeId)
-    setPanelOpen(true)
-    // The pin stays in view: select, show its card in the stop list, keep the phone sheet compact.
-    setMobileList('stops')
+  /* The frozen reveal contract (lib/trip/reveal, amendment 5), used by map pins, show_on_map and
+     For you's "Picked for you" links. The map shows every day's pins but the list shows one day,
+     so a Day 3 pin must open Day 3; an undayed stop (the base hotel) keeps the day and is pinned
+     above the list. Every setter runs in one handler, so the tab, the day, the list and the
+     selection arrive on the same render; the scroll waits for that render (revealRequest). */
+  const revealPlace: RevealPlace = (placeId) => {
+    if (!bundle) return
+    const plan = planReveal(bundle, placeId, { activeDayNumber, tab, panelOpen, listView: mobileList })
+    if (!plan) return
+    setActiveDayNumber(plan.activeDayNumber)
+    if (plan.tab !== tab) setTab(plan.tab)
+    setPanelOpen(plan.panelOpen)
+    setMobileList(plan.listView)
+    setSelectedPlaceId(plan.selectedPlaceId)
+    // The pin stays in view: the phone sheet opens compact, not expanded over the map.
     setExpanded(false)
+    setRevealRequest((r) => ({ placeId, nonce: (r?.nonce ?? 0) + 1 }))
   }
 
   function selectPlaceFromList(placeId: string) {
@@ -267,6 +278,10 @@ export default function TripWorkspace({
     selectedPlaceId,
     selectedTripPlace,
     onSelectPlace: selectPlaceFromList,
+    revealRequest,
+    onRevealPlace: revealPlace,
+    tab,
+    onTab: setTab,
     selectedRestaurantPlaceId,
     onSelectRestaurant: setSelectedRestaurantPlaceId,
     hotels,
@@ -299,13 +314,17 @@ export default function TripWorkspace({
     <>
       {/* Map-driving tools live only where a map exists. key={tripId} guarantees trip A's
           registrations unmount before trip B's mount, so two same-named tools never overlap. */}
+      <TripTabUrl onTab={applyUrl} />
       <TripTools
         key={tripId}
         bundle={bundle}
         showDay={(n) => { setActiveDayNumber(n); setMobileList('stops') }}
-        selectPlace={setSelectedPlaceId}
+        // A place goes through the reveal (its day, the Trip tab, its card in view); null clears.
+        selectPlace={(id) => { if (id) revealPlace(id); else setSelectedPlaceId(null) }}
         setLayerMode={setLayerMode}
-        openPanel={() => setPanelOpen(true)}
+        // show_on_map's day, trip and hotel targets open the Trip tab too (amendment 10).
+        openPanel={() => { setPanelOpen(true); setTab('trip') }}
+        showList={setMobileList}
         refresh={refreshBundle}
         readOnly={readOnly}
       />
@@ -330,7 +349,7 @@ export default function TripWorkspace({
           selectedPlaceId={selectedPlaceId}
           selectedRestaurantPlaceId={selectedRestaurantPlaceId}
           onSelectRestaurant={setSelectedRestaurantPlaceId}
-          onSelectPlace={(id) => selectPlaceFromMap(id)}
+          onSelectPlace={revealPlace}
           selectedHotelId={selectedHotelId}
           layerMode={layerMode}
           focusNonce={focusNonce}

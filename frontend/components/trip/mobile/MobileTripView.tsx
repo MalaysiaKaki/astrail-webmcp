@@ -13,8 +13,10 @@ import StopTimeline from './StopTimeline'
 import type { FeedbackComposer } from '../use-feedback-composer'
 import AboutThisTrip from './AboutThisTrip'
 import SelectedPlaceCard from './SelectedPlaceCard'
+import { useRevealScroll } from './use-reveal-scroll'
 import { dayLabel } from '@/lib/trip/day-labels'
 import type { FitTarget } from '@/lib/trip/fit-target'
+import type { RevealPlace, TripTab } from '@/lib/trip/reveal'
 
 export type MobileListView = 'stops' | 'stay'
 
@@ -35,6 +37,13 @@ export type MobileTripViewProps = {
    *  the active day's list (an undayed base hotel): fix 1. */
   selectedTripPlace: TripPlace | null
   onSelectPlace: (placeId: string) => void
+  /** The last reveal (map pin, show_on_map, Picked for you) to bring into view after mount. */
+  revealRequest: { placeId: string; nonce: number } | null
+  /** lib/trip/reveal's frozen contract, for surfaces outside the list (For you). */
+  onRevealPlace: RevealPlace
+  /** The panel tab (desktop); the phone sheet shows the Trip content. */
+  tab: TripTab
+  onTab: (tab: TripTab) => void
   selectedRestaurantPlaceId: string | null
   onSelectRestaurant: (placeId: string) => void
   hotels: HotelSuggestion[]
@@ -228,6 +237,7 @@ function DayDisclosure({ day, rewriting }: { day: TripDay; rewriting: boolean })
  * widths render one content model.
  */
 export function TripPanelBody(p: MobileTripViewProps) {
+  useRevealScroll(p.revealRequest)
   return (
     <>
       {p.listView === 'stay' ? (

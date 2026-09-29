@@ -9,7 +9,7 @@ import type { TripBundle } from '@/lib/trip/backend-types'
    hotel) had no detail surface on desktop once the map popup was retired. It now gets a pinned
    "Selected place" card at the top of the itinerary, built from the same StopDetail model. */
 
-const { MapCtor, mapInstance, mapProps } = vi.hoisted(() => {
+const { MapCtor, mapInstance, mapProps, toolProps } = vi.hoisted(() => {
   const handler = () => ({ enable: vi.fn(), disable: vi.fn() })
   const mapInstance = {
     on: vi.fn(), setConfigProperty: vi.fn(),
@@ -21,6 +21,7 @@ const { MapCtor, mapInstance, mapProps } = vi.hoisted(() => {
   return {
     MapCtor: vi.fn(() => mapInstance), mapInstance,
     mapProps: { current: null as null | { onSelectPlace: (id: string) => void; show3dNonce?: number; mode3d?: boolean } },
+    toolProps: { current: null as null | Record<string, unknown> },
   }
 })
 
@@ -40,8 +41,13 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(window.location.search),
   usePathname: () => window.location.pathname,
 }))
+// Captures the setters TripWorkspace hands its page tools, so the REAL show_on_map can run on them.
+vi.mock('@/components/webmcp/TripTools', () => ({
+  default: (props: Record<string, unknown>) => { toolProps.current = props; return null },
+}))
 vi.mock('@/components/trip/TripFeedbackPanel', () => ({ default: () => <div data-testid="trip-feedback-panel" /> }))
 
+import { showOnMapTool, type MapDeps } from '@/lib/webmcp/tools/map'
 import MapProvider from '@/components/map/MapProvider'
 import TripWorkspace from '@/components/trip/TripWorkspace'
 
@@ -92,5 +98,128 @@ describe('an undayed selected place (fix 1)', () => {
     await act(async () => { mapProps.current!.onSelectPlace(day1.place_id) })
     expect(screen.queryByRole('region', { name: 'Selected place' })).toBeNull()
     expect(card(day1.place_id)).toHaveAttribute('aria-current', 'true')
+  })
+})
+
+/** The real show_on_map tool, driven through the setters the workspace hands TripTools. */
+function showOnMap(args: Record<string, unknown>) {
+  const t = toolProps.current as unknown as Omit<MapDeps, 'bundle' | 'view'> & { bundle: TripBundle }
+  const tool = showOnMapTool({ ...t, bundle: () => t.bundle, view: () => null })
+  return act(async () => { await tool.execute(args) })
+}
+
+const hidePanel = () => screen.getByRole('button', { name: 'Hide trip details and show the full map' })
+const panel = () => document.getElementById('trip-details-panel')!
+const stayChip = () => screen.getByRole('button', { name: 'Stay' })
+
+describe('revealPlace (amendment 5)', () => {
+  beforeEach(() => { window.history.replaceState(null, '', '/app/trip/demo'); window.sessionStorage.clear() })
+
+  it('a map pin on another day opens that day, with the card in view', async () => {
+    mount()
+    await flush()
+    const lastDay = TOKYO_TRIP.days.at(-1)!.day_number!
+    const stop = placesForDay(TOKYO_TRIP, lastDay)[0]
+    expect(card(stop.place_id)).toBeNull()
+    await act(async () => { mapProps.current!.onSelectPlace(stop.place_id) })
+    await flush()
+    expect(card(stop.place_id)).toHaveAttribute('aria-current', 'true')
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalled()
+  })
+
+  it('reopens a collapsed panel', async () => {
+    mount()
+    await flush()
+    await act(async () => { hidePanel().click() })
+    expect(panel()).toHaveAttribute('inert')
+    await act(async () => { mapProps.current!.onSelectPlace(placesForDay(TOKYO_TRIP, 2)[0].place_id) })
+    expect(panel()).not.toHaveAttribute('inert')
+  })
+
+  it('leaves the Stay list for the stops', async () => {
+    mount()
+    await flush()
+    await act(async () => { stayChip().click() })
+    expect(screen.getByText('Where to stay')).toBeInTheDocument()
+    const stop = placesForDay(TOKYO_TRIP, 1)[1]
+    await act(async () => { mapProps.current!.onSelectPlace(stop.place_id) })
+    expect(screen.queryByText('Where to stay')).toBeNull()
+    expect(card(stop.place_id)).toHaveAttribute('aria-current', 'true')
+  })
+
+  it('a repeated pin click brings the card into view again', async () => {
+    mount()
+    await flush()
+    const stop = placesForDay(TOKYO_TRIP, 1)[0]
+    const spy = Element.prototype.scrollIntoView as ReturnType<typeof vi.fn>
+    await act(async () => { mapProps.current!.onSelectPlace(stop.place_id) })
+    await flush()
+    const after1 = spy.mock.calls.length
+    await act(async () => { mapProps.current!.onSelectPlace(stop.place_id) })
+    await flush()
+    expect(spy.mock.calls.length).toBeGreaterThan(after1)
+  })
+
+  it('switches to the Trip tab from a ?tab= deep link, and drops the param', async () => {
+    window.history.replaceState(null, '', '/app/trip/demo?tab=build')
+    mount()
+    await flush()
+    expect(window.location.search).toBe('?tab=build')
+    await act(async () => { mapProps.current!.onSelectPlace(placesForDay(TOKYO_TRIP, 2)[0].place_id) })
+    expect(window.location.search).toBe('')
+    expect(window.sessionStorage.getItem(`astrail:trip-tab:${TOKYO_TRIP_WITH_HOTELS.trip.id}`)).toBe('trip')
+  })
+
+  it('ignores a place that is not on the trip', async () => {
+    mount()
+    await flush()
+    await act(async () => { hidePanel().click() })
+    await act(async () => { mapProps.current!.onSelectPlace('pl_nowhere') })
+    expect(panel()).toHaveAttribute('inert')
+  })
+})
+
+describe('show_on_map drives the same reveal (amendments 5 and 10)', () => {
+  beforeEach(() => { window.history.replaceState(null, '', '/app/trip/demo?tab=for-you'); window.sessionStorage.clear() })
+
+  it('place: its day, the Trip tab, the panel reopened, the card in view', async () => {
+    mount()
+    await flush()
+    await act(async () => { hidePanel().click() })
+    const lastDay = TOKYO_TRIP.days.at(-1)!.day_number!
+    const stop = placesForDay(TOKYO_TRIP, lastDay)[0]
+    await showOnMap({ target: 'place', place: stop.place.name })
+    expect(panel()).not.toHaveAttribute('inert')
+    expect(window.location.search).toBe('')
+    expect(card(stop.place_id)).toHaveAttribute('aria-current', 'true')
+  })
+
+  it('day: the Trip tab and that day\'s list, from Stay', async () => {
+    mount()
+    await flush()
+    await act(async () => { stayChip().click() })
+    await showOnMap({ target: 'day', day: 2 })
+    expect(window.location.search).toBe('')
+    expect(screen.queryByText('Where to stay')).toBeNull()
+    expect(card(placesForDay(TOKYO_TRIP, 2)[0].place_id)).not.toBeNull()
+  })
+
+  it('trip: the Trip tab and the stops list, from Stay', async () => {
+    mount()
+    await flush()
+    await act(async () => { stayChip().click() })
+    await showOnMap({ target: 'trip' })
+    expect(window.location.search).toBe('')
+    expect(screen.queryByText('Where to stay')).toBeNull()
+  })
+
+  it('hotel_hub: the Trip tab and the Stay view', async () => {
+    mount()
+    await flush()
+    await act(async () => { hidePanel().click() })
+    await showOnMap({ target: 'hotel_hub' })
+    expect(panel()).not.toHaveAttribute('inert')
+    expect(window.location.search).toBe('')
+    expect(screen.getByText('Where to stay')).toBeInTheDocument()
   })
 })

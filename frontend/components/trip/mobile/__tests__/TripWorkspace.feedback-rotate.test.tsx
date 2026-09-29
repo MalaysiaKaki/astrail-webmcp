@@ -19,7 +19,7 @@ vi.mock('@/lib/trip/supabase-api', () => ({ getTrip: vi.fn() }))
 vi.mock('@/components/map/TripMap', () => ({ default: () => <div data-testid="trip-map" /> }))
 vi.mock('mapbox-gl', () => ({ default: { Map: vi.fn(), Marker: vi.fn(), LngLatBounds: vi.fn(), accessToken: '' } }))
 vi.mock('mapbox-gl/dist/mapbox-gl.css', () => ({}))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/app/trip/x' }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/app/trip/x', useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/lib/supabase/session', () => ({ getAccessToken: h.getAccessToken }))
 vi.mock('@/lib/trip/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/trip/api')>()

@@ -37,7 +37,7 @@ vi.mock('mapbox-gl', () => ({
 vi.mock('mapbox-gl/dist/mapbox-gl.css', () => ({}))
 // GenerationProvider owns the router push on a finished run; this suite only cares that the run
 // reaches `complete`, not where it navigates.
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), useSearchParams: () => new URLSearchParams() }))
 // Lightweight stamp: renders the tripId it receives, so the mount tests observe both presence
 // (per the status matrix) and WHICH id flows (the loaded bundle's, never the route param). This
 // keeps the suite's existing @/lib/trip/* mocks valid — the real panel's api/session deps stay out.
