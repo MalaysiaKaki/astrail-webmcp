@@ -5,11 +5,13 @@ create extension if not exists pgtap with schema extensions;
 select plan(64);
 
 -- 20260929120000_mcp_oauth_and_reads (docs/mcp-app/PLAN.md §4.4, §7.3). Proves:
---   * the SHARED hook private.astrail_mcp_access_token, RUN AS supabase_auth_admin (the real Auth
---     role), gives an ENABLED listed client its own aud — on authorization_code AND token_refresh —
+--   * the SHARED hook private.astrail_mcp_access_token gives an ENABLED listed client its own aud — on authorization_code AND token_refresh —
 --     while unknown, disabled and non-UUID clients get exactly the prior astrail-app claims,
 --     non-members get the exact astrail-app exception, and browser tokens pass through;
---   * supabase_auth_admin can read mcp_oauth_clients (RLS policy + grant) and write nothing;
+--   * supabase_auth_admin holds exactly what the hook needs (schema usage, SELECT-only grants, the
+--     RLS read policy) — asserted from the catalog, because the local/CI stack does not let the test
+--     user SET ROLE supabase_auth_admin (astrail-app hit the same limit). The execution proof is
+--     production: a token for a listed client came back with that client's aud (2026-09-29);
 --   * the replay store rejects a duplicate jti with 23505, and prune removes only expired rows,
 --     at most p_max, refusing a null or out-of-range p_max;
 --   * all three functions are closed to PUBLIC, anon and authenticated;
@@ -25,10 +27,10 @@ insert into public.mcp_oauth_clients (client_id, resource, enabled) values
   ('22000000-0000-4000-8000-0000000abcde', 'https://astrail.example/mcp', true),
   ('22000000-0000-4000-8000-000000000002', 'https://astrail.example/mcp', false);
 
--- ── 1. The shared hook private.astrail_mcp_access_token, executed as supabase_auth_admin ───
--- Inputs and outputs live in a temp table the test's superuser creates and grants, so nothing
--- depends on the Auth role holding TEMP. A DO block (no pgTAP access needed) runs each case as
--- that role and records either the output or the error text. iat 1900000000 with a 1h exp, so
+-- ── 1. The shared hook private.astrail_mcp_access_token ─────────────────────────────────────
+-- Run as the test user: the function is SECURITY INVOKER with an empty search_path and only reads
+-- two tables, so its output does not depend on the caller beyond privileges (asserted in §2). A DO
+-- block runs each case and records either the output or the error text. iat 1900000000 with a 1h exp, so
 -- the 900 s cap is visible; 'short' has exp inside the cap.
 insert into public.astrail_app_memberships (user_id) values ('00000000-0000-0000-0000-000000002201');
 
@@ -53,9 +55,6 @@ select label, jsonb_build_object(
 update hook_case
    set event = jsonb_set(event, '{claims,client_id}', to_jsonb(upper(event #>> '{claims,client_id}')))
  where label = 'listed upper';
-grant select, update on hook_case to supabase_auth_admin;
-
-set local role supabase_auth_admin;
 do $$
 declare
   r record;
@@ -69,7 +68,6 @@ begin
   end loop;
 end;
 $$;
-reset role;
 
 -- The astrail-app behaviour, as a value: what every NON-listed client must still get.
 create temporary view prior_claims as
@@ -119,49 +117,18 @@ select is(
       and policyname in ('memberships_read_own', 'memberships_join_own', 'memberships_auth_hook_read')), 3,
   'the astrail-app membership policies are bootstrapped');
 
--- ── 2. supabase_auth_admin: read, never write ───────────────────────────────────────────────
--- Outcomes are recorded as that role (a DO block needs no pgTAP access) and asserted afterwards.
-create temporary table auth_admin_probe (op text primary key, outcome text not null);
-grant insert on auth_admin_probe to supabase_auth_admin;
-
-set local role supabase_auth_admin;
-do $$
-declare
-  v_count int;
-begin
-  select count(*) into v_count from public.mcp_oauth_clients;
-  insert into auth_admin_probe values ('select', v_count::text);
-  begin
-    insert into public.mcp_oauth_clients (client_id, resource)
-      values ('22000000-0000-4000-8000-000000000003', 'https://x.example/mcp');
-    insert into auth_admin_probe values ('insert', 'allowed');
-  exception when others then
-    insert into auth_admin_probe values ('insert', sqlstate);
-  end;
-  begin
-    update public.mcp_oauth_clients set enabled = true;
-    insert into auth_admin_probe values ('update', 'allowed');
-  exception when others then
-    insert into auth_admin_probe values ('update', sqlstate);
-  end;
-  begin
-    delete from public.mcp_oauth_clients;
-    insert into auth_admin_probe values ('delete', 'allowed');
-  exception when others then
-    insert into auth_admin_probe values ('delete', sqlstate);
-  end;
-end;
-$$;
-reset role;
-
-select is((select outcome from auth_admin_probe where op = 'select'), '2',
-  'supabase_auth_admin can SELECT mcp_oauth_clients (RLS policy + grant)');
-select is((select outcome from auth_admin_probe where op = 'insert'), '42501',
-  'supabase_auth_admin cannot INSERT mcp_oauth_clients');
-select is((select outcome from auth_admin_probe where op = 'update'), '42501',
-  'supabase_auth_admin cannot UPDATE mcp_oauth_clients');
-select is((select outcome from auth_admin_probe where op = 'delete'), '42501',
-  'supabase_auth_admin cannot DELETE mcp_oauth_clients');
+-- ── 2. supabase_auth_admin: read, never write (catalog checks; SET ROLE is unavailable here) ──
+select ok(exists (select 1 from pg_policies
+                   where schemaname = 'public' and tablename = 'mcp_oauth_clients'
+                     and policyname = 'mcp_clients_auth_admin_read' and cmd = 'SELECT'
+                     and roles = array['supabase_auth_admin']::name[] and qual = 'true'),
+  'mcp_oauth_clients has a SELECT-only RLS policy for supabase_auth_admin (RLS would hide rows otherwise)');
+select ok(has_schema_privilege('supabase_auth_admin', 'public', 'USAGE'),
+  'supabase_auth_admin can use schema public (to reach mcp_oauth_clients)');
+select ok(has_schema_privilege('supabase_auth_admin', 'private', 'USAGE'),
+  'supabase_auth_admin can use schema private (to run the hook)');
+select ok(has_table_privilege('supabase_auth_admin', 'public.astrail_app_memberships', 'SELECT'),
+  'supabase_auth_admin can read the membership table the hook checks');
 
 select table_privs_are('public', 'mcp_oauth_clients', 'supabase_auth_admin', array['SELECT'],
   'supabase_auth_admin holds SELECT only on mcp_oauth_clients');
