@@ -897,6 +897,9 @@ export default function TripMap({
       const inherited = consumeTripFramed(bundle.trip.id)
       fitWithSheetRef.current = getSheetObstruction() > 0
       cameraIntentRef.current = 'trip'
+      // This framing is solved at the mode's pitch; recording it means the mode effect never
+      // follows with a pitch-only ease that would cut the pitched fit short mid-flight.
+      appliedModeRef.current = mode3dRef.current
       flyToTrip(inherited ? 900 : 2200)
     })
     return () => { cancelled = true; cancelAnimationFrame(raf) }

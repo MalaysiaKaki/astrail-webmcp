@@ -192,6 +192,21 @@ describe('TripMap 3D camera mode', () => {
     })
   }
 
+  /* Orchestrator A5 review: a tilted camera must be solved WITH its pitch. Mapbox v3 fitBounds /
+     flyTo compute the camera for the padded band at the pitch they are given, so the pitch has to
+     travel in the SAME call as the padding and the target — a separate pitch ease after a flat fit
+     would push the far side of the route out of the band. Live proof: harness/a5-band.mjs. */
+  it('passes the 3D pitch in the same call as padding and target, for fits and flights', async () => {
+    const view = await mount({ mode3d: true, fitNonce: 0 })
+    const fit = mapInstance.fitBounds.mock.calls.at(-1)![1]
+    expect(fit).toEqual(expect.objectContaining({ pitch: PITCH_3D, padding: expect.any(Object) }))
+    await view.set({ selectedPlaceId: TOKYO_TRIP.places[0].place_id })
+    const fly = mapInstance.flyTo.mock.calls.at(-1)![0]
+    expect(fly).toEqual(expect.objectContaining({ pitch: PITCH_3D, padding: expect.any(Object), center: expect.any(Array) }))
+    // And no follow-up pitch-only move re-tilts the camera after either framing.
+    expect(mapInstance.easeTo.mock.calls.filter((c) => 'pitch' in c[0])).toHaveLength(0)
+  })
+
   it('the popup\'s "Zoom in for 3D" turns the mode on, then flies to the stop tilted', async () => {
     const onRequest3d = vi.fn()
     const view = await mount({ onRequest3d })
