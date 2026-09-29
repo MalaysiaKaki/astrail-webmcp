@@ -49,34 +49,59 @@ describe('ForYouTab — what the trip was planned with', () => {
     await screen.findByText(/used your saved memory, so it didn't add anything new/i)
   })
 
-  it('shows any other summary as one neutral note', () => {
+  it('shows an uncorroborated summary as recorded notes with usage unverified', () => {
     render(<ForYouTab bundle={TOKYO_TRIP} readOnly onRevealPlace={() => {}} />)
-    expect(screen.getByRole('heading', { name: 'Preferences this trip was planned with' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Preference notes recorded on this trip' })).toBeInTheDocument()
+    expect(screen.getByText(/can't confirm these notes were used/i)).toBeInTheDocument()
     expect(screen.getByText(TOKYO_TRIP.trip.preference_summary as string)).toBeInTheDocument()
     expect(screen.queryByTestId('memory-fact')).toBeNull()
   })
-})
 
-describe('ForYouTab — preferences sent to memory', () => {
-  it('recorded: the user text verbatim with its date, never claimed as learned', async () => {
-    render(<ForYouTab bundle={realBundle()} readOnly={false} onRevealPlace={() => {}} memoryReader={reader([{ data: [writeRow()], error: null }])} />)
-    const section = screen.getByRole('region', { name: 'Preferences you gave this trip, sent to your memory' })
-    await within(section).findByText('“Vegetarian, no early starts”')
-    expect(within(section).getByText(/20 Sept? 2026/)).toBeInTheDocument()
-    expect(within(section).getByText(/Saved when this trip was planned/)).toBeInTheDocument()
-    expect(within(section).getByRole('link', { name: /See what Astrail remembers now/ })).toHaveAttribute('href', '/app/settings')
-    expect(section.textContent).not.toMatch(/learned|taught/i)
+  it('a valid preferences event paired with stale profile prose gets no source tag or planned-with claim', () => {
+    const stale = 'Travel style: slow.\nNotes: I love hikes.\nThis trip: vegetarian'
+    const b = realBundle({ preference_summary: stale, preference_sources: ['memory', 'explicit'] }, [prefEvent('inferred_default')])
+    render(<ForYouTab bundle={b} readOnly onRevealPlace={() => {}} />)
+    const section = screen.getByRole('region', { name: 'Preference notes recorded on this trip' })
+    expect(within(section).getByText(/Travel style: slow\./)).toBeInTheDocument()
+    expect(section.textContent).not.toMatch(/Inferred from your Reels|From your memory|You told us|planned with/i)
   })
 
-  it('a failed add says the outcome is unconfirmed', async () => {
+  it('a corroborated explicit summary is tagged and claimed as planned-with', () => {
+    const b = realBundle({ preference_summary: 'Using your preferences: halal food only', preference_sources: ['explicit'] }, [prefEvent('explicit')])
+    render(<ForYouTab bundle={b} readOnly onRevealPlace={() => {}} />)
+    const section = screen.getByRole('region', { name: 'Preferences this trip was planned with' })
+    expect(within(section).getByText('You told us')).toBeInTheDocument()
+    expect(within(section).getByText('halal food only')).toBeInTheDocument()
+  })
+})
+
+const WRITES_REGION = 'Preferences Astrail tried to add to your memory'
+/** Every claim the rows cannot back: an intent row proves neither dispatch nor retention. */
+const OVERCLAIM = /\b(sent|saved|confirmed|learned|taught|retained|remembered it)\b/i
+
+describe('ForYouTab — memory write attempts', () => {
+  it('an orphan intent (learned row) renders as a dated attempt with an unconfirmed outcome', async () => {
+    render(<ForYouTab bundle={realBundle()} readOnly={false} onRevealPlace={() => {}} memoryReader={reader([{ data: [writeRow()], error: null }])} />)
+    const section = screen.getByRole('region', { name: WRITES_REGION })
+    await within(section).findByText('“Vegetarian, no early starts”')
+    expect(within(section).getByText(/Recorded 20 Sept? 2026/)).toBeInTheDocument()
+    expect(within(section).getByText(/Recorded when this trip was planned: Astrail tried to add these preferences to your memory\./)).toBeInTheDocument()
+    expect(within(section).getByText(/Outcome not confirmed/)).toBeInTheDocument()
+    expect(within(section).getByRole('link', { name: /See what Astrail remembers now/ })).toHaveAttribute('href', '/app/settings')
+    expect(section.textContent).not.toMatch(OVERCLAIM)
+  })
+
+  it('a row the backend marked failed says so, still without claiming anything was saved', async () => {
     render(<ForYouTab bundle={realBundle()} readOnly={false} onRevealPlace={() => {}} memoryReader={reader([{ data: [writeRow('failed')], error: null }])} />)
-    await screen.findByText(/couldn't confirm this was saved/i)
+    const section = screen.getByRole('region', { name: WRITES_REGION })
+    await within(section).findByText(/Marked as failed/)
+    expect(section.textContent).not.toMatch(OVERCLAIM)
   })
 
   it('none: honest empty state, and Check again picks up a late write', async () => {
     const r = reader([{ data: [], error: null }, { data: [writeRow()], error: null }])
     render(<ForYouTab bundle={realBundle({}, [prefEvent('explicit')])} readOnly={false} onRevealPlace={() => {}} memoryReader={r} />)
-    await screen.findByText('No memory write recorded for this trip.')
+    await screen.findByText('No memory write attempt recorded for this trip.')
     await userEvent.click(screen.getByRole('button', { name: 'Check again' }))
     await screen.findByText('“Vegetarian, no early starts”')
     expect(r.from).toHaveBeenCalledTimes(2)
@@ -93,8 +118,11 @@ describe('ForYouTab — preferences sent to memory', () => {
     const r = reader([{ data: [writeRow()], error: null }])
     render(<ForYouTab bundle={TOKYO_TRIP} readOnly onRevealPlace={() => {}} memoryReader={r} />)
     expect(r.from).not.toHaveBeenCalled()
-    const section = screen.getByRole('region', { name: 'Preferences you gave this trip, sent to your memory' })
+    const section = screen.getByRole('region', { name: WRITES_REGION })
     expect(within(section).getByText('Sample')).toBeInTheDocument()
+    expect(within(section).getByText(/Recorded when this trip was planned/)).toBeInTheDocument()
+    expect(within(section).queryByRole('link')).toBeNull()
+    expect(section.textContent).not.toMatch(OVERCLAIM)
     expect(screen.queryByRole('link', { name: /Manage what Astrail remembers/ })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Check again' })).toBeNull()
   })

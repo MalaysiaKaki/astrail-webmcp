@@ -46,16 +46,30 @@ describe('tripPreferenceModel', () => {
     expect(m).toEqual({ kind: 'note', text: MEMORY_SUMMARY, source: null })
   })
 
-  it('never splits a memory-corroborated summary that lacks the prefix (profile tags / notes)', () => {
+  it('never splits, nor sources, a memory event paired with stale profile prose (overwrite failed)', () => {
+    // compose_preference_summary's format: the pipeline's own summary never landed, so the
+    // event's source says nothing about THIS text.
     const profile = 'Travel style: slow.\nInterests: ramen; temples.'
     const m = tripPreferenceModel(bundle({ preference_summary: profile, preference_sources: ['memory'] }, [prefEvent('memory')]))
-    expect(m).toEqual({ kind: 'note', text: profile, source: 'memory' })
+    expect(m).toEqual({ kind: 'note', text: profile, source: null })
   })
 
-  it('shows a mixed memory + explicit summary as one note', () => {
+  it('shows a mixed profile + trip summary as one unsourced note, whatever the event says', () => {
     const mixed = 'Travel style: slow.\nThis trip: vegetarian; no hikes'
-    const m = tripPreferenceModel(bundle({ preference_summary: mixed, preference_sources: ['memory', 'explicit'] }, [prefEvent('explicit')]))
-    expect(m).toEqual({ kind: 'note', text: mixed, source: 'explicit' })
+    for (const source of ['explicit', 'memory', 'inferred_default']) {
+      const m = tripPreferenceModel(bundle({ preference_summary: mixed, preference_sources: ['memory', 'explicit'] }, [prefEvent(source)]))
+      expect(m).toEqual({ kind: 'note', text: mixed, source: null })
+    }
+  })
+
+  it('does not source a summary whose prefix belongs to a different source than the event', () => {
+    const explicitText = 'Using your preferences: halal food only'
+    expect(tripPreferenceModel(bundle({ preference_summary: explicitText }, [prefEvent('memory')])))
+      .toEqual({ kind: 'note', text: explicitText, source: null })
+    expect(tripPreferenceModel(bundle({ preference_summary: MEMORY_SUMMARY }, [prefEvent('explicit')])))
+      .toEqual({ kind: 'note', text: MEMORY_SUMMARY, source: null })
+    expect(tripPreferenceModel(bundle({ preference_summary: 'Travel style: slow.' }, [prefEvent('inferred_default')])))
+      .toEqual({ kind: 'note', text: 'Travel style: slow.', source: null })
   })
 
   it('drops the "Using your preferences:" wrapper only when the event says explicit', () => {
@@ -78,7 +92,7 @@ describe('tripPreferenceModel', () => {
     const m = tripPreferenceModel(bundle({ preference_summary: `${MEMORY_SUMMARY_PREFIX} ; ramen ;`, preference_sources: ['memory'] }, [prefEvent('memory')]))
     expect(m).toEqual({ kind: 'memory_facts', facts: ['ramen'] })
     const empty = tripPreferenceModel(bundle({ preference_summary: `${MEMORY_SUMMARY_PREFIX} ; `, preference_sources: ['memory'] }, [prefEvent('memory')]))
-    expect(empty.kind).toBe('note')
+    expect(empty).toMatchObject({ kind: 'note', source: null })
   })
 
   it('the demo fixture (both sources claimed, no payload) is one neutral note', () => {

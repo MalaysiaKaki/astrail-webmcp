@@ -66,9 +66,18 @@ function PlannedWith({ model }: { model: ReturnType<typeof tripPreferenceModel> 
       </section>
     )
   }
+  // Uncorroborated stored prose (e.g. stale profile text beside the event) is shown as a record,
+  // never as what the trip was planned with, and without a source tag.
+  const verified = model.kind === 'note' && model.source !== null
   return (
     <section aria-labelledby="insights-planned-with" className="flex flex-col gap-3">
-      <SectionHeading id="insights-planned-with">Preferences this trip was planned with</SectionHeading>
+      {verified || model.kind === 'none' ? (
+        <SectionHeading id="insights-planned-with">Preferences this trip was planned with</SectionHeading>
+      ) : (
+        <SectionHeading id="insights-planned-with" sub="Astrail can't confirm these notes were used to plan it.">
+          Preference notes recorded on this trip
+        </SectionHeading>
+      )}
       {model.kind === 'note' ? (
         <div className="m-card flex flex-col items-start gap-2 px-4 py-3.5">
           {model.source ? <Chip tone="accent">{SOURCE_TAG[model.source]}</Chip> : null}

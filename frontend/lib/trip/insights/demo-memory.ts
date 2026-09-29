@@ -17,6 +17,6 @@ export const DEMO_MEMORY_WRITES: readonly MemoryWrite[] = [
     id: 'sample-memory-write-1',
     texts: ['Walkable days, ramen, not too rushed, mid-range budget.'],
     createdAt: TOKYO_TRIP.trip.updated_at,
-    confirmed: true,
+    markedFailed: false,
   },
 ]

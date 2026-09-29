@@ -38,21 +38,23 @@ function fakeReader(results: { data: unknown[] | null; error: unknown }[]) {
 }
 
 describe('rowsToMemoryWrites', () => {
-  it('keeps the user text verbatim with its date, and marks failed adds unconfirmed', () => {
+  it('keeps the user text verbatim with its date, and flags rows the backend marked failed', () => {
     const writes = rowsToMemoryWrites([
       row(),
       row({ id: 'me-2', event_type: 'failed', learned_facts_json: [{ fact: 'halal only' }], created_at: '2026-09-21T10:00:00Z' }),
     ], { tripId: TRIP, ownerId: OWNER })
     expect(writes).toEqual([
-      { id: 'me-1', texts: ['vegetarian, no early starts'], createdAt: '2026-09-20T10:00:00Z', confirmed: true },
-      { id: 'me-2', texts: ['halal only'], createdAt: '2026-09-21T10:00:00Z', confirmed: false },
+      { id: 'me-1', texts: ['vegetarian, no early starts'], createdAt: '2026-09-20T10:00:00Z', markedFailed: false },
+      { id: 'me-2', texts: ['halal only'], createdAt: '2026-09-21T10:00:00Z', markedFailed: true },
     ])
   })
 
-  it('shows an orphan intent (learned row, add never confirmed) as a write attempt, nothing more', () => {
-    // The row is inserted BEFORE the Mem0 add, so a crash leaves it behind. It still only says
-    // "sent"; the component never claims it was retained.
-    expect(rowsToMemoryWrites([row()], { tripId: TRIP, ownerId: OWNER })).toHaveLength(1)
+  it('models a learned row (possibly an orphan intent) as an attempt, never as a confirmed save', () => {
+    // The row is inserted BEFORE the Mem0 add, so a crash or insert timeout leaves it behind.
+    // The rendered claim is pinned in ForYouTab.test.tsx; here: no field says it was saved.
+    const [w] = rowsToMemoryWrites([row()], { tripId: TRIP, ownerId: OWNER })
+    expect(w).not.toHaveProperty('confirmed')
+    expect(w.markedFailed).toBe(false)
   })
 
   it('never shows another owner\'s rows, another trip\'s, or non-write event types', () => {

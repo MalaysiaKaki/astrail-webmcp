@@ -6,17 +6,19 @@ import { MOCK_AUTH_ENABLED } from '@/lib/auth/mock-auth'
 import { DEMO_MEMORY_TRIP_ID, DEMO_MEMORY_WRITES } from './demo-memory'
 
 /**
- * "Preferences you gave this trip, sent to your memory": a read of `memory_events` (plan
+ * "Preferences Astrail tried to add to your memory": a read of `memory_events` (plan
  * amendment 1). Local row type: the table has no mirror in backend-types.ts and this round does
  * not add one (migration 20260701131304, RLS `memory_events_select_own`).
  *
  * What a row means, and what it does not. The backend inserts `event_type='learned'` BEFORE the
  * Mem0 add is attempted (C11 intent-first), with the user's own explicit text in
- * `learned_facts_json`, then flips it to 'failed' if the add errors. So:
- *   - 'learned' = the text was sent (or about to be). A crash leaves an orphan intent that reads
- *     the same; nothing here can tell them apart, so the copy never claims it was retained.
- *   - 'failed'  = sent, outcome unconfirmed.
- *   - no row    = nothing was sent (memory-only or inferred trip, memory off, or not yet: the
+ * `learned_facts_json`, then flips it to 'failed' if the add errors. Neither value proves an
+ * outcome (backend/pipeline/preferences.py): an insert timeout can commit the row yet skip the
+ * add, a crash leaves an orphan intent, and a failed mark-failed update leaves 'learned' after an
+ * add that errored. So every row is a recorded write ATTEMPT with an unconfirmed outcome:
+ *   - 'learned' = an attempt was recorded. Not "sent", not "saved".
+ *   - 'failed'  = an attempt was recorded and the backend later marked it failed.
+ *   - no row    = no attempt recorded (memory-only or inferred trip, memory off, or not yet: the
  *     write-back runs AFTER the terminal result, so an early read can be empty).
  */
 export type MemoryEventRow = {
@@ -33,8 +35,8 @@ export type MemoryWrite = {
   /** The user's own words, verbatim (trimmed). Plain text only, never markup. */
   texts: string[]
   createdAt: string
-  /** False for a 'failed' row: the add was issued but Astrail could not confirm it. */
-  confirmed: boolean
+  /** True for a 'failed' row. False does NOT mean saved: no row ever confirms the outcome. */
+  markedFailed: boolean
 }
 
 export type MemoryWritesState =
@@ -75,7 +77,7 @@ export function rowsToMemoryWrites(
   return rows
     .filter((r) => r.trip_id === tripId && r.user_id === ownerId)
     .filter((r) => (WRITE_TYPES as readonly string[]).includes(r.event_type))
-    .map((r) => ({ id: r.id, texts: factTexts(r.learned_facts_json), createdAt: r.created_at, confirmed: r.event_type === 'learned' }))
+    .map((r) => ({ id: r.id, texts: factTexts(r.learned_facts_json), createdAt: r.created_at, markedFailed: r.event_type === 'failed' }))
     .filter((w) => w.texts.length > 0)
 }
 

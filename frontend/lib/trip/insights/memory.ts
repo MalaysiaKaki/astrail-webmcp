@@ -10,18 +10,25 @@ import type { GenerationEvent, PreferenceSource, TripBundle } from '@/lib/trip/b
  *     'memory' source, and those contain their own semicolons.
  *   - `trip.preference_sources` can claim both 'memory' and 'explicit' at once.
  * The persisted `preferences` generation event carries `payload.preference_source`, the one
- * value the runner set from what it actually used. So the summary is split into Mem0 fact chips
- * only when it has the prefix AND the event says memory; everything else is one note.
+ * value the runner set from what it actually used. But the event alone does not describe the
+ * STORED prose: if the runner's best-effort summary overwrite failed, the create-time
+ * profile-plus-trip text (`compose_preference_summary`: "Travel style: … / This trip: …")
+ * survives beside a valid event. So a source, and the "planned with" claim, attach only when the
+ * summary is in the exact format the pipeline writes for THAT source
+ * (backend/pipeline/preferences.py `build_preference_context`); anything else is a recorded note
+ * whose use is unverified (`source: null`).
  */
 export const MEMORY_SUMMARY_PREFIX = 'Using your saved travel preferences: '
 const EXPLICIT_SUMMARY_PREFIX = 'Using your preferences: '
+const INFERRED_DEFAULT_SUMMARY = 'No preferences provided — Astrail will infer a balanced first draft from your Reels.'
 
 const SOURCES: readonly PreferenceSource[] = ['explicit', 'memory', 'inferred_default']
 
 export type TripPreferenceModel =
   /** Mem0 facts the pipeline recalled, one chip each. */
   | { kind: 'memory_facts'; facts: string[] }
-  /** The stored summary as one statement; `source` only when the event corroborates it. */
+  /** The stored summary as one statement; `source` only when the event AND the summary's
+   *  pipeline format agree, otherwise null (recorded text, use unverified). */
   | { kind: 'note'; text: string; source: PreferenceSource | null }
   | { kind: 'none' }
 
@@ -55,7 +62,10 @@ export function tripPreferenceModel(bundle: TripBundle): TripPreferenceModel {
     const text = summary.slice(EXPLICIT_SUMMARY_PREFIX.length).trim()
     if (text) return { kind: 'note', text, source }
   }
-  return { kind: 'note', text: summary, source }
+  if (source === 'inferred_default' && summary === INFERRED_DEFAULT_SUMMARY) {
+    return { kind: 'note', text: summary, source }
+  }
+  return { kind: 'note', text: summary, source: null }
 }
 
 /** The hero's personalised badge, or null when no stated or remembered preference shaped it. */
