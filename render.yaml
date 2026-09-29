@@ -108,6 +108,15 @@ services:
         sync: false
       - key: RESEND_FROM_EMAIL
         sync: false
+      # Remote-MCP internal reads (/internal/mcp/v1/*, backend/auth_delegation.py). DORMANT-safe:
+      # unset or malformed = only those three routes answer 503; nothing else reads them. Both
+      # must match the Vercel gateway's values. MCP_DELEGATION_SECRET is dedicated (`openssl rand
+      # -base64 64`), never the Supabase JWT secret. MCP_BACKEND_ORIGIN is this service's bare
+      # https origin — it forms the delegation token's exact `aud`. Web service only.
+      - key: MCP_DELEGATION_SECRET
+        sync: false
+      - key: MCP_BACKEND_ORIGIN
+        sync: false
       # SWEEP OWNERSHIP — which deployment executes the IRREVERSIBLE account-deletion sweep.
       # `main._reap_loop` runs in EVERY process on this image and calls the two-pass delete
       # engine (purge app data, then hard-delete the auth.users row) every 120s, so without
