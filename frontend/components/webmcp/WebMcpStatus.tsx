@@ -31,7 +31,9 @@ export default function WebMcpStatus({
   const count = tools.length
 
   const panel = open && (
-    <div className="pointer-events-auto w-full overflow-hidden m-card text-[var(--m-text)]">
+    // shrink-0: inside the dock's bounded scroller an overflow-hidden flex child would shrink below
+    // its content and clip its own list; the scroller scrolls it instead (fix 3 runtime check).
+    <div className="pointer-events-auto w-full shrink-0 overflow-hidden m-card text-[var(--m-text)]">
       <div className="flex items-center justify-between gap-2 border-b border-[var(--m-accent-wash)] px-3 py-2">
         <p className="text-[length:var(--t-body)] font-semibold text-[var(--m-text)]">
           {supported ? 'Tools an agent can use here' : 'Agent tools unavailable'}

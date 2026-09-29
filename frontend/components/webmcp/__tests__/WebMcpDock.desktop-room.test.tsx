@@ -87,6 +87,8 @@ describe('desktop dock: one bounded scroll area over a fixed footer (fix 3)', ()
     const list = screen.getByText(/Tools an agent can use here/)
     expect(scroll.contains(list)).toBe(true)
     expect(foot.contains(screen.getByRole('button', { name: /WebMCP active/ }))).toBe(true)
+    // The list's card must not shrink (it is overflow-hidden, so it would clip its own list).
+    expect(list.closest('.m-card')!.className).toMatch(/\bshrink-0\b/)
     const listBody = scroll.querySelector<HTMLElement>('[data-tool-list-body]')!
     expect(listBody.className).not.toMatch(/calc\(var\(--dock-room,100dvh\)-13rem\)\)\]/)
   })
