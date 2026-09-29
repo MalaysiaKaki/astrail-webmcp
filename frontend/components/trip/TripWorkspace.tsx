@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import type { TripBundle } from '@/lib/trip/backend-types'
 import { getTrip } from '@/lib/trip/supabase-api'
@@ -150,6 +150,20 @@ export default function TripWorkspace({
      is shown (at the pin, or in the sidebar). */
   const cards = useOpenCard()
   const { openCard, close: closeCard } = cards
+  // Crossing to the phone with focus in the place card: the card unmounts, so focus follows the
+  // selection to the phone sheet's card for the same stop (Codex review §4), never to <body>.
+  const cardFocusRef = useRef(false)
+  useEffect(() => {
+    const track = () => { cardFocusRef.current = Boolean(document.activeElement?.closest?.('[data-place-card]')) }
+    document.addEventListener('focusin', track)
+    return () => document.removeEventListener('focusin', track)
+  }, [])
+  useEffect(() => {
+    if (layout !== 'mobile' || !cardFocusRef.current || openCard?.kind !== 'stop') return
+    cardFocusRef.current = false
+    cards.focusAfterCommit([`[data-trip-scroll] [data-place-id="${CSS.escape(openCard.id)}"]`])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layout])
   // An edit that removed the open card's place closes it: content is read from the latest bundle.
   useEffect(() => {
     if (!bundle || !openCard) return
@@ -304,7 +318,7 @@ export default function TripWorkspace({
   const detailPlaceId = layout !== 'mobile' && openCard && openStop
     && (cards.detailsHere || !hasToken || !cardEntity || cards.fallbackNonce === openCard.nonce)
     ? openStop.place_id : null
-  const mapCardNode = !openCard || !cardEntity || detailPlaceId ? null
+  const mapCardNode = layout !== 'desktop' || !openCard || !cardEntity || detailPlaceId ? null
     : openCard.kind === 'stop' ? (
       <StopPlaceCard
         bundle={bundle}
