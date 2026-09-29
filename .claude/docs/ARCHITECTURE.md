@@ -180,6 +180,28 @@ non-column migration can be made visible by anchoring a column it ships alongsid
 `render.yaml:16-52` carries the full reasoning, including the incident that disabled auto-deploy in
 the first place.
 
+## Remote MCP server (ChatGPT) — added 2026-09-29
+
+A second agent surface next to browser WebMCP (`lib/webmcp`, unchanged). Design and decisions:
+`docs/mcp-app/PLAN.md`; rollout: `docs/deploy/2026-09-29-mcp-app-rollout.md`.
+
+```
+ChatGPT ──OAuth 2.1 + PKCE──▶ Supabase OAuth server ──consent on astrail-app.vercel.app──▶ shared hook private.astrail_mcp_access_token
+            (client in mcp_oauth_clients → aud=this /mcp; else astrail-mcp) ──▶ 15-min access token
+ChatGPT ──POST /mcp (Bearer)──▶ Next route handler (frontend/lib/mcp)
+            verify JWKS/iss/aud/role/permission/client/scope ─▶ fresh McpServer + stateless transport per request
+            tool ─▶ HS256 delegation JWT (≤60 s, endpoint aud, body hash, jti) ─▶ FastAPI /internal/mcp/v1/*
+                                                   (backend/auth_delegation.py: durable jti replay store)
+            render_itinerary ─▶ ui://astrail/itinerary-v1.html (frontend/mcp-app, single-file Vite build)
+```
+
+- Read-only v1 tools: `get_profile`, `list_trips`, `get_itinerary`, `list_saved_reels`, `render_itinerary`.
+- `/internal/mcp/v1/*` accepts ONLY delegation tokens; every other route still accepts only Supabase ES256/RS256 tokens.
+  These are the first backend trip/reel READ endpoints — owner-scoped service-role queries that mirror `getTrip`
+  (`backend/mcp_reads.py`, `mcp_projection.py`, `mcp_budget.py`), because the browser's RLS path is unavailable to a
+  server acting for a remote client. Saved reels go through the service-only RPC `saved_reel_cards_for_user`.
+- The MCP access token is never forwarded upstream; the Next layer holds no Supabase client or service credential.
+
 ## Entitlement ledger (free trial + beta seats)
 
 Trip generation is metered by an **entitlement charge that lives ON the durable `jobs` row**. The invariant is narrow and load-bearing: *a charge exists iff a durable job row records it.* Migration `supabase/migrations/20260803120000_entitlement_free_trial.sql` adds:

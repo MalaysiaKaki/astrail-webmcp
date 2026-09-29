@@ -168,6 +168,26 @@ upload only). Never prefix the auth token with `NEXT_PUBLIC_`. All frontend runt
 `sendDefaultPii=false`, disable tracing, and pass events/breadcrumbs through the recursive
 credential scrubber in `frontend/sentry.shared.ts` before sending.
 
+## Remote MCP server (`/mcp`, ChatGPT) — frontend PRIVATE, backend
+
+Server-only on Vercel (never `NEXT_PUBLIC_*`). Any missing/malformed value makes `/mcp` and its
+metadata answer 503 (fail closed). Parsed and validated by `frontend/lib/mcp/config.ts`; see
+`docs/mcp-app/PLAN.md` and `docs/deploy/2026-09-29-mcp-app-rollout.md`.
+
+```
+MCP_RESOURCE_URL          # canonical resource = exact token audience, e.g. https://astrail.xyz/mcp (must equal mcp_oauth_clients.resource)
+MCP_AUTH_ISSUER           # exact Supabase issuer, https://<ref>.supabase.co/auth/v1
+MCP_AUTH_JWKS_URL         # https://<ref>.supabase.co/auth/v1/.well-known/jwks.json
+MCP_ALLOWED_CLIENT_IDS    # comma-separated OAuth client UUIDs (the ChatGPT connector client) — each also needs a mcp_oauth_clients row whose resource = MCP_RESOURCE_URL
+MCP_BACKEND_ORIGIN        # bare Render origin, https only (http://localhost allowed outside production)
+MCP_DELEGATION_SECRET     # base64 of >=48 random bytes: `openssl rand -base64 64`. SAME value on Render. NOT the Supabase JWT secret
+MCP_ALLOWED_ORIGINS       # optional, comma-separated extra browser Origins (e.g. a local MCP Inspector)
+```
+
+Backend (Render) reads `MCP_DELEGATION_SECRET` (same value) and `MCP_BACKEND_ORIGIN` (its own
+public origin, used to check each delegation token's exact audience). Missing → the
+`/internal/mcp/v1/*` routes answer 503; every other route is unaffected.
+
 ## Removed — do not reintroduce
 
 **Removed in the 2026-06-20 stack freeze:** all `CLERK_*` (`CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`), all `CONVEX_*` (`CONVEX_DEPLOYMENT_URL`, `CONVEX_DEPLOY_KEY`, `NEXT_PUBLIC_CONVEX_URL`), and the single combined `MAPBOX_ACCESS_TOKEN` (now split into secret `sk` / public `pk`).

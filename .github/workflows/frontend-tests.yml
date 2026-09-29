@@ -39,8 +39,13 @@ jobs:
 
       # Typecheck BEFORE tests: a type error is the cheaper, faster failure and `next build` on
       # Vercel would reject it anyway — catch it at PR time, not at deploy time.
+      # `npm run typecheck` builds the MCP App widget first (lib/mcp imports its generated HTML
+      # module, which is gitignored) and then checks both the Next project and mcp-app/.
       - name: Typecheck
-        run: npx tsc --noEmit
+        run: npm run typecheck
+
+      - name: Widget cast guard
+        run: npm run check:widget-casts
 
       - name: Run frontend test suite
         run: npm test
