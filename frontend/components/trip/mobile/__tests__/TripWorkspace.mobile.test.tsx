@@ -13,7 +13,7 @@ import type { TripBundle } from '@/lib/trip/backend-types'
 
 const h = vi.hoisted(() => ({
   mapMounts: 0,
-  mapProps: null as null | { onSelectPlace: (id: string) => void; layerMode?: string; focusNonce?: number; fitNonce?: number },
+  mapProps: null as null | { onSelectPlace: (id: string) => void; layerMode?: string; focusNonce?: number; fitNonce?: number; mode3d?: boolean; onRequest3d?: () => void },
   mobile: false,
   listeners: new Set<() => void>(),
   registered: [] as string[],
@@ -297,20 +297,22 @@ describe('TripWorkspace — the phone branch', () => {
     for (const el of screen.getAllByText(TOKYO_TRIP.trip.inferred_destination!)) expect(sheet()!.contains(el)).toBe(true)
   })
 
-  /* A1 follow-up: the demo has no hotels, and here no dock fills the agent slot — so the stack is
-     Fit and nothing else. Each control draws its own glyph, so no two can be mistaken. */
-  it('shows only Fit in the demo stack: no hotels means no layer toggle', () => {
+  /* A1 follow-up, migrated in A5: the demo has no hotels, and here no dock fills the agent slot —
+     so the stack is Fit then 3D (no zoom on a phone: pinch is native). Each control draws its own
+     glyph, so no two can be mistaken. */
+  it('shows Fit and 3D in the demo stack: no hotels means no layer toggle, no zoom buttons', () => {
     renderSeeded()
     const buttons = within(stack()).getAllByRole('button')
-    expect(buttons.map((b) => b.getAttribute('aria-label'))).toEqual(['Fit map to the day'])
+    expect(buttons.map((b) => b.getAttribute('aria-label'))).toEqual(['Fit map to the day', '3D view'])
     expect(screen.queryByRole('button', { name: 'Hotel map layer' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Zoom (in|out)$/ })).toBeNull()
     expect(buttons[0].querySelector('svg')).toHaveAttribute('data-icon', 'scope')
   })
 
-  it('draws the hotel layer toggle with its own bed glyph, distinct from Fit', () => {
+  it('draws the hotel layer toggle with its own bed glyph, distinct from Fit and 3D', () => {
     renderSeeded(TOKYO_TRIP_WITH_HOTELS)
-    const icons = within(stack()).getAllByRole('button').map((b) => b.querySelector('svg')!.getAttribute('data-icon'))
-    expect(icons).toEqual(['scope', 'bed'])
+    const icons = within(stack()).getAllByRole('button').map((b) => b.querySelector('[data-icon]')!.getAttribute('data-icon'))
+    expect(icons).toEqual(['scope', '3d', 'bed'])
   })
 
   it('offers the agent a slot at the top of the stack (the dock fills it when WebMCP exists)', () => {
@@ -501,5 +503,62 @@ describe('TripWorkspace — the phone branch', () => {
     expect(screen.getByRole('heading', { level: 3, name: 'Sep 20' })).toBeInTheDocument()
     expect(within(sheet()!).getByText('No stops planned for this day.')).toBeInTheDocument()
   })
-})
 
+  /* ---- Phase A5: the 3D camera mode and the shared control stack ---- */
+
+  it('3D is a mode owned by the workspace: off by default, the toggle flips it and reports aria-pressed', () => {
+    renderSeeded()
+    const toggle = within(stack()).getByRole('button', { name: '3D view' })
+    expect(h.mapProps!.mode3d).toBe(false)
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(toggle)
+    expect(h.mapProps!.mode3d).toBe(true)
+    expect(within(stack()).getByRole('button', { name: '3D view' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(within(stack()).getByRole('button', { name: '3D view' }))
+    expect(h.mapProps!.mode3d).toBe(false)
+  })
+
+  it('the popup\'s "Zoom in for 3D" request turns the mode on', () => {
+    renderSeeded()
+    act(() => { h.mapProps!.onRequest3d!() })
+    expect(h.mapProps!.mode3d).toBe(true)
+    expect(within(stack()).getByRole('button', { name: '3D view' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('keeps the mode across a rotation to the desktop layout, where zoom, 3D and Fit stack on the right', () => {
+    renderSeeded()
+    fireEvent.click(within(stack()).getByRole('button', { name: '3D view' }))
+    setMobile(false)
+    const desk = screen.getByTestId('map-control-stack-desktop')
+    const labels = within(desk).getAllByRole('button').map((b) => b.getAttribute('aria-label'))
+    expect(labels).toEqual(['Zoom in', 'Zoom out', '3D view', 'Fit map to the day'])
+    for (const b of within(desk).getAllByRole('button')) expect(b.className).toMatch(/\bm-btn-icon\b/)
+    expect(within(desk).getByRole('button', { name: '3D view' })).toHaveAttribute('aria-pressed', 'true')
+    expect(h.mapProps!.mode3d).toBe(true)
+    expect(h.mapMounts).toBe(1)                                    // the map driver never remounts
+  })
+
+  it('the desktop Fit asks the map to re-frame, like the phone one', () => {
+    h.mobile = false
+    renderSeeded()
+    const before = h.mapProps!.fitNonce ?? 0
+    fireEvent.click(within(screen.getByTestId('map-control-stack-desktop')).getByRole('button', { name: /^Fit map to/ }))
+    expect(h.mapProps!.fitNonce).toBe(before + 1)
+  })
+
+  it('drops Hotel from the stack when four circles would reach the compact sheet (Stay chip keeps it reachable)', async () => {
+    const { setSheetObstruction } = await import('@/lib/trip/sheet-obstruction')
+    const tall = window.innerHeight
+    try {
+      renderSeeded(TOKYO_TRIP_WITH_HOTELS)
+      expect(within(stack()).queryByRole('button', { name: 'Hotel map layer' })).not.toBeNull()
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 390 })
+      act(() => { setSheetObstruction(203) })
+      expect(within(stack()).queryByRole('button', { name: 'Hotel map layer' })).toBeNull()
+      expect(within(screen.getByRole('group', { name: 'Trip days' })).getByRole('button', { name: 'Stay' })).toBeInTheDocument()
+    } finally {
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: tall })
+      act(() => { setSheetObstruction(0) })
+    }
+  })
+})

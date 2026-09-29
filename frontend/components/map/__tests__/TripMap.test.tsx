@@ -541,7 +541,8 @@ describe('TripMap', () => {
 
     expect(mapInstance.fitBounds).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ maxZoom: 14, pitch: 45 }),
+      // Plan A5 amendment 1: pitch comes from the 3D mode, which is off by default (was 45).
+      expect.objectContaining({ maxZoom: 14, pitch: 0 }),
     )
   })
 

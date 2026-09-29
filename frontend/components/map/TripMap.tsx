@@ -16,6 +16,8 @@ import { readSafeAreaTop } from '@/lib/trip/safe-area'
 import { getSheetObstruction, useSheetObstruction } from '@/lib/trip/sheet-obstruction'
 import { useTripLayout } from '@/lib/trip/use-trip-layout'
 import { computeFramePadding } from './frame-padding'
+import { cameraPitch, createTerrainController, nativeBuildings, PITCH_3D, type TerrainController } from './camera-mode'
+import { getControlRects, useControlRects } from '@/lib/trip/control-obstruction'
 import { buildPhonePin } from './phone-pin'
 import './phone-pins.css'
 import './phone-map-cards.css'
@@ -340,6 +342,8 @@ export default function TripMap({
   onSelectRestaurant,
   focusNonce = 0,
   fitNonce = 0,
+  mode3d = false,
+  onRequest3d,
 }: {
   bundle: TripBundle
   activeDayNumber: number
@@ -362,6 +366,12 @@ export default function TripMap({
   /** Bumped by the phone's "Fit" control: frame the fitTarget (day, hub or trip) again, even when
    *  nothing else changed — the user panned away and wants the route back. 0 means no request. */
   fitNonce?: number
+  /** The trip camera's 3D mode (components/map/camera-mode). Every camera command below takes its
+   *  pitch from it, and terrain + fog exist on the shared map only while it is on. */
+  mode3d?: boolean
+  /** The evidence popup's "Zoom in for 3D": asks the owner to turn the mode on; the fly to the stop
+   *  follows once it is. Absent, the popup still flies there tilted. */
+  onRequest3d?: () => void
 }) {
   const { hasToken, ready, getMap, acquire, release, setMarkers } = useSharedMap()
   const routeIdsRef = useRef<string[]>([])
@@ -388,6 +398,17 @@ export default function TripMap({
   // measurement, and re-fitting the whole trip then would silently undo it. 'other' (a restaurant
   // or hotel hub flight) is left alone: only its padding eases.
   const cameraIntentRef = useRef<'trip' | 'day' | 'place' | 'other'>('trip')
+  // Read at call time by every camera command, so a fly issued from a stale closure (a marker
+  // click handler, a deferred re-fit) still uses the mode as it is now.
+  const mode3dRef = useRef(mode3d)
+  mode3dRef.current = mode3d
+  const terrainRef = useRef<TerrainController | null>(null)
+  const terrainMapRef = useRef<mapboxgl.Map | null>(null)
+  // The mode the camera was last moved for; only a real change eases the pitch.
+  const appliedModeRef = useRef(false)
+  // A popup's "Zoom in for 3D" waiting for the mode to turn on.
+  const pending3dFlyRef = useRef<[number, number] | null>(null)
+  const controlRects = useControlRects()
 
   function clearRoutes() {
     const map = getMap()
@@ -462,6 +483,14 @@ export default function TripMap({
       markerLabelsRef.current = []
       clearRoutes()
       clearBuildings()
+      // Terrain and fog go before the map is handed back: the shared map outlives this route, and
+      // /app/trips (or the next trip) must never inherit this trip's 3D atmosphere.
+      // Only on the live map: when the whole /app shell is leaving, MapProvider may already have
+      // removed it, and a removed map has no style left to restore into (or to throw from).
+      if (terrainMapRef.current && getMap() === terrainMapRef.current) terrainRef.current?.dispose()
+      terrainRef.current = null
+      terrainMapRef.current = null
+      pending3dFlyRef.current = null
       // Order matters. release() calls map.stop(), and Mapbox's stop() fires `moveend`
       // SYNCHRONOUSLY — so a padding ease deferred to moveend (the effect below) would start a
       // fresh easeTo with this trip's padding after any reset. Disarm it first, stop the map,
@@ -570,16 +599,13 @@ export default function TripMap({
             .setLngLat([tp.place.lng, tp.place.lat])
             .setDOMContent(
               evidencePopupContent(buildPopupModel(bundle, tp), () => {
-                // Drop to street level and tilt: the fill-extrusion buildings switch on at z15,
-                // so this is what turns "a dot on a map" into "what is actually around this place".
-                map.flyTo({
-                  center: [tp.place.lng, tp.place.lat],
-                  zoom: 17,
-                  pitch: 60,
-                  bearing: -20,
-                  duration: 1400,
-                  essential: true,   // still runs under prefers-reduced-motion
-                })
+                // "Turn 3D on + fly to this stop": the mode, not a one-off tilt, so the next
+                // selection or Fit stays in 3D. When the mode is already on (or nobody owns it),
+                // fly now; otherwise the mode effect flies once it has switched.
+                const at: [number, number] = [tp.place.lng, tp.place.lat]
+                if (mode3dRef.current || !onRequest3d) { flyToStreet(at); return }
+                pending3dFlyRef.current = at
+                onRequest3d()
               }),
             )
             .addTo(map)
@@ -700,9 +726,18 @@ export default function TripMap({
     routeIdsRef.current.push(id, casingId, coreId)
   }
 
+  // Drop to street level, tilted: this is what turns "a dot on a map" into "what is actually around
+  // this place". essential: still runs under prefers-reduced-motion.
+  function flyToStreet(at: [number, number]) {
+    getMap()?.flyTo({ center: at, zoom: 17, pitch: PITCH_3D, bearing: -20, duration: 1400, essential: true })
+  }
+
   function drawBuildings() {
     const map = getMap()
     if (!map || buildingLayerAddedRef.current || map.getLayer(BUILDING_LAYER_ID)) return
+    // Mapbox Standard draws its own 3D buildings; adding ours as well would z-fight them. The
+    // custom layer is only the fallback for a style without them — never both.
+    if (nativeBuildings(map)) return
     // Standard normally exposes vector buildings through `composite`. Other styles may not;
     // skipping the layer keeps those styles fully functional instead of failing the trip map.
     if (!map.getSource('composite')) return
@@ -782,7 +817,12 @@ export default function TripMap({
     // `??`, not `||`: a canvas measured at ZERO (transiently, mid-layout) is a real measurement.
     // No canvas at all still falls back to the window.
     const win = typeof window === 'undefined' ? { w: 1024, h: 768 } : { w: window.innerWidth, h: window.innerHeight }
+    // The controls measured themselves in viewport pixels; the pads are in canvas pixels.
+    const container = typeof map?.getContainer === 'function' ? map.getContainer() : null
+    const origin = typeof container?.getBoundingClientRect === 'function' ? container.getBoundingClientRect() : null
+    const controls = getControlRects().map((r) => ({ ...r, x: r.x - (origin?.left ?? 0), y: r.y - (origin?.top ?? 0) }))
     return computeFramePadding({
+      controls,
       width: canvas?.clientWidth ?? win.w,
       height: canvas?.clientHeight ?? win.h,
       obstruction: getSheetObstruction(),
@@ -809,12 +849,12 @@ export default function TripMap({
       map.resize()
     }
     if (pts.length === 1) {
-      map.flyTo({ center: pts[0], zoom: 13.5, pitch: 45, padding: framePadding(), duration, essential: true })
+      map.flyTo({ center: pts[0], zoom: 13.5, pitch: cameraPitch(mode3dRef.current), padding: framePadding(), duration, essential: true })
       return
     }
     const bounds = new mapboxgl.LngLatBounds()
     pts.forEach((p) => bounds.extend(p))
-    map.fitBounds(bounds, { padding: framePadding(), maxZoom: 14, pitch: 45, duration, essential: true })
+    map.fitBounds(bounds, { padding: framePadding(), maxZoom: 14, pitch: cameraPitch(mode3dRef.current), duration, essential: true })
   }
 
   function pointsForDay(dayNumber: number): [number, number][] {
@@ -924,7 +964,39 @@ export default function TripMap({
     }
     apply()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sheetObstruction, layout])
+  }, [sheetObstruction, layout, controlRects])
+
+  // The 3D mode. Our terrain + fog follow it (camera-mode.ts; the Standard style's own z<13.7 relief
+  // is its baseline and not ours to remove), and a real change eases the camera's pitch where it
+  // is — or, for
+  // a popup's "Zoom in for 3D", flies to that stop. Before the first framing only the terrain is
+  // set: the framing itself reads the mode for its pitch.
+  useEffect(() => {
+    if (!ready) return
+    const map = getMap()
+    if (!map) return
+    // Off adds nothing (no DEM source, no fog); the controller only reads until 3D is first on.
+    // Defensive on the API, like framing: a map without terrain support stays a flat map.
+    if (typeof map.setTerrain === 'function' && typeof map.getTerrain === 'function') {
+      if (!terrainRef.current) {
+        terrainRef.current = createTerrainController(map as unknown as Parameters<typeof createTerrainController>[0])
+        terrainMapRef.current = map
+      }
+      terrainRef.current.set(mode3d)
+    }
+    if (appliedModeRef.current === mode3d) return
+    appliedModeRef.current = mode3d
+    const street = pending3dFlyRef.current
+    pending3dFlyRef.current = null
+    if (!framedRef.current) return
+    if (street && mode3d) { flyToStreet(street); return }
+    const pitch = cameraPitch(mode3d)
+    const reduced = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reduced && typeof map.jumpTo === 'function') map.jumpTo({ pitch })
+    else map.easeTo({ pitch, duration: 700, essential: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, mode3d])
 
   // Mapbox's attribution and logo are bottom-corner controls, and the phone sheet covers exactly
   // that strip. Publish the covered height on the map container; phone-map-cards.css lifts the
@@ -960,7 +1032,7 @@ export default function TripMap({
     const place = buildPlaceIndex(bundle).get(selectedPlaceId)
     if (!place || !hasRealCoords(place.lng, place.lat)) return false
     map.flyTo({
-      center: [place.lng, place.lat], zoom: 14, pitch: 55,
+      center: [place.lng, place.lat], zoom: 14, pitch: cameraPitch(mode3dRef.current),
       padding: framePadding({ popupRoom: true }), duration, essential: true,
     })
     return true
@@ -985,7 +1057,7 @@ export default function TripMap({
     if (target === 'hub') {
       const hub = selectedHotel(bundle, selectedHotelId)!
       cameraIntentRef.current = 'other'
-      map.flyTo({ center: [hub.lng!, hub.lat!], zoom: 14, pitch: 45, padding: framePadding(), duration: 900, essential: true })
+      map.flyTo({ center: [hub.lng!, hub.lat!], zoom: 14, pitch: cameraPitch(mode3dRef.current), padding: framePadding(), duration: 900, essential: true })
     } else if (target === 'day') {
       cameraIntentRef.current = 'day'
       flyToDay(900)
@@ -1019,7 +1091,7 @@ export default function TripMap({
     if (!place || !hasRealCoords(place.lng, place.lat)) return
     cameraIntentRef.current = 'other'
     map.flyTo({
-      center: [place.lng, place.lat], zoom: 15, pitch: 45,
+      center: [place.lng, place.lat], zoom: 15, pitch: cameraPitch(mode3dRef.current),
       padding: framePadding({ popupRoom: true }), duration: 1200, essential: true,
     })
     const suggestion = bundle.restaurants.find((r) => r.restaurant_place_id === selectedRestaurantPlaceId)
@@ -1048,7 +1120,7 @@ export default function TripMap({
     if (!hasRealCoords(hub.lng, hub.lat)) return
     cameraIntentRef.current = 'other'
     map.flyTo({
-      center: [hub.lng, hub.lat], zoom: 14, pitch: 45,
+      center: [hub.lng, hub.lat], zoom: 14, pitch: cameraPitch(mode3dRef.current),
       padding: framePadding({ popupRoom: true }), duration: 1200, essential: true,
     })
     openSuggestionPopup([hub.lng, hub.lat], buildStayPopup(hub))

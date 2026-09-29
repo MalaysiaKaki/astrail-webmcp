@@ -29,8 +29,14 @@ import { useFeedbackComposer } from './use-feedback-composer'
 import MobileTripView, { type MobileListView } from './mobile/MobileTripView'
 import type { SheetState } from './mobile/MobileTripSheet'
 import { useTripLayout } from '@/lib/trip/use-trip-layout'
-import { fitTarget } from '@/lib/trip/fit-target'
+import { fitLabel, fitTarget } from '@/lib/trip/fit-target'
 import { PhoneFailed, PhoneGenerating, PhoneLoading, PhoneNotFound } from './mobile/PhoneStateScreens'
+import MapControlStack from '@/components/map/MapControlStack'
+
+function prefersReducedMotion(): boolean {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
 
 const TripMap = dynamic(() => import('@/components/map/TripMap'), { ssr: false })
 
@@ -93,7 +99,7 @@ export default function TripWorkspace({
   bundle?: TripBundle
   readOnly?: boolean
 }) {
-  const { acquire, release } = useSharedMap()
+  const { acquire, release, getMap } = useSharedMap()
   /**
    * Did the run the shell just finished produce THIS trip?
    *
@@ -162,6 +168,10 @@ export default function TripWorkspace({
   // Bumped by the phone map's Fit control: a counter, so a second press after a manual pan is a
   // new request even though the target is the same (plan amendment 1).
   const [fitNonce, setFitNonce] = useState(0)
+  /* The trip camera's 3D mode (plan A5, amendment 1): off by default, kept for as long as this trip
+     page is open, and honoured by every camera command TripMap issues. One value for both layouts,
+     so rotating across 768px keeps the map as tilted as it was. */
+  const [mode3d, setMode3d] = useState(false)
   /* Which panel tree to render. null during SSR and hydration: the desktop tree then renders
      behind `max-md:hidden`, so desktop paints its rail straight from the server HTML exactly as
      before, and a phone shows no desktop flash before the client snapshot picks the phone tree.
@@ -415,6 +425,8 @@ export default function TripWorkspace({
           layerMode={layerMode}
           focusNonce={focusNonce}
           fitNonce={fitNonce}
+          mode3d={mode3d}
+          onRequest3d={() => setMode3d(true)}
         />
       </div>
 
@@ -446,6 +458,8 @@ export default function TripWorkspace({
           sheet={sheetState}
           fitTarget={fitTarget(bundle, activeDayNumber, layerMode, selectedHotelId)}
           onFit={() => setFitNonce((n) => n + 1)}
+          mode3d={mode3d}
+          onToggle3d={() => setMode3d((v) => !v)}
           onToggleSheetHeight={() => setExpanded((v) => !v)}
           onHideSheet={() => setPanelOpen(false)}
           onReopenSheet={() => { setExpanded(false); setPanelOpen(true) }}
@@ -454,6 +468,22 @@ export default function TripWorkspace({
         />
       ) : (
       <div className={layout === null ? 'max-md:hidden' : undefined}>
+
+      {/* Desktop map controls: zoom, 3D and Fit as kit circles down the right edge, clear of the
+          details panel on the left and the layer switch at the top centre. */}
+      <MapControlStack
+        variant="desktop"
+        owner="trip-stack-desktop"
+        className="paper-scope pointer-events-none absolute right-4 top-4 z-20"
+        mode3d={mode3d}
+        onToggle3d={() => setMode3d((v) => !v)}
+        onZoomIn={() => getMap()?.zoomIn({ duration: prefersReducedMotion() ? 0 : 300 })}
+        onZoomOut={() => getMap()?.zoomOut({ duration: prefersReducedMotion() ? 0 : 300 })}
+        fit={(() => {
+          const target = fitTarget(bundle, activeDayNumber, layerMode, selectedHotelId)
+          return target ? { label: fitLabel(target), onFit: () => setFitNonce((n) => n + 1) } : null
+        })()}
+      />
 
       {/* Map layer switch — route line vs. hotel hub-and-spokes, never both (plan decision #3).
           Floats over the map, clear of the left/bottom details panel. The Hotel segment is

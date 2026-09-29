@@ -44,11 +44,15 @@ export function useAgentTriggerSlot(): HTMLElement | null {
 }
 
 /** The element a page renders where it wants the trigger. Empty (and hidden) until filled. */
-export function AgentTriggerSlot({ className }: { className?: string }) {
+export function AgentTriggerSlot({ className, measure = false }: {
+  className?: string
+  /** Mark the slot as a map control, so the camera pads around it once the trigger is in it. */
+  measure?: boolean
+}) {
   const ref = useCallback((el: HTMLDivElement | null) => {
     if (!el) return
     setAgentTriggerSlot(el)
     return () => setAgentTriggerSlot(null, el)
   }, [])
-  return <div ref={ref} data-agent-trigger-slot className={className} />
+  return <div ref={ref} data-agent-trigger-slot data-map-control={measure ? '' : undefined} className={className} />
 }

@@ -45,6 +45,9 @@ export type MobileTripViewProps = {
   /** What the map's Fit control frames (null hides it), and the press that asks for it. */
   fitTarget: FitTarget | null
   onFit: () => void
+  /** The trip camera's 3D mode, owned by TripWorkspace. */
+  mode3d: boolean
+  onToggle3d: () => void
   onToggleSheetHeight: () => void
   onHideSheet: () => void
   onReopenSheet: () => void
@@ -226,6 +229,8 @@ export default function MobileTripView(p: MobileTripViewProps) {
         layerMode={p.layerMode}
         canUseHubLayer={p.canUseHubLayer}
         onToggleLayer={() => p.onLayerMode(p.layerMode === 'hub' ? 'route' : 'hub')}
+        mode3d={p.mode3d}
+        onToggle3d={p.onToggle3d}
       />
       <MobileTripSheet
         state={p.sheet}

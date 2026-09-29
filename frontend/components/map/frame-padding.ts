@@ -19,16 +19,18 @@ export type FramePadding = { top: number; right: number; bottom: number; left: n
 export type Rect = { x: number; y: number; w: number; h: number }
 
 /* The phone map chrome (MobileMapControls): a back button top-left and a vertical stack of up to
-   three circular buttons top-right (agent, fit, layer). Kept here, beside the pads derived from it,
-   so the "no pin under a control" property is one test away from any change to either. */
+   four circular buttons top-right (agent, Fit, 3D, Hotel). Kept here, beside the pads derived from
+   it, so the "no pin under a control" property is one test away from any change to either. The
+   live camera pads against the MEASURED rects (lib/trip/control-obstruction); this model is the
+   fallback before anything has measured, and the shape the tests hold the measured path to. */
 /** Distance of every map control from the viewport's top and side edges. */
 export const MOBILE_CONTROL_INSET = 12
 /** Every map control is a 44px circle. */
 export const MOBILE_CONTROL_SIZE = 44
 /** Vertical gap between buttons in the right-hand stack. */
 export const MOBILE_STACK_GAP = 8
-/** Agent, fit, layer. */
-export const MAX_STACK_BUTTONS = 3
+/** Agent, Fit, 3D, Hotel. */
+export const MAX_STACK_BUTTONS = 4
 /** Half of a drawn pin (the dot and its ring): the framed POINT is its centre. */
 export const PIN_RADIUS = 18
 
@@ -66,9 +68,32 @@ export function mobileControlRects(width: number, stackButtons: number, safeTop 
   return [back, ...stack]
 }
 
-const DESKTOP_BREAKPOINT = 768
+/** Room kept between the lowest stack button and the compact sheet's top edge. */
+export const STACK_SHEET_GAP = 12
 
-export function computeFramePadding({ width, height, obstruction, popupRoom = false, safeTop = 0 }: {
+/**
+ * Whether a phone stack of `buttons` circles clears the sheet's top edge. When four do not (a very
+ * short viewport), the Hotel button leaves the stack: the sheet's Stay chip already switches the
+ * map to the hotel layer, so nothing becomes unreachable.
+ */
+export function phoneStackFits({ buttons, safeTop, viewportHeight, obstruction }: {
+  buttons: number
+  safeTop: number
+  viewportHeight: number
+  obstruction: number
+}): boolean {
+  if (obstruction <= 0 || buttons <= 0) return true
+  const bottom = controlsTop(safeTop) + buttons * MOBILE_CONTROL_SIZE + (buttons - 1) * MOBILE_STACK_GAP
+  return bottom + STACK_SHEET_GAP <= viewportHeight - obstruction
+}
+
+const DESKTOP_BREAKPOINT = 768
+/** The gap kept between a control's edge and a framed pin's drawn edge. */
+const CONTROL_CLEARANCE = PIN_RADIUS + 2
+
+export function computeFramePadding({
+  width, height, obstruction, popupRoom = false, safeTop = 0, controls,
+}: {
   width: number
   height: number
   /** Pixels the mobile sheet covers at the bottom; 0 when hidden or absent. */
@@ -77,6 +102,9 @@ export function computeFramePadding({ width, height, obstruction, popupRoom = fa
   safeTop?: number
   /** Bias the pin into the upper third so an evidence popup has somewhere to open (desktop). */
   popupRoom?: boolean
+  /** The map controls' measured rects, in canvas pixels. Any the base pads do not already clear
+   *  push the cheapest pad outward. Omitted: the base pads (which clear the modelled phone stack). */
+  controls?: readonly Rect[]
 }): FramePadding {
   const wide = width >= DESKTOP_BREAKPOINT
   const wanted = wide
@@ -94,17 +122,48 @@ export function computeFramePadding({ width, height, obstruction, popupRoom = fa
   // viewport degrades to "framed tight" rather than an abandoned camera.
   if (popupRoom && wide) wanted.bottom = wanted.top + Math.round(height * 0.4)
 
-  const [top, bottom] = fitAxis(wanted.top, wanted.bottom, height)
-  const [left, right] = fitAxis(wanted.left, wanted.right, width)
+  const pads = clearControls(wanted, width, height, controls ?? [])
+
+  // On a phone the controls are at the top and the sheet at the bottom: when the axis is over
+  // budget (an expanded sheet), the sheet side gives way first, so a framed pin can be squeezed
+  // toward the sheet but is never pushed back under the back button or the stack.
+  const [top, bottom] = fitAxis(pads.top, pads.bottom, height, wide ? null : 'a')
+  const [left, right] = fitAxis(pads.left, pads.right, width, null)
   return { top, right, bottom, left }
 }
 
+/**
+ * Push pads outward until no control (inflated by a pin's radius) intersects the framed area.
+ * Per control, the side that needs the smallest increase wins: a stack on the right edge widens
+ * the right pad, a button along the top deepens the top pad.
+ */
+function clearControls(base: FramePadding, W: number, H: number, controls: readonly Rect[]): FramePadding {
+  const pads = { ...base }
+  for (const c of controls) {
+    if (c.w <= 0 || c.h <= 0) continue
+    const intersects = c.x + c.w + CONTROL_CLEARANCE > pads.left && c.x - CONTROL_CLEARANCE < W - pads.right
+      && c.y + c.h + CONTROL_CLEARANCE > pads.top && c.y - CONTROL_CLEARANCE < H - pads.bottom
+    if (!intersects) continue
+    const need: Array<[keyof FramePadding, number]> = [
+      ['top', c.y + c.h + CONTROL_CLEARANCE],
+      ['bottom', H - c.y + CONTROL_CLEARANCE],
+      ['left', c.x + c.w + CONTROL_CLEARANCE],
+      ['right', W - c.x + CONTROL_CLEARANCE],
+    ]
+    const [side, value] = need.reduce((best, cur) => (cur[1] - pads[cur[0]] < best[1] - pads[best[0]] ? cur : best))
+    pads[side] = Math.ceil(value)
+  }
+  return pads
+}
+
 // Never let opposing pads consume the canvas: Mapbox abandons the fit entirely rather than doing
-// its best. Cap each axis at 70% and shrink proportionally — "framed a bit tight", not "not framed".
-function fitAxis(a: number, b: number, extent: number): readonly [number, number] {
+// its best. Cap each axis at 70% — "framed a bit tight", not "not framed". With a protected side,
+// the other side shrinks first; without one (or if the protected side alone is over), both scale.
+function fitAxis(a: number, b: number, extent: number, protect: 'a' | null): readonly [number, number] {
   const budget = extent * 0.7
   const total = a + b
   if (total <= budget || total === 0) return [a, b]
+  if (protect === 'a' && a <= budget) return [a, Math.floor(budget - a)]
   const scale = budget / total
   return [Math.floor(a * scale), Math.floor(b * scale)]
 }

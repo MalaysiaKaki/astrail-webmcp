@@ -32,3 +32,10 @@ export function fitTarget(
   if (bundle.places.some(located)) return 'trip'
   return null
 }
+
+/** The Fit control's accessible name for a target: it says what the camera will frame. */
+export function fitLabel(target: FitTarget): string {
+  if (target === 'hub') return 'Fit map to the hotel'
+  if (target === 'day') return 'Fit map to the day'
+  return 'Fit map to the whole trip'
+}
