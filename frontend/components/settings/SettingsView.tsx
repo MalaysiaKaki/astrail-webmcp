@@ -16,6 +16,7 @@ import {
 } from '@/lib/trip/backend-types'
 import DeleteAccountCard from '@/components/settings/DeleteAccountCard'
 import AccountRows from '@/components/settings/AccountRows'
+import { ACCENT_TAG, BODY, CARD, DESTRUCTIVE_BUTTON, META, PAGE_TITLE, ROW_GROUP, SECTION_TITLE } from '@/lib/shell/ui'
 
 // Self-serve account deletion is HIDDEN until go-live: Task 6 flips this frontend flag together
 // with the backend `_DELETION_EXECUTION_READY` gate. Read at render (not a module const) so it
@@ -33,11 +34,13 @@ type ProfileData = { profile: TravelerProfile; status: MemoryStatus; facts: Memo
 // backend attempted it but couldn't confirm (memory_clear_unknown).
 type ClearStatus = 'idle' | 'clearing' | 'cleared' | 'unavailable' | 'unknown'
 
+// One read-only row of the preferences group: a muted label over the value, hairline-separated by
+// the group (ROW_GROUP). Not interactive, so no chevron.
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <dt className="text-[10px] font-semibold uppercase tracking-wide text-[color:var(--text-faint)]">{label}</dt>
-      <dd className="text-[14px] text-[color:var(--text)]">{value}</dd>
+    <div className="flex flex-col gap-0.5 px-4 py-3.5">
+      <dt className={META}>{label}</dt>
+      <dd className={BODY}>{value}</dd>
     </div>
   )
 }
@@ -45,14 +48,13 @@ function Row({ label, value }: { label: string; value: string }) {
 // Static provenance tag for a remembered mem0 memory. Matches EvidenceChip's "Memory"
 // label (KIND_LABEL.memory_preference) but drops the confidence % — mem0 carries no score.
 function MemoryTag() {
-  return (
-    <span className="type-evidence inline-flex items-center gap-1.5 rounded-[var(--radius-chip)] bg-[var(--chip-bg)] px-2 py-0.5 text-[10px] tracking-wide text-[var(--muted)]">
-      <span className="font-semibold uppercase text-[var(--brass-bright)]">Memory</span>
-    </span>
-  )
+  return <span className={ACCENT_TAG}>Memory</span>
 }
 
-const CARD = 'flex flex-col gap-4 rounded-2xl border border-[color:var(--paper-line-2)] bg-[color:var(--surface-1)] p-5'
+// Placify grouped settings (web revamp C4): each section is a serif title (plus a line of
+// context where it helps) over one white card. Recipes: lib/shell/ui.ts.
+const SECTION = 'flex flex-col gap-3'
+const STATUS_TEXT = META
 
 export default function SettingsView() {
   const [data, setData] = useState<ProfileData | null>(null)
@@ -101,21 +103,16 @@ export default function SettingsView() {
   // while profile/preferences are pending or have failed.
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-8">
-      <h1
-        className="font-display text-[28px] font-medium tracking-[-0.015em] text-[color:var(--text)]"
-        style={{ fontVariationSettings: "'SOFT' 28, 'WONK' 1, 'opsz' 28" }}
-      >
-        Settings
-      </h1>
+      <h1 className={PAGE_TITLE}>Settings</h1>
 
       {data ? (
         <LoadedSettings data={data} clearStatus={clearStatus} onClear={handleClear} />
       ) : loadFailed ? (
-        <p role="alert" className="text-[14px] text-[color:var(--text-muted)]">
+        <p role="alert" className={`${CARD} ${BODY}`}>
           Couldn’t load your settings. Refresh the page to try again.
         </p>
       ) : (
-        <p className="text-[14px] text-[color:var(--text-muted)]">Loading your settings…</p>
+        <p className={META}>Loading your settings…</p>
       )}
 
       <AccountRows />
@@ -141,9 +138,9 @@ function LoadedSettings({
 
   return (
     <>
-      <section className={CARD}>
-        <h2 className="font-display text-[18px] font-medium text-[color:var(--text)]">Using your saved travel preferences</h2>
-        <dl className="flex flex-col gap-3">
+      <section aria-labelledby="settings-preferences" className={SECTION}>
+        <h2 id="settings-preferences" className={SECTION_TITLE}>Using your saved travel preferences</h2>
+        <dl className={ROW_GROUP}>
           <Row label="Origin" value={profile.origin_city ?? 'Not set'} />
           <Row label="Travel style" value={profile.travel_style_tags.join(', ') || 'None yet'} />
           <Row label="Interests" value={profile.preference_tags.join(', ') || 'None yet'} />
@@ -151,62 +148,64 @@ function LoadedSettings({
         </dl>
       </section>
 
-      <section className={CARD}>
+      <section aria-labelledby="settings-memory" className={SECTION}>
         <div>
-          <h2 className="font-display text-[18px] font-medium text-[color:var(--text)]">What Astrail remembers</h2>
-          <p className="mt-1 text-[13px] text-[color:var(--text-muted)]">
+          <h2 id="settings-memory" className={SECTION_TITLE}>What Astrail remembers</h2>
+          <p className={`mt-1 ${META}`}>
             Every remembered fact shows where it came from. Clearing it takes effect on your next trip.
           </p>
         </div>
 
-        {clearStatus === 'cleared' ? (
-          <p className="text-[14px] text-[color:var(--text-muted)]">Memory cleared. Astrail will infer fresh preferences next time.</p>
-        ) : status !== 'ok' ? (
-          /* Distinguish "memory is down" from "nothing saved yet" (backend api/schemas.py):
-             an empty list under a non-ok status is a failure, not an honest empty state. */
-          <p className="text-[14px] text-[color:var(--text-muted)]">
-            {status === 'disabled'
-              ? 'Preference memory is turned off for your account.'
-              : 'Couldn’t load your saved preferences right now. Try again in a moment.'}
-          </p>
-        ) : facts.length === 0 ? (
-          <p className="text-[14px] text-[color:var(--text-muted)]">Astrail hasn’t remembered anything yet. Plan a trip and your preferences start building here.</p>
-        ) : (
-          /* Every remembered item is a mem0 memory, so each carries the same "Memory"
-             provenance (DESIGN.md §7 disclosure). No confidence % — mem0 returns prose with
-             no score, and showing an invented number would fabricate data (guardrail #1). */
-          <ul className="flex flex-col gap-2.5">
-            {facts.map((fact) => (
-              <li key={fact.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px] text-[color:var(--text)]">
-                <span aria-hidden className="text-[color:var(--brass-deep)]">•</span> {fact.memory}
-                <MemoryTag />
-              </li>
-            ))}
-          </ul>
-        )}
+        <div className={`${CARD} flex flex-col gap-4`}>
+          {clearStatus === 'cleared' ? (
+            <p className={STATUS_TEXT}>Memory cleared. Astrail will infer fresh preferences next time.</p>
+          ) : status !== 'ok' ? (
+            /* Distinguish "memory is down" from "nothing saved yet" (backend api/schemas.py):
+               an empty list under a non-ok status is a failure, not an honest empty state. */
+            <p className={STATUS_TEXT}>
+              {status === 'disabled'
+                ? 'Preference memory is turned off for your account.'
+                : 'Couldn’t load your saved preferences right now. Try again in a moment.'}
+            </p>
+          ) : facts.length === 0 ? (
+            <p className={STATUS_TEXT}>Astrail hasn’t remembered anything yet. Plan a trip and your preferences start building here.</p>
+          ) : (
+            /* Every remembered item is a mem0 memory, so each carries the same "Memory"
+               provenance (DESIGN.md §7 disclosure). No confidence % — mem0 returns prose with
+               no score, and showing an invented number would fabricate data (guardrail #1). */
+            <ul className="flex flex-col divide-y divide-[color:var(--line-soft)]">
+              {facts.map((fact) => (
+                <li key={fact.id} className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 py-3 first:pt-0 ${BODY}`}>
+                  <span className="min-w-0">{fact.memory}</span>
+                  <MemoryTag />
+                </li>
+              ))}
+            </ul>
+          )}
 
-        {/* Clear-all memory is a destructive action the user takes and can't undo —
-            the one place --fail belongs on a control (DESIGN.md §9 / palette). */}
-        <button
-          type="button"
-          onClick={onClear}
-          disabled={clearStatus === 'cleared' || clearStatus === 'clearing'}
-          className="mt-2 self-start rounded-lg border border-[color:var(--fail)] px-3 py-2 text-[12px] font-semibold uppercase tracking-wide text-[color:var(--fail)] transition-colors hover:bg-[color:var(--surface-2)] disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]"
-        >
-          {clearStatus === 'clearing' ? 'Clearing…' : 'Clear memory'}
-        </button>
+          {/* Clear-all memory is a destructive action the user takes and can't undo —
+              the one place --fail belongs on a control (DESIGN.md §9 / palette). */}
+          <button
+            type="button"
+            onClick={onClear}
+            disabled={clearStatus === 'cleared' || clearStatus === 'clearing'}
+            className={`${DESTRUCTIVE_BUTTON} self-start`}
+          >
+            {clearStatus === 'clearing' ? 'Clearing…' : 'Clear memory'}
+          </button>
 
-        {/* Honest outcome of a REAL clear — never a fake success. Truthful copy for each backend
-            state; while the reconciliation gate is off the backend 503s → "couldn't reach". */}
-        {clearStatus === 'unavailable' ? (
-          <p role="status" className="text-[13px] text-[color:var(--text-muted)]">
-            Couldn’t reach the memory service — try again later.
-          </p>
-        ) : clearStatus === 'unknown' ? (
-          <p role="status" className="text-[13px] text-[color:var(--text-muted)]">
-            Clearing started — couldn’t fully confirm.
-          </p>
-        ) : null}
+          {/* Honest outcome of a REAL clear — never a fake success. Truthful copy for each backend
+              state; while the reconciliation gate is off the backend 503s → "couldn't reach". */}
+          {clearStatus === 'unavailable' ? (
+            <p role="status" className={STATUS_TEXT}>
+              Couldn’t reach the memory service — try again later.
+            </p>
+          ) : clearStatus === 'unknown' ? (
+            <p role="status" className={STATUS_TEXT}>
+              Clearing started — couldn’t fully confirm.
+            </p>
+          ) : null}
+        </div>
       </section>
     </>
   )

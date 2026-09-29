@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useUser } from '@/lib/auth/use-user'
+import { CARD as UI_CARD, DESTRUCTIVE_BUTTON, INPUT, META, SECTION_TITLE, SUBCARD } from '@/lib/shell/ui'
 import { getAccessToken } from '@/lib/supabase/session'
 import {
   ApiError,
@@ -31,12 +32,12 @@ import {
 
 const DELETE_KEYWORD = 'DELETE'
 
-const CARD =
-  'flex flex-col gap-4 rounded-2xl border border-[color:var(--paper-line-2)] bg-[color:var(--surface-1)] p-5'
-const DESTRUCTIVE_BTN =
-  'self-start rounded-lg border border-[color:var(--fail)] px-3 py-2 text-[12px] font-semibold uppercase tracking-wide text-[color:var(--fail)] transition-colors hover:bg-[color:var(--surface-2)] disabled:opacity-40 disabled:cursor-default focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]'
-const NEUTRAL_BTN =
-  'self-start rounded-lg border border-[color:var(--paper-line-2)] bg-transparent px-3 py-2 text-[12px] font-semibold uppercase tracking-wide text-[color:var(--text)] transition-colors hover:bg-[color:var(--surface-2)] disabled:opacity-40 disabled:cursor-default focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]'
+// Placify kit (web revamp C4): a white card, the shared destructive pill for anything that deletes,
+// and a white kit pill for the neutral way back. The destructive action stays behind the typed
+// confirmation below.
+const CARD = `${UI_CARD} flex flex-col gap-4`
+const DESTRUCTIVE_BTN = `${DESTRUCTIVE_BUTTON} self-start`
+const NEUTRAL_BTN = 'm-btn-secondary self-start disabled:opacity-40'
 
 // Deterministic, locale-pinned so the shown date matches the backend's calendar day regardless
 // of the viewer's timezone/locale (the schedule is a UTC instant 7 days out).
@@ -174,13 +175,13 @@ export default function DeleteAccountCard({
   }
 
   const errorAlert = error ? (
-    <p role="alert" className="text-[13px] text-[color:var(--fail)]">
+    <p role="alert" className="font-[family-name:var(--font-ui)] text-[length:var(--t-meta)] text-[color:var(--fail)]">
       {error}
     </p>
   ) : null
 
   const noticeMessage = notice ? (
-    <p role="status" className="text-[13px] text-[color:var(--text-muted)]">
+    <p role="status" className={META}>
       {notice}
     </p>
   ) : null
@@ -191,10 +192,10 @@ export default function DeleteAccountCard({
     // Show a notice that preserves cancellation guidance instead.
     return (
       <section className={CARD} aria-labelledby="delete-account-heading">
-        <h2 id="delete-account-heading" className="font-display text-[18px] font-medium text-[color:var(--text)]">
+        <h2 id="delete-account-heading" className={SECTION_TITLE}>
           Account deletion
         </h2>
-        <p role="status" className="text-[14px] text-[color:var(--text)]">
+        <p role="status" className="font-[family-name:var(--font-ui)] text-[length:var(--t-body)] leading-[1.5] text-[color:var(--m-text)]">
           We couldn’t confirm your account’s deletion status right now. Refresh this page, or if you
           requested deletion and don’t see a cancel option, contact support.
         </p>
@@ -206,10 +207,10 @@ export default function DeleteAccountCard({
     const deleting = status === 'deleting'
     return (
       <section className={CARD} aria-labelledby="delete-account-heading">
-        <h2 id="delete-account-heading" className="font-display text-[18px] font-medium text-[color:var(--text)]">
+        <h2 id="delete-account-heading" className={SECTION_TITLE}>
           Account deletion
         </h2>
-        <p role="status" className="text-[14px] text-[color:var(--text)]">
+        <p role="status" className="font-[family-name:var(--font-ui)] text-[length:var(--t-body)] leading-[1.5] text-[color:var(--m-text)]">
           {deleting ? (
             'Your account deletion is in progress — this can no longer be cancelled.'
           ) : (
@@ -234,10 +235,10 @@ export default function DeleteAccountCard({
   return (
     <section className={CARD} aria-labelledby="delete-account-heading">
       <div>
-        <h2 id="delete-account-heading" className="font-display text-[18px] font-medium text-[color:var(--text)]">
+        <h2 id="delete-account-heading" className={SECTION_TITLE}>
           Delete account
         </h2>
-        <p className="mt-1 text-[13px] text-[color:var(--text-muted)]">
+        <p className={`mt-1 ${META}`}>
           Permanently delete your account and everything Astrail remembers. Your account enters a
           7-day grace period first — you can cancel any time before then.
         </p>
@@ -252,14 +253,14 @@ export default function DeleteAccountCard({
           role="dialog"
           aria-modal="true"
           aria-labelledby="delete-confirm-heading"
-          className="flex flex-col gap-3 rounded-xl border border-[color:var(--line-soft)] bg-[color:var(--surface-2)] p-4"
+          className={`${SUBCARD} flex flex-col gap-3`}
         >
-          <h3 id="delete-confirm-heading" className="text-[14px] font-semibold text-[color:var(--text)]">
+          <h3 id="delete-confirm-heading" className="t-card-title text-[color:var(--m-text)]">
             This is permanent
           </h3>
-          <label htmlFor="delete-confirm-input" className="text-[13px] text-[color:var(--text-muted)]">
-            Type your account email (<span className="font-medium text-[color:var(--text)]">{email || 'your email'}</span>)
-            or the word <span className="font-medium text-[color:var(--text)]">{DELETE_KEYWORD}</span> to confirm.
+          <label htmlFor="delete-confirm-input" className={META}>
+            Type your account email (<span className="font-semibold text-[color:var(--m-text)]">{email || 'your email'}</span>)
+            or the word <span className="font-semibold text-[color:var(--m-text)]">{DELETE_KEYWORD}</span> to confirm.
           </label>
           <input
             id="delete-confirm-input"
@@ -268,9 +269,9 @@ export default function DeleteAccountCard({
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}
             placeholder={DELETE_KEYWORD}
-            className="min-h-11 w-full rounded-lg border border-[color:var(--line-soft)] bg-[color:var(--surface-1)] px-4 text-[color:var(--text)] placeholder:text-[color:var(--text-faint)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]"
+            className={`${INPUT} w-full`}
           />
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={() => void handleConfirm()}
