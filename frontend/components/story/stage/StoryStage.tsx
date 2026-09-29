@@ -6,15 +6,16 @@ import '../story.css'
 
 import StoryNav from '../StoryNav'
 import { PhoneHeroActions, PhoneHeroDevice } from '../PhoneHero'
+import { SampleTrailButton, SampleTrailPill } from '../SampleTrailLink'
 import Beat0Layer from './Beat0Layer'
 import AsterStory from '../sections/AsterStory'
 import HowItWorks from '../sections/HowItWorks'
 import LiveMapDemo from '../sections/LiveMapDemo'
 import DemoVideoSlot from '../sections/DemoVideoSlot'
+import AgentSection from '../sections/AgentSection'
 import FAQ from '../sections/FAQ'
 import FinalCTA from '../sections/FinalCTA'
 import StoryFooter from '../sections/StoryFooter'
-import ChallengePanels from '@/components/landing/ChallengePanels'
 import { useLenis } from './useLenis'
 
 /* PRODUCT-FIRST HYBRID, repointed to the open beta (2026-08-03).
@@ -24,22 +25,21 @@ import { useLenis } from './useLenis'
    product: how it works (real screenshots), a live map,
    the demo video, the FAQ, the CTA, and a full footer.
 
-   Repointed to the challenge build (2026-08-31). The beta/seat framing this comment used to
-   describe is gone from the rendered page and should not be restored from here. The primary
-   action is still "Sign in to try it" — the tools act as the signed-in user — but signing in is
-   no longer the ONLY way in: `/app/trip/demo` offers six of the seventeen tools with no account,
-   and the sticky ChallengeBanner links it above everything else.
+   The beta/seat framing this comment used to describe is gone from the rendered page and should
+   not be restored from here. The primary action is "Sign in to try it" — the tools act as the
+   signed-in user — but signing in is not the ONLY way in: `/app/trip/demo` offers six of the
+   seventeen tools with no account, and the hero links it (SampleTrailLink).
 
    NOTE for anyone writing copy in this file: `/` registers NO WebMCP tools. `GlobalTools` mounts
    in the /app layout only. Describing what the agent can do once you are in the app is fine;
-   writing "open this page and the agent can…" is a false claim on the judged surface. */
+   writing "open this page and the agent can…" is a false claim. */
 export default function StoryStage() {
   useLenis()
 
   return (
     <main className="story">
-      {/* First in <main>: on phones the nav is sticky in normal flow right after the challenge
-          banner (story.css). Desktop positions it fixed, where DOM order does not move it. */}
+      {/* First in <main>: on phones the nav is sticky in normal flow at the top of the page
+          (story.css). Desktop positions it fixed, where DOM order does not move it. */}
       <StoryNav />
       {/* ---- HERO: Aster walks in and idles. No metaphor transition. ---- */}
       <section className="story-hero relative h-[100dvh] min-h-[640px] overflow-hidden bg-[color:var(--story-ivory)]">
@@ -47,8 +47,10 @@ export default function StoryStage() {
         <div className="story-wash-left" />
 
         <div className="story-copy story-copy--center" style={{ zIndex: 40 }}>
+          {/* Phones only: the no-account way in, as the pill above the headline. */}
+          <SampleTrailPill />
           <p className="story-eyebrow text-[color:var(--story-teal-ink)]">
-            AI-native trip planning &middot; WebMCP Challenge build
+            AI-native trip planning &middot; works with your agent
           </p>
           <h1 className="story-h text-[color:var(--ink-900)] [font-size:clamp(2.4rem,4.6vw,4rem)]">
             Turn the reels you saved into a route you&rsquo;ll{' '}
@@ -56,16 +58,16 @@ export default function StoryStage() {
           </h1>
           <p className="story-sub max-w-[29em] text-[color:var(--ink-600)]">
             Astrail turns scattered travel inspiration into a real itinerary on
-            a map, where every stop says where it came from. This build adds WebMCP,
-            so an agent can work on it with you, on the page you are looking at.
+            a map, where every stop says where it came from. It speaks WebMCP, so an
+            agent can plan and edit the trip with you, on the page you are looking at.
           </p>
           <div className="story-hero__ctas m-desktop-only mt-8 flex flex-wrap items-center gap-4">
             <Link href="/sign-in" className="story-btn story-btn--primary">
               Sign in to try it
             </Link>
-            <a href="#how-it-works" className="story-btn story-btn--ghost">
-              See how it works
-            </a>
+            {/* The secondary action is the no-account sample trip; "How it works" stays one
+                click away in the nav and under the scroll hint. */}
+            <SampleTrailButton />
           </div>
           {/* Phones (< 768px) get the kit's pills instead of the story buttons above. */}
           <PhoneHeroActions />
@@ -77,7 +79,7 @@ export default function StoryStage() {
             The tools live in the app, not on this page, which is just the pitch.
             Open Astrail in ChatGPT&rsquo;s built-in browser and ask what you can do
             here. Fourteen tools answer once you are signed in, seventeen once a trip
-            is open, and six on the sample trail linked at the top, which needs no
+            is open, and six on the sample trip linked above, which needs no
             account.
           </p>
         </div>
@@ -97,13 +99,11 @@ export default function StoryStage() {
       <HowItWorks />
       <LiveMapDemo />
       <DemoVideoSlot />
+      {/* What the agent can do and how to try it: after the product has been shown, before
+          the questions it raises. */}
+      <AgentSection />
       <FAQ />
       <FinalCTA />
-      {/* The challenge panels sit HERE, not after the stage: `StoryFooter` is rendered by
-          this component, so anything appended in `page.tsx` landed below the footer, past
-          the point a reader treats a page as over. A judge's setup instructions are the one
-          thing on this page that must not be findable only by scrolling past the end. */}
-      <ChallengePanels />
       <StoryFooter />
 
     </main>

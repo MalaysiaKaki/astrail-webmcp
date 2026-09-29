@@ -6,8 +6,8 @@ import { faqs } from '@/components/landing/landing-copy'
 
 /* Objection handling. Static (not an accordion) — six short Q/As read faster
    than they click. Copy lives in landing-copy so edits stay in one file.
-   Retargeted for the challenge build: the questions are about what was made and
-   whether it can be trusted, not about joining a beta.
+   The questions are about what Astrail does and whether it can be trusted, not
+   about joining a beta.
 
    PHONES (< 768px, Placify-pattern revamp phase B2) turn each item into a card-link disclosure:
    the question becomes a kit m-card-link button with a chevron and aria-expanded, and the answer
@@ -33,7 +33,7 @@ export default function FAQ() {
           Questions
         </p>
         <h2 className="story-h text-[color:var(--ink-900)]">
-          What people ask about this build.
+          What people ask about Astrail.
         </h2>
 
         <dl className="story-faq mt-12 border-t border-[color:var(--paper-line)]">

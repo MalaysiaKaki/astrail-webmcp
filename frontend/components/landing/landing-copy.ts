@@ -3,7 +3,7 @@ export const navItems = [
   { label: "Proof", href: "#proof" },
 ] as const;
 
-/* Rewritten for the WebMCP Challenge build, for the same reason the FAQ below was. These steps
+/* Rewritten agent-first, for the same reason the FAQ below was. These steps
    described an app you OPERATE — paste, wait, receive — in an entry about an app you WORK WITH.
    Each step now names both hands: what you bring, and what the agent does with it. */
 export const howItWorksSteps = [
@@ -21,14 +21,13 @@ export const howItWorksSteps = [
   },
 ] as const;
 
-/* Rewritten for the WebMCP Challenge deployment. The previous set answered "should I join this
-   beta" — seats, pricing, what ships later — which is the wrong question to leave in front of a
-   judge evaluating an experiment. These answer "what did they build, and can I trust it". */
+/* The previous set answered "should I join this beta" — seats, pricing, what ships later. These
+   answer "what does it do, and can I trust it". */
 export const faqs = [
   {
-    question: "What is this?",
+    question: "What is Astrail?",
     answer:
-      "A WebMCP Challenge build of Astrail, a planner that turns saved Instagram Reels into a routed, evidence-backed itinerary. The challenge work is the layer that lets an agent operate that planner directly, reading the page you are signed into and acting on it, rather than you clicking through it alone.",
+      "A planner that turns saved Instagram Reels into a routed, evidence-backed itinerary. It speaks WebMCP, the layer that lets an agent operate that planner directly, reading the page you are signed into and acting on it, rather than you clicking through it alone.",
   },
   {
     question: "What can the agent actually do?",

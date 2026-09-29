@@ -4,9 +4,9 @@ import { join } from 'node:path'
 import { act, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import ChallengeBanner from '@/components/landing/ChallengeBanner'
 import StoryNav from '@/components/story/StoryNav'
 import { PhoneHeroActions, PhoneHeroDevice } from '@/components/story/PhoneHero'
+import { SampleTrailPill } from '@/components/story/SampleTrailLink'
 
 /* Phase B1 of the Placify-pattern revamp, home page on phones (< 768px). Visibility is CSS
    (the kit's m-phone-only / m-desktop-only, story.css), checked in a browser; these pin the markup
@@ -98,18 +98,14 @@ describe('phone hero device frame', () => {
   })
 })
 
-describe('challenge notice as the phone hero pill', () => {
-  it('adds only decoration to the phone pill: a status dot in the lead, a chevron in the link', () => {
-    render(<ChallengeBanner />)
-    const status = screen.getByRole('status')
-    const link = within(status).getByRole('link')
-    const lead = status.querySelector('.challenge-banner__phone')!
+describe('sample trail as the phone hero pill', () => {
+  it('adds only decoration to the pill: a status dot and a chevron, both hidden', () => {
+    render(<SampleTrailPill />)
+    const link = screen.getByRole('link')
 
-    const dot = lead.querySelector('.challenge-banner__dot')
-    expect(dot).toHaveAttribute('aria-hidden', 'true')
-    const chevron = link.querySelector('svg.challenge-banner__chevron')
-    expect(chevron).toHaveAttribute('aria-hidden', 'true')
+    expect(link.querySelector('.story-hero-pill__dot')).toHaveAttribute('aria-hidden', 'true')
+    expect(link.querySelector('svg.m-chevron')).toHaveAttribute('aria-hidden', 'true')
     // Decoration adds no words: the name still promises exactly the finished trip.
-    expect(link).toHaveAccessibleName(/^see a finished trip, no account needed/i)
+    expect(link).toHaveAccessibleName(/^see a finished trip, no account needed$/i)
   })
 })

@@ -6,9 +6,9 @@ import PlayOnceVideo from '../PlayOnceVideo'
 import { PhoneHeroActions } from '../PhoneHero'
 import { CLIPS, STILLS } from '../story-config'
 
-/* The warm bookend — the mech lands and waves. The message is the challenge build, not a beta:
-   the seat/FOMO framing this comment used to describe was dropped when the FAQ was retargeted
-   (landing-copy.ts), because "should I join this beta" is the wrong question in front of a judge.
+/* The warm bookend — the mech lands and waves. The message is the product, not a beta: the
+   seat/FOMO framing this comment used to describe was dropped when the FAQ was retargeted
+   (landing-copy.ts), because "should I join this beta" is the wrong question to close on.
    Do not restore it from this comment.
 
    The copy also used to say "open THIS page" and then list what the agent can do, which is false
@@ -34,7 +34,7 @@ export default function FinalCTA() {
 
       <div className="story-cta__copy story-copy story-copy--center" style={{ zIndex: 40 }}>
         <p className="story-eyebrow text-[color:var(--story-teal-ink)]">
-          Try it with an agent
+          Your turn
         </p>
         <h2 className="story-h text-[color:var(--ink-900)]">
           Ask it what you can do here.
@@ -62,8 +62,8 @@ export default function FinalCTA() {
         <PhoneHeroActions />
 
         <p className="story-cta__fine mt-5 text-[13px] text-[color:var(--ink-400)]">
-          A challenge build rather than a finished product. There is nothing to
-          sign up for, and there are rough edges.
+          An early build rather than a finished product, so expect rough
+          edges.
         </p>
 
         <p className="mt-8 text-[13px] uppercase tracking-[0.16em] text-[color:var(--ink-400)]">

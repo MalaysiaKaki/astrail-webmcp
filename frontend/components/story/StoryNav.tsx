@@ -8,11 +8,9 @@ import { useScrolledPast } from './useScrolledPast'
 /* Persistent chrome. Glass pills so the same nav reads on both the warm ivory hero and the night
    sections.
 
-   The seat counter ("25 seats · open beta") is gone on THIS deployment. It is a real scarcity
-   signal for the product, and reading it on a challenge build invites exactly the wrong
-   conclusion: that a judge is being funnelled toward a beta rather than shown an experiment. The
-   sign-in stays, because judges have credentials and need somewhere to use them — it just no
-   longer sells anything.
+   The seat counter ("25 seats · open beta") is gone on THIS deployment: a scarcity signal reads
+   as a funnel toward a beta, when the page's job is to show what the product does. The sign-in
+   stays, because the tools act as the signed-in user — it just no longer sells anything.
 
    PHONES (< 768px) get their own header instead (Placify-pattern revamp, phase B1): the wordmark
    and the kit's primary sign-in, sitting flat on the hero at the top and turning into a floating
@@ -39,7 +37,7 @@ export default function StoryNav() {
 
         <div className="story-nav__pill">
           <span className="story-nav__seats">
-            <b>WebMCP</b> &middot; challenge build
+            <b>WebMCP</b> &middot; agent-ready
           </span>
           <Link href="/sign-in" className="story-nav__cta">
             Sign in to try it

@@ -31,7 +31,7 @@ export const SCREENS: {
   agentsResearch?: string
   tripWorkspace?: string
 } = {
-  // Re-shot 2026-09-02 against the challenge build. The keys keep their names because they are
+  // Re-shot 2026-09-02 against the WebMCP build. The keys keep their names because they are
   // the three STEPS, not the three files; the filenames now say what each shot actually shows.
   createTrail: '/landing/screens/save-reel.webp',
   agentsResearch: '/landing/screens/trip-generation.webp',
@@ -41,13 +41,11 @@ export const SCREENS: {
 /* The demo the landing page plays.
  *
  * Resolved 2026-09-03: this used to serve `/landing/astrail-beta-demo.mp4`, a 61-second capture
- * of the PRE-CHALLENGE product, under a headline promising three minutes. It now points at the
- * submission recording on YouTube, which is the same video linked from the Devpost entry, so the
- * page and the submission cannot drift apart.
+ * of the pre-WebMCP product, under a headline promising three minutes. It now points at the
+ * demo recording on YouTube, the same video the README links, so the two cannot drift apart.
  *
  * YouTube rather than a local file on purpose: the MP4 was a 14 MB download on a landing page,
- * and the challenge rules require the video to stay publicly available for the whole judging
- * period regardless of what happens to this deployment. `next.config.ts` already allows
+ * and a public YouTube upload stays available regardless of what happens to this deployment. `next.config.ts` already allows
  * `https://www.youtube.com` in `frame-src` and `i.ytimg.com` in `img-src`, so this needs no CSP
  * change. The player is click-to-play, so nothing from YouTube loads until someone asks for it. */
 export const DEMO_YOUTUBE_ID = 'kzgCUgO_wlM'

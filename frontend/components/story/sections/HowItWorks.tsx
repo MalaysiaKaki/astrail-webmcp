@@ -6,10 +6,10 @@ import { SCREENS } from '../story-config'
 /* The trust spine: what Astrail actually does, told with REAL app UI.
    Three steps, real screenshots (no renders, no simulated product).
 
-   Rewritten agent-first for the challenge build. The steps used to describe the manual flow with
-   the agent as a footnote, which is backwards for a page whose whole subject is operating a
-   website WITH an agent. Each step now leads with what you say and names the tools behind it, so
-   a judge can match the claim to the registry.
+   Rewritten agent-first. The steps used to describe the manual flow with the agent as a
+   footnote, which is backwards for a page whose whole subject is operating a website WITH an
+   agent. Each step now leads with what you say and names the tools behind it, so a reader can
+   match the claim to the registry.
 
    The badge label became a per-step field. It was hardcoded "Soon" for a Telegram teaser that is
    out of scope here and promised something nobody could try; a roadmap word sitting in front of a

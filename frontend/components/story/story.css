@@ -197,10 +197,7 @@
 
 .story-nav {
   position: fixed;
-  /* Sits BELOW the challenge banner, which is sticky at z-100 and would otherwise cover these
-     links entirely. ChallengeBanner measures itself and publishes the variable; the 0px fallback
-     is what every page without a banner gets, so this file needs no per-route knowledge. */
-  top: var(--challenge-banner-h, 0px);
+  top: 0;
   left: 0;
   right: 0;
   z-index: 50;
@@ -448,12 +445,9 @@
 
 /* ============================================================
    Placify-pattern revamp, phase B1 (plan docs/superpowers/plans/2026-09-28-placify-mobile-revamp.md):
-   phone header, the challenge notice as the hero pill, and the hero with a framed screenshot.
-   Everything that can change layout sits under max-width: 767.98px; the only rule outside it
-   hides the pill's chevron, which is new markup desktop never showed.
+   phone header, the sample-trip pill, and the hero with a framed screenshot. Everything that can
+   change layout sits under max-width: 767.98px (the pill itself is m-phone-only).
    ============================================================ */
-
-.challenge-banner__chevron { display: none; }
 
 @media (max-width: 767.98px) {
   /* ---- Header: flat at the top, a floating white card after 8px of scroll ----
@@ -523,68 +517,42 @@
   /* Anchor jumps already land 84px down (globals.css sets html scroll-padding-top), which
      clears this 72px header with 12px of air; no scroll-margin here, or the two would add up. */
 
-  /* ---- The challenge notice becomes the hero pill ----
-     Out of flow and pinned where the hero reserves room for it, so the header is first on the
-     page and the pill reads as part of the hero. It scrolls with the page (absolute to the
-     document), under the header. Selectors are doubled up to outrank globals.css's phone rules. */
-  aside.challenge-banner {
-    position: absolute;
-    top: 88px;
-    left: 50%;
-    z-index: 60;
+  /* ---- The sample-trip pill: the kit pill badge, first in the hero copy ----
+     In flow, 16px under the 72px header and 24px above the headline, so the headline keeps the
+     y it had when this slot held an absolutely placed notice. The whole pill is the link. */
+  .story-hero .story-hero-pill {
+    display: flex;
     width: max-content;
-    max-width: calc(100% - 32px);
-    transform: translateX(-50%);
-    padding: 0 16px 0 14px;
-    border: 0;
-    border-radius: var(--m-r-pill);
-    background: var(--m-card);
-    color: var(--m-text);
-    box-shadow: var(--m-shadow-1);
-    font-size: 14px;
+    max-width: 100%;
+    margin: 0 auto 24px;
+    gap: 8px;
+    padding: 0 12px 0 14px;
+    font-size: var(--t-meta);
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+    text-decoration: none;
+    transition: transform var(--m-dur-press) var(--m-ease);
   }
-  .challenge-banner .challenge-banner__row { gap: 0; }
-  .challenge-banner .challenge-banner__phone {
-    display: inline-flex;
-    align-items: center;
-    color: var(--m-text-muted);
-  }
-  .challenge-banner .challenge-banner__phone b { color: var(--m-text); }
-  .challenge-banner__dot {
+  .story-hero-pill:active { transform: scale(0.97); }
+  .story-hero-pill .m-chevron { width: 16px; height: 16px; margin-left: 0; }
+  .story-hero-pill__dot {
     width: 8px;
     height: 8px;
-    margin-right: 8px;
     flex: none;
     border-radius: 50%;
     background: var(--spruce-bright);
     box-shadow: 0 0 0 3px rgba(111, 201, 180, 0.28);
   }
-  .challenge-banner .challenge-banner__link {
-    gap: 4px;
-    color: var(--m-text);
-    text-decoration: none;
-  }
-  .challenge-banner .challenge-banner__link:hover { color: var(--m-text); }
-  .challenge-banner .challenge-banner__link::after { border-radius: var(--m-r-pill); }
-  .challenge-banner .challenge-banner__link:focus-visible { outline: none; }
-  .challenge-banner .challenge-banner__link:focus-visible::after { box-shadow: var(--m-focus); }
-  .challenge-banner .challenge-banner__arrow { display: none; }
-  .challenge-banner .challenge-banner__chevron {
-    display: block;
-    flex: none;
-    width: 16px;
-    height: 16px;
-    color: var(--m-text-muted);
-  }
 
   /* ---- Hero: centred copy, kit pills, then the framed screenshot ---- */
   .story-hero .story-copy--center {
-    padding-top: 156px;          /* 72 header + 16 + 44 pill + 24 */
+    padding-top: 88px;           /* 72 header + 16; the pill and its 24px follow in flow */
     padding-bottom: 88px;        /* the scroll hint */
     text-align: center;
   }
-  /* The pill directly above already names the Challenge build, so on phones the eyebrow would
-     repeat it as two wrapped caps lines. Kept for assistive tech, hidden visually. */
+  /* The pill takes the eyebrow's slot on phones, where the eyebrow would wrap to two caps lines
+     above the headline. Kept for assistive tech, hidden visually. */
   .story-hero .story-eyebrow {
     position: absolute;
     width: 1px;
@@ -666,14 +634,15 @@
   }
 }
 
-/* Small phones (360px): the one-line pill needs 13px type to fit inside the 16px gutters. */
+/* Small phones (360px): the one-line pill needs tighter type to fit inside the 16px gutters. */
 @media (max-width: 379.98px) {
-  aside.challenge-banner { padding: 0 12px 0 11px; font-size: 13px; }
-  .challenge-banner__dot { margin-right: 7px; }
+  .story-hero .story-hero-pill { gap: 6px; padding: 0 10px 0 12px; font-size: 13px; }
 }
 
 @media (max-width: 767.98px) and (prefers-reduced-motion: reduce) {
-  .story-phone-header__bar { transition: none; }
+  .story-phone-header__bar,
+  .story-hero .story-hero-pill { transition: none; }
+  .story-hero-pill:active { transform: none; }
 }
 
 /* ============================================================
@@ -681,7 +650,7 @@
    White feature cards (20px radius, --m-shadow-1) on the paper sections, dark cards on the night
    band and footer, 16px page gutters. Every rule is inside max-width: 767.98px and hangs off a
    class the markup added for this (story-how, story-step, story-shot, story-chapters, story-live,
-   story-watch, story-faq, story-cta__copy, story-panel, story-footer__*), so desktop is untouched.
+   story-watch, story-agent, story-faq, story-cta__copy, story-footer__*), so desktop is untouched.
    The kit classes are used directly only on phone-only markup (the FAQ toggles, the CTA pills);
    shared elements reuse the kit's look through its --m-* tokens.
    ============================================================ */
@@ -692,27 +661,28 @@
   .story-how,
   .story-live,
   .story-watch,
+  .story-agent,
   #faq {
     padding: 64px 16px;
   }
   /* Section heads read left-aligned, as Placify's do; only the hero and the CTA card centre. */
-  :is(.story-chapters, .story-how, .story-live, .story-watch, #faq) > div > :is(.story-eyebrow, .story-h, .story-sub) {
+  :is(.story-chapters, .story-how, .story-live, .story-watch, .story-agent, #faq) > div > :is(.story-eyebrow, .story-h, .story-sub) {
     margin-inline: 0;
     text-align: left;
   }
-  :is(.story-chapters, .story-how, .story-live, .story-watch, #faq, .story-cta) .story-eyebrow {
+  :is(.story-chapters, .story-how, .story-live, .story-watch, .story-agent, #faq, .story-cta) .story-eyebrow {
     font-size: 14px;
     font-weight: 600;
     letter-spacing: 0;
     text-transform: none;
     margin-bottom: 10px;
   }
-  :is(.story-chapters, .story-how, .story-live, .story-watch, #faq) > div > .story-h {
+  :is(.story-chapters, .story-how, .story-live, .story-watch, .story-agent, #faq) > div > .story-h {
     font-size: 26px;
     line-height: 1.15;
     text-wrap: balance;
   }
-  :is(.story-chapters, .story-how, .story-live, .story-watch, #faq) > div > .story-sub {
+  :is(.story-chapters, .story-how, .story-live, .story-watch, .story-agent, #faq) > div > .story-sub {
     font-size: 16px;
     text-wrap: pretty;
   }
@@ -929,50 +899,6 @@
     max-height: 250px;
   }
 
-  /* ---- Challenge panels: white cards, the record link as a secondary pill ---- */
-  .story-panels { padding: 8px 16px 64px; }
-  .story-panels .story-panel {
-    padding: 24px 20px;
-    border: 0;
-    border-radius: var(--m-r-card);
-    background: var(--m-card);
-    box-shadow: var(--m-shadow-1);
-  }
-  /* The setup card keeps its brass edge so a judge can find it, drawn inside the card. */
-  .story-panels .story-panel--judges {
-    box-shadow: inset 0 0 0 1.5px var(--brass-deep), var(--m-shadow-1);
-  }
-  .story-panel h2 { font-size: 24px; }
-  .story-panels .story-panel > p:first-child {
-    font-size: 14px;
-    font-weight: 600;
-    letter-spacing: 0;
-    text-transform: none;
-  }
-  .story-panels .story-panel__record {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 44px;
-    padding: 10px 20px;
-    border-radius: var(--m-r-pill);
-    background: var(--m-card);
-    color: var(--m-text);
-    font-size: 15px;
-    line-height: 1.3;
-    text-align: center;
-    text-decoration: none;
-    box-shadow: var(--m-shadow-1);
-    transition: transform var(--m-dur-press) var(--m-ease);
-  }
-  .story-panel__record:active { transform: scale(0.97); }
-  .story-panel__record:focus-visible { outline: none; box-shadow: var(--m-focus); }
-  .story-panels .story-panel__signin {
-    border: 0;
-    border-radius: var(--m-r-sub);
-    background: var(--m-subcard);
-  }
-
   /* ---- Footer: each column is a dark card of 48px rows with chevrons ---- */
   .story-footer { padding: 48px 16px 40px; }
   .story-footer .story-footer__grid {
@@ -1036,9 +962,65 @@
   .story-faq__chevron,
   .story-chapters__handoff,
   .story-watch__yt-link,
-  .story-panel__record,
   .story-footer__list .story-footer__link { transition: none; }
   .story-chapters__handoff:has(a:active),
-  .story-watch__yt-link:active,
-  .story-panel__record:active { transform: none; }
+  .story-watch__yt-link:active { transform: none; }
 }
+
+/* ============================================================
+   What the agent can do / Try it with an agent (phase B5). Kit cards at every width: the
+   capability list and the setup steps side by side from 1024px, stacked below it. Type comes from
+   the shared scale (t-body, t-title, t-meta, t-label); the section head reuses the story's.
+   ============================================================ */
+
+.story-agent__grid {
+  display: grid;
+  gap: 16px;
+  margin-top: 40px;
+}
+@media (min-width: 1024px) {
+  .story-agent__grid { grid-template-columns: 1.35fr 1fr; gap: 24px; align-items: start; }
+}
+.story-agent__card { padding: 24px 20px; color: var(--ink-600); }
+@media (min-width: 768px) {
+  .story-agent__card { padding: 32px; }
+}
+.story-agent__card b { color: var(--m-text); font-weight: 600; }
+.story-agent__list,
+.story-agent__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.story-agent__item,
+.story-agent__step { display: flex; gap: 12px; }
+.story-agent__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 8px;
+  border-radius: 50%;
+  background: var(--brass-deep);
+}
+.story-agent__code {
+  font-family: var(--font-ibm-plex-mono), ui-monospace, monospace;
+  font-size: 0.9em;
+  color: var(--m-text);
+  overflow-wrap: anywhere;
+}
+.story-agent__title { margin: 0 0 18px; color: var(--m-text); font-weight: 600; }
+.story-agent__num {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--m-ink);
+  color: var(--m-on-ink);
+}
+.story-agent__note { margin: 20px 0 0; padding: 14px 16px; }

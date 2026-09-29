@@ -1,11 +1,10 @@
-# Astrail · WebMCP Challenge build
+# Astrail
 
 Astrail turns the Instagram Reels you save into a routed trip on a live 3D map, and you drive the
 whole thing by talking to ChatGPT. Every stop says where it came from.
 
 | | |
 |---|---|
-| **Devpost** | https://devpost.com/software/astrail |
 | **Live app** | https://astrail-webmcp.vercel.app |
 | **Demo video** | https://youtu.be/kzgCUgO_wlM |
 | **No account needed** | https://astrail-webmcp.vercel.app/app/trip/demo |
@@ -39,9 +38,10 @@ checked against real coordinates, and a missing forecast reported rather than in
 2. Select **GPT-5.6 Sol or Terra**. Luna has WebMCP disabled, and site tools are unavailable in
    Enterprise or Edu workspaces.
 3. Turn on **Settings > Browser > Permissions > Enable site tools**.
-4. Sign in with the judge account. Its credentials are in the testing-instructions field of our
-   Devpost submission, which only Devpost and the judges can see. They are deliberately not in
-   this repository: it is public, and the account spends real Apify and OpenAI credit.
+4. Sign in with your Astrail account, or open the
+   [sample trail](https://astrail-webmcp.vercel.app/app/trip/demo), which needs none and carries
+   six of the tools. No login is kept in this repository: it is public, and an account spends
+   real Apify and OpenAI credit.
 5. Click the **Site tools** arrow in the address bar. You should see **14** tools, and **17** once
    a trip is open. The WebMCP chip at the bottom of the page shows the same count.
 
@@ -178,19 +178,14 @@ removing a stop requires a visible approval card.
 | [`frontend/components/webmcp/`](frontend/components/webmcp/) | Registration, approval cards, activity rail, status chip |
 | [`backend/main.py`](backend/main.py) | The owner-checked edit endpoints behind the five write tools |
 
-## What is new for this challenge
+## Verification
 
-Astrail existed before 25 August as a form: you pasted Reel links, waited, and got an itinerary you
-could read but not change.
-
-Everything in `frontend/lib/webmcp/` was written on or after 26 August, along with the five
-owner-checked edit endpoints, the rebuilt map, and the signed-out sample trail. The itinerary used
-to be immutable at every layer, with no endpoint, no frontend mutation and row-level security that
-was SELECT-only. The mem0 memory engine is older, built in July, and is not claimed as challenge
-work; what is new is that an agent can reach it. The
-[dated eligibility record](docs/webmcp/WHATS-NEW.md) has the commit-by-commit split.
-
-### What has actually been run
+Before the WebMCP layer, Astrail was a form: you pasted Reel links, waited, and got an itinerary
+you could read but not change. Everything in `frontend/lib/webmcp/` was added from 26 August 2026,
+along with the five owner-checked edit endpoints, the rebuilt map, and the signed-out sample
+trail. The itinerary used to be immutable at every layer, with no endpoint, no frontend mutation
+and row-level security that was SELECT-only. The mem0 memory engine is older, built in July; what
+is new is that an agent can reach it.
 
 On 2026-08-30 the full arc was driven through an agent in ChatGPT's built-in browser against a
 **local** backend: `plan_trip_from_reels` generated a trip end to end, `save_reels` landed places
@@ -205,9 +200,8 @@ Satsukiyama Park from day 2 to day 1, replying *"The user approved. Moved 'Satsu
 shifted that trip to 23 to 24 December, keeping every day's stops and number. Both went through
 their approval card and returned `outcome: done`. Every tool that writes has now been run live.
 
-One limitation is worth naming rather than leaving a judge to find it: `set_map_mode`'s hub view
-**declines** on any trip generated since hotel search was switched off, because no hotel has
-coordinates to centre on.
+One known limitation: `set_map_mode`'s hub view **declines** on any trip generated since hotel
+search was switched off, because no hotel has coordinates to centre on.
 
 ## Run locally
 
@@ -273,8 +267,6 @@ the tool names out of `lib/webmcp/tools/` and fails if the table above drifts fr
 
 ## More
 
-- [Devpost submission answers](docs/webmcp/SUBMISSION.md)
-- [What is new vs pre-existing](docs/webmcp/WHATS-NEW.md)
 - [Backend API reference](docs/BACKEND-API.md)
 
 **Astrail = Astra + Trail.** Star path, guided route.

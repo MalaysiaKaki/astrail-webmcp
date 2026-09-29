@@ -4,7 +4,7 @@ import { useState } from 'react'
 
 import { DEMO_YOUTUBE_ID, DEMO_YOUTUBE_URL } from '../story-config'
 
-/* The submission recording, in the same browser-chrome card as the HowItWorks screenshots.
+/* The product demo recording, in the same browser-chrome card as the HowItWorks screenshots.
  *
  * Click-to-play rather than a mounted iframe. A YouTube embed on load pulls several hundred KB
  * and sets cookies for every visitor who never presses play, and this section sits well below
@@ -78,9 +78,8 @@ export default function DemoVideoSlot() {
           </div>
         </div>
 
-        {/* The rules require this video to stay public for the whole judging period, so the page
-            names where it lives rather than only embedding it. A judge whose browser blocks the
-            iframe still has a way to watch it. */}
+        {/* The page names where the video lives rather than only embedding it, so a visitor
+            whose browser blocks the iframe still has a way to watch it. */}
         <p className="story-watch__yt mt-4 text-[14px] text-[color:var(--ink-400)]">
           Also on YouTube:{' '}
           <a

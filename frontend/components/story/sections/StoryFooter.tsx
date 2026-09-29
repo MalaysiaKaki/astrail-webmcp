@@ -81,7 +81,7 @@ export default function StoryFooter() {
             take. Evidence-backed planning on a real map.
           </p>
           <p className="mt-4 text-xs uppercase tracking-[0.16em] text-[color:var(--starlight-70)]">
-            WebMCP Challenge build
+            Works with WebMCP agents
           </p>
         </div>
 
@@ -102,9 +102,9 @@ export default function StoryFooter() {
       </div>
 
       <div className="story-footer__legal mx-auto mt-14 flex max-w-6xl flex-col gap-2 border-t border-[color:var(--night-line)] pt-6 text-xs text-[color:var(--starlight-70)] md:flex-row md:items-center md:justify-between">
-        <p>&copy; 2026 Astrail &middot; Singapore &middot; WebMCP Challenge build</p>
+        <p>&copy; 2026 Astrail &middot; Singapore</p>
         <p>
-          Astrail is a WebMCP Challenge build, not a finished product. It uses AI to
+          Astrail is an early build, not a finished product. It uses AI to
           generate recommendations from public content, so double-check details
           before you travel.
         </p>

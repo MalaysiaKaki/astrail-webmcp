@@ -18,7 +18,7 @@ import LiveMapDemo from '../sections/LiveMapDemo'
  * the false version reads better than the true one, so it will be written again.
  *
  * WHAT IS ASSERTED IS THE MEANING, NOT THE WORDING. The copy is meant to be rewritten — it is
- * marketing on a page a judge reads first. A test pinning exact strings would either block every
+ * marketing on a page a visitor reads first. A test pinning exact strings would either block every
  * edit or be deleted by the first person it blocked. So:
  *
  *   1. the copy must ACCOUNT for every `PlaceSourceType` the schema declares, read from the
