@@ -43,6 +43,14 @@ export function useOpenCard() {
     focusAfterCommit(openerSelectors(card))
   }, [focusAfterCommit])
 
+  /** Closes the open card only if it is still `which` (A12): a phone DOM card closed after a stop
+   *  was chosen must not close the stop's card. No `which`: the card open now. */
+  const closeIf = useCallback((which?: { kind: OpenCardKind; id: string }) => {
+    const card = currentRef.current
+    if (which && (!card || card.kind !== which.kind || card.id !== which.id)) return
+    setOpenCard(null)
+  }, [])
+
   const requestPanel = useCallback((target: PanelRequest['target'], day: number) => {
     setPanelRequest({ target, day, nonce: next() })
   }, [])
@@ -59,7 +67,7 @@ export function useOpenCard() {
   }, [focusRequest])
 
   return {
-    openCard, open, close,
+    openCard, open, close, closeIf,
     fallbackNonce, fallBack: setFallbackNonce,
     detailsHere, setDetailsHere,
     panelRequest, requestPanel,

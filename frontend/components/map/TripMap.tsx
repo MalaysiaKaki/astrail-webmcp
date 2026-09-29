@@ -30,7 +30,7 @@ import { addSpokeLayers, addTrailLayers } from './route-layers'
 import { addDayEmphasisLayers, applyDayEmphasis, removeChevronImage } from './day-emphasis'
 import { reconcileOnMap, type PinEntry } from './pin-reconcile'
 import { usePlaceCard, type MapCard } from './use-place-card'
-import { createDomSuggestionCard } from './dom-suggestion-card'
+import { createDomSuggestionCard, type SuggestionRef } from './dom-suggestion-card'
 import './place-card.css'
 import { usePlacementObstacles } from '@/lib/trip/placement-obstacles'
 import { useOptionalWebMcpRegistry } from '@/components/webmcp/WebMcpRegistry'
@@ -40,7 +40,8 @@ export type MapCardHandlers = {
   /** Nothing fits at the pin: show this request's detail in the sidebar. */
   onFallback: (nonce: number) => void
   /** A click on the empty map. */
-  onDismiss: () => void
+  /** With `which`: only that eat/hotel (a phone DOM card closed, A12). Without: the open card. */
+  onDismiss: (which?: SuggestionRef) => void
   onOpenEat: (restaurantPlaceId: string) => void
   onOpenHotel: (hotelId: string) => void
   /** Whether a card can be shown at all: false until the shared map has loaded, and for good if
@@ -102,7 +103,7 @@ export default function TripMap({
   const panelObstruction = usePanelObstruction()
   // The phone's eat/stay DOM card (./dom-suggestion-card); a user close closes the owner's card.
   const domCardRef = useRef<ReturnType<typeof createDomSuggestionCard> | null>(null)
-  if (!domCardRef.current) domCardRef.current = createDomSuggestionCard(() => getMap(), () => cardsRef.current?.onDismiss())
+  if (!domCardRef.current) domCardRef.current = createDomSuggestionCard(() => getMap(), (which) => cardsRef.current?.onDismiss(which))
   const domCard = domCardRef.current
   const buildingLayerAddedRef = useRef(false)
   const framedRef = useRef(false)
@@ -210,12 +211,10 @@ export default function TripMap({
     return buildPlaceIndex(bundle).get(r.near_place_id)?.name ?? null
   }
 
-  function openSuggestionPopup(at: [number, number], content: HTMLElement) { domCard.open(at, content) }
-  function dropDomPopup() { domCard.drop() }
-
-  // Crossing the breakpoint with an eat or hotel detail open (Codex final #6): one surface. Widening
-  // drops the phone's DOM card (the owner's place card takes over); narrowing builds the DOM card
-  // the desktop place card leaves behind. The effects that normally open it do not re-run.
+  const openSuggestionPopup = (at: [number, number], el: HTMLElement, which: SuggestionRef) => domCard.open(at, el, which)
+  const dropDomPopup = () => domCard.drop()
+  // Crossing the breakpoint with an eat/hotel detail open (Codex #6): one surface. Widening drops the
+  // phone's DOM card for the place card; narrowing rebuilds the DOM card the place card leaves.
   const shownLayoutRef = useRef(layout)
   const openSuggestionRef = useRef(openSuggestion)
   openSuggestionRef.current = openSuggestion
@@ -354,7 +353,7 @@ export default function TripMap({
           // The owner always learns which card is open (a rotation carries it); the phone also
           // shows its DOM card.
           cardsRef.current?.onOpenHotel(hub.id)
-          if (!desktopCards()) openSuggestionPopup(at, buildStayPopup(hub))
+          if (!desktopCards()) openSuggestionPopup(at, buildStayPopup(hub), { kind: 'hotel', id: hub.id })
         })
         markers.push(new mapboxgl.Marker({ element: el }).setLngLat(at).addTo(map))
       }
@@ -378,7 +377,7 @@ export default function TripMap({
           e.stopPropagation()
           onSelectRestaurant?.(place.id)      // keep the sidebar strip in step with the map
           cardsRef.current?.onOpenEat(place.id)
-          if (!desktopCards()) openSuggestionPopup([place.lng, place.lat], buildEatPopup(r, place, nearName(r)))
+          if (!desktopCards()) openSuggestionPopup([place.lng, place.lat], buildEatPopup(r, place, nearName(r)), { kind: 'eat', id: place.id })
         })
         return new mapboxgl.Marker({ element: el }).setLngLat([place.lng, place.lat]).addTo(map)
       })
@@ -726,6 +725,7 @@ export default function TripMap({
   // Refresh marker selection and fly to the selected place.
   useEffect(() => {
     if (!ready) return
+    if (selectedPlaceId) dropDomPopup()   // a chosen stop replaces a phone eat/stay DOM card (A12)
     drawMarkers()
     if (flyToSelected(1400)) cameraIntentRef.current = 'place'
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -752,7 +752,7 @@ export default function TripMap({
     const suggestion = bundle.restaurants.find((r) => r.restaurant_place_id === selectedRestaurantPlaceId)
     // Desktop: the owner opens the eat's place card (A10); the phone keeps its DOM card.
     if (suggestion && !desktopCards()) {
-      openSuggestionPopup([place.lng, place.lat], buildEatPopup(suggestion, place, nearName(suggestion)))
+      openSuggestionPopup([place.lng, place.lat], buildEatPopup(suggestion, place, nearName(suggestion)), { kind: 'eat', id: selectedRestaurantPlaceId })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRestaurantPlaceId])
@@ -776,8 +776,9 @@ export default function TripMap({
       center: [hub.lng, hub.lat], zoom: 14, pitch: cameraPitch(mode3dRef.current),
       padding: framePadding({ popupRoom: true }), duration: 1200, essential: true,
     })
-    if (desktopCards()) cardsRef.current!.onOpenHotel(hub.id)
-    else openSuggestionPopup([hub.lng, hub.lat], buildStayPopup(hub))
+    // The owner always learns which card is open, as a hub click does (A12: phone Stay selections).
+    cardsRef.current?.onOpenHotel(hub.id)
+    if (!desktopCards()) openSuggestionPopup([hub.lng, hub.lat], buildStayPopup(hub), { kind: 'hotel', id: hub.id })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedHotelId, layerMode])
 

@@ -494,7 +494,8 @@ export default function TripWorkspace({
           cards={{
             onFallback: onCardFallback,
             onAvailability: setMapAvailable,
-            onDismiss: () => closeCard(),
+            // Identity-checked (A12): a DOM card closes only the suggestion it showed.
+            onDismiss: (which) => cards.closeIf(which),
             onOpenEat: (id) => openEat(id, 'pin'),
             onOpenHotel: (id) => cards.open('hotel', id, 'pin'),
           }}

@@ -8,10 +8,12 @@ import { buildEatPopup, buildStayPopup } from './suggestion-popup'
  * moved out of TripMap.tsx (A11). One at a time across every layer.
  *
  * `drop()` clears its ref BEFORE removing, so a replacement or a teardown is never mistaken for
- * the user's close; a user close (its ✕, a map click) calls `onDismiss`, so the owner's open card
+ * the user's close; a user close (its ✕, a map click) calls `onDismiss` with the suggestion it shows, so that card
  * closes with it and a later rotation does not bring back a dismissed card (Codex final #6).
  */
-export function createDomSuggestionCard(getMap: () => mapboxgl.Map | null, onDismiss: () => void) {
+export type SuggestionRef = { kind: 'eat' | 'hotel'; id: string }
+
+export function createDomSuggestionCard(getMap: () => mapboxgl.Map | null, onDismiss: (which: SuggestionRef) => void) {
   let current: mapboxgl.Popup | null = null
 
   function drop() {
@@ -20,7 +22,9 @@ export function createDomSuggestionCard(getMap: () => mapboxgl.Map | null, onDis
     popup?.remove()
   }
 
-  function open(at: [number, number], content: HTMLElement) {
+  /** `which`: the suggestion this card shows. A user close dismisses THAT one only (A12): by then
+   *  the owner's open card may already be a stop chosen since. */
+  function open(at: [number, number], content: HTMLElement, which: SuggestionRef) {
     const map = getMap()
     if (!map) return
     drop()
@@ -33,7 +37,7 @@ export function createDomSuggestionCard(getMap: () => mapboxgl.Map | null, onDis
     popup.on?.('close', () => {
       if (current !== popup) return
       current = null
-      onDismiss()
+      onDismiss(which)
     })
   }
 
@@ -44,12 +48,12 @@ export function createDomSuggestionCard(getMap: () => mapboxgl.Map | null, onDis
       const place = bundle.suggestion_places.find((p) => p.id === s.id) ?? buildPlaceIndex(bundle).get(s.id)
       if (!r || !place || !hasRealCoords(place.lng, place.lat)) return
       const near = r.near_place_id ? buildPlaceIndex(bundle).get(r.near_place_id)?.name ?? null : null
-      open([place.lng, place.lat], buildEatPopup(r, place, near))
+      open([place.lng, place.lat], buildEatPopup(r, place, near), s)
       return
     }
     const hub = selectedHotel(bundle, s.id)
     if (hub && hub.geo_status === 'placed' && hub.lng !== null && hub.lat !== null && hasRealCoords(hub.lng, hub.lat)) {
-      open([hub.lng, hub.lat], buildStayPopup(hub))
+      open([hub.lng, hub.lat], buildStayPopup(hub), s)
     }
   }
 
