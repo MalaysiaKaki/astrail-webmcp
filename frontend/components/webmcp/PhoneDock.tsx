@@ -88,14 +88,16 @@ export default function PhoneDock({
               </svg>
             </button>
           </div>
-          <div data-dock-scroll className="phone-dock flex min-h-0 flex-1 flex-col items-end gap-2 overflow-y-auto overscroll-contain p-3">
+          {/* Hidden when nothing is in it (a document route with no activity and the tool list
+              shut): an empty padded box showed as two bare hairline rows (integration QA). */}
+          <div data-dock-scroll className="phone-dock peer flex min-h-0 flex-1 flex-col items-end gap-2 overflow-y-auto overscroll-contain p-3 empty:hidden">
             {overCanvas && !toolsOpen && <ExamplePrompts />}
             <AgentActivityRail compact={!overCanvas} cleared={cleared} onClear={onClear} />
             <WebMcpStatus open={toolsOpen} onOpenChange={onToolsOpenChange} part="panel" />
           </div>
           {/* The tools chip is a footer, outside the scroll: at the end of the scroll area a long
               prompts panel or tool list pushed it against the overlay's bottom edge and clipped it. */}
-          <div data-dock-footer className="flex shrink-0 justify-end border-t border-[var(--m-accent-wash)] px-3 py-2.5">
+          <div data-dock-footer className="flex shrink-0 justify-end border-t border-[var(--m-accent-wash)] px-3 py-2.5 peer-empty:border-t-0">
             <WebMcpStatus open={toolsOpen} onOpenChange={onToolsOpenChange} part="chip" />
           </div>
         </section>

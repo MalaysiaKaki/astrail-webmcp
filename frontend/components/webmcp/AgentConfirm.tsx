@@ -32,6 +32,8 @@ const CARD_STYLE = { boxShadow: 'var(--m-shadow-2)' } as const
 const BODY = 'min-h-0 overflow-y-auto overscroll-contain'
 const APPROVE = 'm-btn-primary flex-1'
 const DECLINE = 'm-btn-secondary flex-1'
+const STACKED_APPROVE = 'm-btn-primary w-full whitespace-nowrap'
+const STACKED_DECLINE = 'm-btn-secondary w-full whitespace-nowrap'
 const HEADER = 'mb-2 flex items-center gap-2 text-[length:var(--t-meta)] font-semibold text-[var(--m-accent)]'
 const DOT = 'inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--m-accent)]'
 const SUMMARY = 'whitespace-pre-line leading-relaxed text-[var(--m-text)]'
@@ -198,11 +200,13 @@ function PreferenceCard({ pending }: { pending: PendingPrompt }) {
         />
       </label>
       </div>
-      <div className="mt-4 flex shrink-0 gap-2">
+      {/* Stacked full width, primary first: side by side at 390 the primary label wrapped to two
+          lines ("Try what it / remembers"). The plain confirm card's short pair stays in a row. */}
+      <div className="mt-4 flex shrink-0 flex-col gap-2">
         <button
           type="button"
           onClick={() => resolve({ approved: true, text: override })}
-          className={APPROVE}
+          className={STACKED_APPROVE}
         >
           {override ? 'Use this instead' : 'Try what it remembers'}
         </button>
@@ -211,7 +215,7 @@ function PreferenceCard({ pending }: { pending: PendingPrompt }) {
           /* `text: null`, whatever is in the field. Declining is a refusal to start, not a
              preference stated on the way out — and a declined run must carry nothing forward. */
           onClick={() => resolve({ approved: false, text: null })}
-          className={DECLINE}
+          className={STACKED_DECLINE}
         >
           Not now
         </button>

@@ -36,6 +36,22 @@ const field = () => screen.getByLabelText(/different this trip/i)
 const approve = () => screen.getByRole('button', { name: /use this instead|try what it remembers/i })
 
 describe('AgentConfirm — the preference card', () => {
+  /* Integration QA (Tab C): at 390 the primary label wrapped to two lines ("Try what it /
+     remembers") beside "Not now". The two actions stack full width, primary first, on one line. */
+  it('stacks its two actions full width, primary first, so neither label wraps', async () => {
+    ask('Spend the allowance')
+    const primary = await approve()
+    const decline = screen.getByRole('button', { name: 'Not now' })
+    const row = primary.parentElement!
+    expect(row).toBe(decline.parentElement)
+    expect(row.className).toMatch(/\bflex-col\b/)
+    expect(row.firstElementChild).toBe(primary)
+    for (const b of [primary, decline]) {
+      expect(b.className).toMatch(/\bw-full\b/)
+      expect(b.className).toMatch(/\bwhitespace-nowrap\b/)
+    }
+  })
+
   it('shows the request verbatim, with an optional field beside it', async () => {
     ask('Plan a trip from 4 reels\nAstrail will try to recall: walkable days\nThis uses your trip allowance.')
     expect(await screen.findByText(/This uses your trip allowance/)).toBeInTheDocument()
