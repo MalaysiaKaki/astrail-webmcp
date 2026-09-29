@@ -16,6 +16,11 @@
 // fixed map show through a right-hand window — opts out by rendering a `[data-fullbleed]`
 // child: the `has-[…]` variants drop the padding and hand scroll control to the page. This
 // is scoped to that page only; the document pages never carry the attribute.
+//
+// main is deliberately NOT positioned: a positioned main would paint its paper background over
+// the shared fixed map that /app/trips shows through its transparent window. So a page must give
+// any absolutely positioned child (sr-only labels included) a positioned ancestor of its own,
+// or the child escapes the scroller and stretches the document.
 import Sidebar from '@/components/dashboard/Sidebar'
 import BottomTabBar from '@/components/dashboard/BottomTabBar'
 import PhoneBrandHeader from '@/components/dashboard/PhoneBrandHeader'

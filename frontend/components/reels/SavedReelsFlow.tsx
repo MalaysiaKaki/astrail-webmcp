@@ -537,7 +537,7 @@ export default function SavedReelsFlow() {
   const runNotice = generateError ? (
     <p
       role="alert"
-      className="fixed left-1/2 top-4 z-[60] w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border border-dashed border-[color:var(--line-soft)] bg-[color:var(--surface-2)] p-3 text-center text-[13px] text-[color:var(--text-muted)] shadow-lg"
+      className="fixed left-1/2 top-4 z-[60] w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 m-card p-4 text-center font-[family-name:var(--font-ui)] text-[length:var(--t-meta)] leading-[1.4] text-[color:var(--m-text)]"
     >
       {generateError}
     </p>
@@ -620,7 +620,7 @@ export default function SavedReelsFlow() {
     <div>
       {runNotice}
       {inboxNotice ? (
-        <p role="alert" className="mb-6 rounded-lg border border-dashed border-[color:var(--line-soft)] bg-[color:var(--surface-2)] p-3 text-[13px] text-[color:var(--text-muted)]">
+        <p role="alert" className="m-subcard t-meta mb-6 p-4">
           {inboxNotice}
         </p>
       ) : null}

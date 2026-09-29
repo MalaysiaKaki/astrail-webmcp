@@ -34,12 +34,12 @@ const THEME: Record<Variant, {
   rangeFill: string; day: string; dayDisabled: string; endpoint: string; todayRing: string
 }> = {
   night: {
-    trigger: 'surface text-[var(--starlight)]',
+    trigger: 'surface rounded-lg p-2.5 text-sm text-[var(--starlight)]',
     placeholder: 'text-[var(--faint)]',
     caption: 'text-[var(--faint)]',
     icon: 'text-[var(--muted)]',
     ring: 'focus-visible:ring-[var(--brass)]',
-    popover: 'border-[var(--line)] bg-[var(--elevated)] shadow-[var(--shadow-night)]',
+    popover: 'rounded-lg border border-[var(--line)] bg-[var(--elevated)] p-3 shadow-[var(--shadow-night)]',
     nav: 'text-[var(--muted)] hover:bg-[var(--brass-soft)] hover:text-[var(--starlight)]',
     heading: 'text-[var(--starlight)]',
     weekday: 'text-[var(--faint)]',
@@ -50,22 +50,25 @@ const THEME: Record<Variant, {
     todayRing: 'ring-[var(--faint)]',
   },
   paper: {
-    trigger: 'min-h-11 border border-[color:var(--line-soft)] bg-[color:var(--surface-1)] text-[color:var(--text)]',
-    placeholder: 'text-[color:var(--text-faint)]',
-    caption: 'text-[color:var(--text-faint)]',
-    icon: 'text-[color:var(--text-muted)]',
-    ring: 'focus-visible:ring-[color:var(--brass-deep)]',
-    popover: 'border-[color:var(--paper-line-2)] bg-[color:var(--surface-1)] shadow-[0_1px_2px_rgba(28,23,16,0.12),0_14px_40px_rgba(28,23,16,0.22)]',
-    nav: 'text-[color:var(--text-muted)] hover:bg-[color:var(--brass-glow)] hover:text-[color:var(--text)]',
-    heading: 'text-[color:var(--text)]',
-    weekday: 'text-[color:var(--text-faint)]',
-    rangeFill: 'bg-[color:var(--brass-glow)]',
-    day: 'text-[color:var(--text)] hover:bg-[color:var(--brass-glow)]',
-    dayDisabled: 'text-[color:var(--text-faint)] opacity-40',
-    endpoint: 'bg-[color:var(--brass-deep)] text-[color:var(--paper-0)]',
-    todayRing: 'ring-[color:var(--paper-line-2)]',
+    trigger: 'min-h-12 rounded-[var(--m-r-sub)] bg-[color:var(--m-card)] px-4 text-[length:var(--t-body-lg)] text-[color:var(--m-text)] shadow-[inset_0_0_0_1px_var(--line-soft)]',
+    placeholder: 'text-[color:var(--m-text-muted)]',
+    caption: 'text-[color:var(--m-text-muted)]',
+    icon: 'text-[color:var(--m-text-muted)]',
+    ring: 'focus-visible:ring-[color:var(--m-accent)]',
+    popover: 'rounded-[var(--m-r-sheet)] bg-[color:var(--m-card)] p-3 shadow-[var(--m-shadow-2)]',
+    nav: 'text-[color:var(--m-text-muted)] hover:bg-[color:var(--m-accent-wash)] hover:text-[color:var(--m-text)]',
+    heading: 'text-[color:var(--m-text)]',
+    weekday: 'text-[color:var(--m-text-muted)]',
+    rangeFill: 'bg-[color:var(--m-accent-wash)]',
+    day: 'text-[color:var(--m-text)] hover:bg-[color:var(--m-accent-wash)]',
+    dayDisabled: 'text-[color:var(--m-text-muted)] opacity-40',
+    endpoint: 'bg-[color:var(--m-ink)] text-[color:var(--m-on-ink)]',
+    todayRing: 'ring-[color:var(--m-text-muted)]',
   },
 }
+
+// 7 columns of 44px day targets + p-3; capped so it still fits a 360px phone (8px gutters).
+const POPOVER_W = 336
 
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const MONTHS_LONG = [
@@ -277,7 +280,7 @@ export default function DateRangePicker({
       onBlur={onWidgetBlur}
     >
       {showLabel ? (
-        <span className={cx('type-label text-[11px] uppercase tracking-wide', variant === 'night' ? 'text-[var(--muted)]' : 'text-[color:var(--text-muted)]')}>
+        <span className={cx('type-label text-[length:var(--t-label)] uppercase tracking-wide', variant === 'night' ? 'text-[var(--muted)]' : 'text-[color:var(--text-muted)]')}>
           {label}
         </span>
       ) : null}
@@ -290,8 +293,9 @@ export default function DateRangePicker({
         aria-expanded={open}
         aria-label={hasRange ? `${label}: ${triggerText}. Change dates.` : `Select ${label.toLowerCase()}`}
         className={cx(
-          'type-body flex items-center justify-between gap-2 rounded-lg p-2.5 text-left text-sm',
+          'type-body flex items-center justify-between gap-2 text-left',
           'transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-0',
+          variant === 'paper' && 'focus-visible:shadow-[var(--m-focus)] focus-visible:ring-0',
           t.trigger, t.ring,
         )}
       >
@@ -300,7 +304,7 @@ export default function DateRangePicker({
       </button>
 
       {hasRange ? (
-        <p className={cx('type-body text-xs', t.caption)}>
+        <p className={cx('type-body text-[length:var(--t-meta)]', t.caption)}>
           {nights === 0 ? 'Same-day trip' : `${nights} night${nights === 1 ? '' : 's'}`}
         </p>
       ) : null}
@@ -313,31 +317,32 @@ export default function DateRangePicker({
           onBlur={onWidgetBlur}
           style={{
             position: 'fixed',
-            left: Math.round(Math.max(8, Math.min(rect.left, window.innerWidth - 304 - 8))),
+            left: Math.round(Math.max(8, Math.min(rect.left, window.innerWidth - Math.min(POPOVER_W, window.innerWidth - 16) - 8))),
             ...(placement === 'top'
               ? { bottom: Math.round(window.innerHeight - rect.top + 8) }
               : { top: Math.round(rect.bottom + 8) }),
+            width: `min(${POPOVER_W}px, calc(100vw - 16px))`,
             zIndex: 50,
           }}
-          className={cx('w-[19rem] rounded-lg border p-3', t.popover)}
+          className={cx(t.popover)}
         >
           <div className="mb-2 flex items-center justify-between">
             <button
               type="button"
               onClick={() => goToMonth(-1, false)}
               aria-label="Previous month"
-              className={cx('grid size-7 place-items-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2', t.nav, t.ring)}
+              className={cx('grid size-11 place-items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2', t.nav, t.ring)}
             >
               <Chevron dir="left" />
             </button>
-            <span aria-live="polite" className={cx('type-label text-xs uppercase tracking-wide', t.heading)}>
+            <span aria-live="polite" className={cx('type-label text-[length:var(--t-meta)] uppercase tracking-wide', t.heading)}>
               {MONTHS_LONG[view.m]} {view.y}
             </span>
             <button
               type="button"
               onClick={() => goToMonth(1, false)}
               aria-label="Next month"
-              className={cx('grid size-7 place-items-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2', t.nav, t.ring)}
+              className={cx('grid size-11 place-items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2', t.nav, t.ring)}
             >
               <Chevron dir="right" />
             </button>
@@ -350,7 +355,7 @@ export default function DateRangePicker({
                   key={i}
                   role="columnheader"
                   aria-label={w}
-                  className={cx('type-label grid h-7 place-items-center text-[10px] uppercase', t.weekday)}
+                  className={cx('type-label grid h-8 place-items-center text-[length:var(--t-label)] uppercase', t.weekday)}
                 >
                   {w[0]}
                 </span>
@@ -360,7 +365,7 @@ export default function DateRangePicker({
             {weeks.map((week, wi) => (
               <div role="row" key={wi} className="grid grid-cols-7">
                 {week.map((day, di) => {
-                  if (day == null) return <span role="gridcell" key={di} className="h-9" />
+                  if (day == null) return <span role="gridcell" key={di} className="h-11" />
                   const dayIso = iso(view.y, view.m, day)
                   const isDisabled = disabled(dayIso)
                   const isLo = dayIso === rangeLo
@@ -373,8 +378,8 @@ export default function DateRangePicker({
                     <span role="gridcell" aria-selected={isEnd} key={di} className={cx(
                       'grid place-items-center',
                       (inRange || (isEnd && solidRange)) && t.rangeFill,
-                      isLo && solidRange && 'rounded-l-md',
-                      isHi && solidRange && 'rounded-r-md',
+                      isLo && solidRange && 'rounded-l-full',
+                      isHi && solidRange && 'rounded-r-full',
                     )}>
                       <button
                         type="button"
@@ -385,7 +390,7 @@ export default function DateRangePicker({
                         onMouseEnter={() => anchor && setHover(dayIso)}
                         aria-label={`${MONTHS_LONG[view.m]} ${day}, ${view.y}`}
                         className={cx(
-                          'type-body grid size-9 place-items-center rounded-md text-sm transition-colors',
+                          'type-body grid size-11 place-items-center rounded-full text-sm transition-colors',
                           'focus-visible:outline-none focus-visible:ring-2', t.ring,
                           isDisabled && cx('cursor-not-allowed', t.dayDisabled),
                           !isDisabled && !isEnd && t.day,

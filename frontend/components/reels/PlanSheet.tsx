@@ -6,6 +6,7 @@ import { budgetLabel } from '@/lib/trip/trip-presenters'
 import type { BriefInput } from '@/lib/trip/parse-inspiration'
 import type { SavedReelPlaceProof } from '@/lib/reels/backend-types'
 import type { BudgetLevel } from '@/lib/trip/backend-types'
+import { ACCENT_TAG, BODY, EYEBROW, INPUT, META, MAP_SHEET, ROW_GROUP, SHEET_HANDLE, TEXT_BUTTON } from '@/lib/shell/ui'
 import VerifiedPlacesMap from './VerifiedPlacesMap'
 import DateRangePicker from '@/components/create/DateRangePicker'
 
@@ -23,19 +24,16 @@ function deriveDestination(places: SavedReelPlaceProof[]): string {
 }
 
 const BUDGETS: BudgetLevel[] = ['budget', 'mid_range', 'premium', 'luxury']
-const INPUT =
-  'min-h-11 rounded-lg border border-[color:var(--line-soft)] bg-[color:var(--surface-1)] px-3 text-[color:var(--text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]'
-
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-[color:var(--line-soft)] py-3">
-      <span className="pt-0.5 text-[13px] text-[color:var(--text-muted)]">{label}</span>
+    <div className="flex items-start justify-between gap-4 px-4 py-3">
+      <span className={`${EYEBROW} pt-1`}>{label}</span>
       <span className="flex min-w-0 flex-col items-end text-right">{children}</span>
     </div>
   )
 }
 function Provenance({ children }: { children: React.ReactNode }) {
-  return <span className="mt-0.5 text-[11px] uppercase tracking-wide text-[color:var(--text-faint)]">{children}</span>
+  return <span className={`${ACCENT_TAG} mt-1`}>{children}</span>
 }
 
 export default function PlanSheet({
@@ -105,22 +103,21 @@ export default function PlanSheet({
           type="button"
           onClick={onBack}
           aria-label="Back to places"
-          className="flex h-11 w-11 items-center justify-center rounded-full border border-[rgba(232,182,103,0.3)] bg-[rgba(18,22,31,0.82)] text-[18px] text-[color:var(--starlight)] transition-colors hover:bg-[color:var(--night-700)]"
+          className="m-btn-icon text-[18px]"
         >
           ←
         </button>
       </div>
 
-      <section className="absolute z-20 flex flex-col border border-[color:var(--paper-line-2)] bg-[color:var(--surface-1)] text-[color:var(--text)] shadow-[0_1px_2px_rgba(28,23,16,0.10),0_-10px_44px_rgba(0,0,0,0.4)] inset-x-0 bottom-0 max-h-[82dvh] rounded-t-2xl md:inset-x-auto md:left-4 md:top-4 md:bottom-4 md:w-[420px] md:max-h-none md:rounded-2xl">
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-24 pt-6">
-          <div className="mb-4 flex items-baseline justify-between">
-            <h2 className="font-display text-[22px] font-medium leading-[1.22] tracking-[-0.015em]" style={{ fontVariationSettings: "'SOFT' 28, 'WONK' 1, 'opsz' 22" }}>
-              Plan this trip
-            </h2>
-            <span className="text-[13px] text-[color:var(--text-faint)]">{places.length} places</span>
+      <section className={`${MAP_SHEET} max-h-[82dvh] md:max-h-none`}>
+        <div aria-hidden className={SHEET_HANDLE} />
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-32 pt-4">
+          <div className="mb-4 flex items-baseline justify-between px-1">
+            <h2 className="t-title font-medium text-[color:var(--m-text)]">Plan this trip</h2>
+            <span className={META}>{places.length} places</span>
           </div>
 
-          <div>
+          <div className={ROW_GROUP}>
             <Row label="Where">
               {editing ? (
                 <input
@@ -132,7 +129,7 @@ export default function PlanSheet({
                 />
               ) : (
                 <>
-                  <span className="text-[15px] font-medium">{whereText || 'Astrail will infer'}</span>
+                  <span className={`${BODY} font-semibold`}>{whereText || 'Astrail will infer'}</span>
                   <Provenance>From {reelCount} of your Reels</Provenance>
                 </>
               )}
@@ -149,7 +146,7 @@ export default function PlanSheet({
                 />
               ) : (
                 <>
-                  <span className="text-[15px] font-medium">{originText || 'Not set'}</span>
+                  <span className={`${BODY} font-semibold`}>{originText || 'Not set'}</span>
                   <Provenance>{originText ? 'Your profile' : 'Optional'}</Provenance>
                 </>
               )}
@@ -170,7 +167,7 @@ export default function PlanSheet({
                 </select>
               ) : (
                 <>
-                  <span className="text-[15px] font-medium">{brief.budget_level ? budgetLabel(brief.budget_level) : 'Mid-range'}</span>
+                  <span className={`${BODY} font-semibold`}>{brief.budget_level ? budgetLabel(brief.budget_level) : 'Mid-range'}</span>
                   <Provenance>{brief.budget_level ? 'Your choice' : 'Astrail’s default'}</Provenance>
                 </>
               )}
@@ -187,7 +184,7 @@ export default function PlanSheet({
                 />
               ) : (
                 <>
-                  <span className="max-w-[220px] text-[15px] font-medium">{styleText || 'Balanced first draft'}</span>
+                  <span className={`${BODY} max-w-[220px] font-semibold`}>{styleText || 'Balanced first draft'}</span>
                   <Provenance>{styleText ? 'Your profile' : 'Inferred from your Reels'}</Provenance>
                 </>
               )}
@@ -195,7 +192,7 @@ export default function PlanSheet({
           </div>
 
           <div className="mt-6">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--text-muted)]">When are you going?</p>
+            <p className={`${EYEBROW} mb-2 px-1`}>When are you going?</p>
             <DateRangePicker
               variant="paper"
               placement="top"
@@ -210,7 +207,7 @@ export default function PlanSheet({
                 them stuck at "I don't know how to start". Now the offer is real: the button fills
                 the picker with a visible range they can see and change before generating. */}
             {ready ? null : (
-              <p className="mt-2 text-[13px] text-[color:var(--text-muted)]">
+              <p className={`${META} mt-2 flex flex-wrap items-center gap-x-1 px-1`}>
                 Not sure yet?{' '}
                 <button
                   type="button"
@@ -222,7 +219,7 @@ export default function PlanSheet({
                     const iso = (d: Date) => d.toISOString().slice(0, 10)
                     onBrief((b) => ({ ...b, start_date: iso(start), end_date: iso(end) }))
                   }}
-                  className="font-medium text-[color:var(--brass-deep)] underline underline-offset-2"
+                  className={`${TEXT_BUTTON} underline underline-offset-2`}
                 >
                   Use a 3-day draft
                 </button>{' '}
@@ -231,14 +228,14 @@ export default function PlanSheet({
             )}
           </div>
 
-          <button type="button" onClick={() => setEditing((e) => !e)} className="mt-4 text-[13px] font-medium text-[color:var(--brass-deep)] underline underline-offset-2">
+          <button type="button" onClick={() => setEditing((e) => !e)} className={`${TEXT_BUTTON} mt-3`}>
             {editing ? 'Done editing' : 'Change any of the above'}
           </button>
         </div>
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-2 p-4">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-2 bg-gradient-to-t from-[color:var(--m-page)] via-[color:var(--m-page)] to-transparent px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-8">
           {error ? (
-            <p role="alert" className="pointer-events-auto max-h-24 overflow-y-auto rounded-lg border border-dashed border-[color:var(--fail)] bg-[color:var(--surface-1)] px-3 py-2 text-[12px] text-[color:var(--fail)]">
+            <p role="alert" className="m-subcard pointer-events-auto max-h-24 overflow-y-auto px-4 py-2 text-[length:var(--t-meta)] font-semibold text-[color:var(--fail)]">
               {error}
             </p>
           ) : null}
@@ -249,7 +246,7 @@ export default function PlanSheet({
               type="button"
               onClick={onGenerate}
               disabled={!ready}
-              className="pointer-events-auto flex min-h-[52px] w-full items-center justify-center rounded-full border border-[color:var(--accent)] bg-[color:var(--accent)] px-5 text-[14px] font-medium text-[color:var(--accent-text)] shadow-[0_10px_28px_-8px_rgba(138,90,24,0.55)] transition-opacity hover:opacity-90 disabled:cursor-default disabled:border-dashed disabled:border-[color:var(--line-soft)] disabled:bg-transparent disabled:text-[color:var(--text-muted)]"
+              className="m-btn-primary pointer-events-auto w-full disabled:cursor-default disabled:opacity-50"
             >
               {ready ? 'Generate trip' : 'Add your dates to generate'}
             </button>

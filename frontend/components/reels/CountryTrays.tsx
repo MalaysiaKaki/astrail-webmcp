@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { countryDisplayLabel, type CountryTray } from '@/lib/reels/organize'
 import { sourceLabel } from '@/lib/reels/labels'
 import { safeHref } from '@/lib/safe-href'
+import { EYEBROW, GROUP_ROW, MAP_SHEET, META, ROW_GROUP, TAG } from '@/lib/shell/ui'
 import VerifiedPlacesMap from './VerifiedPlacesMap'
 
 /* Map-first tray: the collection over a full-bleed map (DESIGN.md — the map is the
@@ -49,25 +50,19 @@ export default function CountryTrays({
       {/* Floating collection title over the map */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-wrap items-center gap-3 p-4 md:pl-[460px]">
         {onBack ? (
-          <button
-            type="button"
-            onClick={onBack}
-            className="pointer-events-auto inline-flex min-h-11 items-center gap-1.5 rounded-full bg-[color:var(--surface-1)] px-4 py-2 text-[13px] font-medium text-[color:var(--text)] shadow-[0_2px_12px_rgba(0,0,0,0.35)] transition-colors hover:bg-[color:var(--surface-2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]"
-          >
+          <button type="button" onClick={onBack} className="m-btn-secondary pointer-events-auto">
             <span aria-hidden>←</span> Back
           </button>
         ) : null}
-        <span className="rounded-full bg-[color:var(--brass-bright)] px-4 py-2 text-[14px] font-medium text-[color:var(--night-900)] shadow-[0_2px_12px_rgba(0,0,0,0.35)]">
-          Places we found
-        </span>
-        <span className="text-[13px] text-[color:var(--starlight-70)]">
+        <span className="m-pill-badge t-body font-semibold">Places we found</span>
+        <span className="m-pill-badge text-[length:var(--t-meta)]">
           {total} {total === 1 ? 'place' : 'places'} · {countries} {countries === 1 ? 'country' : 'countries'}
         </span>
       </div>
 
       {/* Retractable sheet — bottom on mobile, left rail on desktop. Tap the grip to collapse. */}
       <section
-        className={`absolute z-20 flex flex-col border border-[color:var(--paper-line-2)] bg-[color:var(--surface-1)] text-[color:var(--text)] shadow-[0_1px_2px_rgba(28,23,16,0.10),0_-10px_44px_rgba(0,0,0,0.4)] transition-transform duration-300 ease-out inset-x-0 bottom-0 max-h-[70dvh] rounded-t-2xl md:inset-x-auto md:left-4 md:top-4 md:bottom-4 md:max-h-none md:w-[420px] md:rounded-2xl ${
+        className={`${MAP_SHEET} max-h-[70dvh] transition-transform duration-300 ease-out motion-reduce:transition-none md:max-h-none ${
           collapsed ? 'translate-y-[calc(100%-3.25rem)] md:translate-y-0 md:-translate-x-[calc(100%+1rem)]' : ''
         }`}
       >
@@ -75,52 +70,60 @@ export default function CountryTrays({
           type="button"
           onClick={() => setCollapsed((c) => !c)}
           aria-expanded={!collapsed}
-          className="flex min-h-[3.25rem] shrink-0 items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-[color:var(--brass-deep)]"
+          className="flex min-h-11 shrink-0 items-center justify-center focus-visible:outline-none focus-visible:shadow-[inset_0_0_0_2px_var(--m-accent)]"
         >
-          <span aria-hidden className="h-1 w-9 rounded-full bg-[color:var(--paper-line-2)]" />
+          <span aria-hidden className="h-1.5 w-10 flex-none rounded-full bg-[rgba(28,23,16,0.18)]" />
           <span className="sr-only">{collapsed ? 'Show places' : 'Hide places'}</span>
         </button>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-24">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-32">
           {trays.map((tray) => (
             <div key={tray.country_code} className="mb-6">
-              <div className="mb-3 flex items-baseline justify-between">
-                <h2 className="font-display text-[18px] font-medium text-[color:var(--text)]">{countryDisplayLabel(tray)}</h2>
-                <span className="text-[13px] text-[color:var(--text-faint)]">{tray.places.length}</span>
+              <div className="mb-2 flex items-baseline justify-between px-1">
+                <h2 className={EYEBROW}>{countryDisplayLabel(tray)}</h2>
+                <span className={META}>{tray.places.length}</span>
               </div>
-              <ul className="flex flex-col gap-2">
+              <ul className={ROW_GROUP}>
                 {tray.places.map((place) => {
                   const on = selectedPlaceIds.includes(place.place_id)
                   return (
                     <li key={place.place_id}>
                       <label
-                        className={`flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors ${
-                          on ? 'border-[color:var(--accent)]' : 'border-[color:var(--line-soft)] hover:bg-[color:var(--surface-2)]'
+                        className={`${GROUP_ROW} cursor-pointer items-start py-3 has-[:focus-visible]:shadow-[inset_0_0_0_2px_var(--m-accent)] ${
+                          on ? 'bg-[color:var(--m-subcard)]' : ''
                         }`}
                       >
-                        <input
-                          type="checkbox"
-                          aria-label={`Select ${place.name}`}
-                          checked={on}
-                          disabled={!on && atMax}
-                          onChange={() => onToggle(place.place_id)}
-                          className="mt-0.5 h-5 w-5 shrink-0 accent-[color:var(--brass-deep)] disabled:cursor-not-allowed disabled:opacity-40"
-                        />
+                        {/* The native checkbox keeps its semantics; only its look is drawn here. The
+                            /app shell's dark colour-scheme renders an unchecked native box as a dark
+                            square, so it is appearance-none with a kit circle that fills with ink. */}
+                        <span className="relative mt-0.5 grid h-6 w-6 flex-none place-items-center">
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${place.name}`}
+                            checked={on}
+                            disabled={!on && atMax}
+                            onChange={() => onToggle(place.place_id)}
+                            className="peer absolute inset-0 m-0 h-6 w-6 cursor-pointer appearance-none rounded-full bg-[color:var(--m-card)] shadow-[inset_0_0_0_1.5px_rgba(28,23,16,0.3)] transition-colors duration-[var(--m-dur-press)] checked:bg-[color:var(--m-ink)] checked:shadow-none focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
+                          />
+                          <svg viewBox="0 0 24 24" fill="none" aria-hidden className="pointer-events-none relative hidden h-4 w-4 text-[color:var(--m-on-ink)] peer-checked:block">
+                            <path d="m5.5 12.5 4 4 9-9" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </span>
                         <span className="min-w-0 flex-1">
-                          <span className="flex items-center gap-2 text-[15px] font-medium text-[color:var(--text)]">
-                            <span data-testid="place-pin" aria-hidden className="inline-block h-2 w-2 shrink-0 rounded-full bg-[color:var(--brass-deep)]" />
+                          <span className={`flex items-center gap-2 font-semibold ${on ? 'text-[color:var(--m-ink)]' : ''}`}>
+                            <span data-testid="place-pin" aria-hidden className="inline-block h-2 w-2 shrink-0 rounded-full bg-[color:var(--m-accent)]" />
                             {place.name}
                           </span>
-                          <span className="mt-0.5 block font-mono text-[11px] text-[color:var(--text-faint)]">
+                          <span className="mt-0.5 block font-mono text-[length:var(--t-label)] text-[color:var(--m-text-muted)]">
                             {place.lat.toFixed(4)}, {place.lng.toFixed(4)}
                           </span>
-                          <span className="mt-1.5 block text-[13px] text-[color:var(--text-muted)]">“{place.evidence_quote}”</span>
+                          <span className={`mt-1.5 block ${META}`}>“{place.evidence_quote}”</span>
                           {safeHref(place.source_reel_url) ? (
                             <a
                               href={safeHref(place.source_reel_url)}
                               target="_blank"
                               rel="noreferrer"
-                              className="mt-2 inline-block text-[11px] font-semibold uppercase tracking-wide text-[color:var(--brass-deep)] underline underline-offset-2"
+                              className="mt-1 inline-flex min-h-11 items-center text-[length:var(--t-meta)] font-semibold text-[color:var(--m-accent)] underline underline-offset-2 focus-visible:outline-none focus-visible:shadow-[var(--m-focus)]"
                             >
                               {sourceLabel(place.source_reel_url) === 'Post' ? 'Source post' : 'Source Reel'}
                             </a>
@@ -136,17 +139,15 @@ export default function CountryTrays({
         </div>
 
         {/* FAB pinned at the sheet bottom */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-stretch gap-2 p-4">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-stretch gap-2 bg-gradient-to-t from-[color:var(--m-page)] via-[color:var(--m-page)] to-transparent px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-8">
           {maxSelected && atMax ? (
-            <p className="self-center rounded-full bg-[color:var(--surface-2)] px-3 py-1 text-[12px] text-[color:var(--text-muted)]">
-              Up to {maxSelected} places per trip
-            </p>
+            <p className={`${TAG} self-center`}>Up to {maxSelected} places per trip</p>
           ) : null}
           <button
             type="button"
             onClick={onPlan}
             disabled={!selectedPlaceIds.length}
-            className="pointer-events-auto flex min-h-[52px] w-full items-center justify-center rounded-full border border-[color:var(--accent)] bg-[color:var(--accent)] px-5 text-[14px] font-medium text-[color:var(--accent-text)] shadow-[0_10px_28px_-8px_rgba(138,90,24,0.55)] transition-opacity hover:opacity-90 disabled:cursor-default disabled:border-dashed disabled:border-[color:var(--line-soft)] disabled:bg-transparent disabled:text-[color:var(--text-muted)]"
+            className="m-btn-primary pointer-events-auto w-full disabled:cursor-default disabled:opacity-50"
           >
             {selectedPlaceIds.length ? `Plan this trip · ${selectedPlaceIds.length}${maxSelected ? ` / ${maxSelected}` : ''}` : 'Select places to plan this trip'}
           </button>
@@ -164,7 +165,7 @@ export default function CountryTrays({
         aria-hidden={!collapsed}
         tabIndex={collapsed ? 0 : -1}
         data-testid="reopen-places"
-        className={`absolute left-0 top-1/2 z-30 hidden -translate-y-1/2 items-center justify-center rounded-r-xl border border-l-0 border-[color:var(--paper-line-2)] bg-[color:var(--surface-1)] px-1.5 py-5 text-[color:var(--text-muted)] shadow-[0_2px_12px_rgba(0,0,0,0.35)] transition-opacity duration-300 hover:text-[color:var(--text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)] md:flex ${
+        className={`absolute left-0 top-1/2 z-30 hidden min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-r-[var(--m-r-card)] bg-[color:var(--m-card)] px-2 py-5 text-[color:var(--m-text)] shadow-[var(--m-shadow-2)] transition-opacity duration-300 focus-visible:outline-none focus-visible:shadow-[var(--m-focus)] motion-reduce:transition-none md:flex ${
           collapsed ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
       >

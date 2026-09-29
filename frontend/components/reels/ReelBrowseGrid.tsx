@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import type { SavedReelCard } from '@/lib/reels/backend-types'
 import { countryLabel, reelLabel, sourceLabel, statusLabel } from '@/lib/reels/labels'
+import { META, TAG } from '@/lib/shell/ui'
 
 /* ReelBrowseGrid — the default "Browse" view of the Library. It replaced the card-fan carousel
    (kept at ui/card-fan-carousel.tsx for reference): the fan showed only bare, cropped thumbnails,
@@ -40,7 +41,7 @@ function conciseLabel(full: string): string {
 const PlaceholderGlyph = () => (
   <span
     aria-hidden
-    className="absolute inset-0 flex items-center justify-center text-[color:var(--brass-deep)] opacity-40"
+    className="absolute inset-0 flex items-center justify-center text-[color:var(--m-accent)] opacity-40"
   >
     <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -102,29 +103,29 @@ function ReelCard({
           onMouseMove={handleMove}
           onMouseLeave={() => setTilt({ rx: 0, ry: 0 })}
           style={{ transform: `rotateX(${tilt.rx}deg) rotateY(${tilt.ry}deg)` }}
-          className="group block w-full origin-center overflow-hidden rounded-xl border border-[color:var(--paper-line-2)] bg-[color:var(--surface-1)] text-left shadow-[0_2px_10px_rgba(0,0,0,0.05)] transition-[transform,box-shadow] duration-200 ease-out will-change-transform hover:shadow-[0_14px_30px_rgba(0,0,0,0.16)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]"
+          className="group rounded-[var(--m-r-card)] bg-[color:var(--m-card)] shadow-[var(--m-shadow-1)] block w-full origin-center overflow-hidden text-left transition-[transform,box-shadow] duration-200 ease-out will-change-transform hover:shadow-[var(--m-shadow-2)] focus-visible:outline-none focus-visible:shadow-[var(--m-focus)]"
         >
-          <div className="relative aspect-[9/16] w-full bg-[color:var(--surface-2)]">
+          <div className="relative m-2 aspect-[9/16] overflow-hidden rounded-[var(--m-r-sub)] bg-[color:var(--m-subcard)]">
             {card.thumbnail_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={card.thumbnail_url} alt="" loading="lazy" className="h-full w-full object-cover" />
             ) : (
               <PlaceholderGlyph />
             )}
-            <span className="absolute left-2 top-2 rounded-full border border-[color:var(--paper-line-2)] bg-[color:var(--surface-1)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--text-faint)]">
+            <span className={`${TAG} absolute left-2 top-2 !bg-[color:var(--m-card)]`}>
               {sourceLabel(card.normalized_url)}
             </span>
           </div>
 
-          <div className="flex flex-col gap-1 px-3 py-2.5">
-            <span className="truncate font-display text-[14px] font-medium tracking-[-0.01em] text-[color:var(--text)]">
+          <div className="flex flex-col gap-1 px-3 pb-3 pt-1">
+            <span className="t-card-title truncate text-[color:var(--m-text)]">
               {label}
             </span>
-            <span className="flex items-center gap-1.5 text-[12px] text-[color:var(--text-muted)]">
+            <span className={`${META} flex items-center gap-1.5`}>
               <span
                 aria-hidden
                 className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${
-                  active ? 'bg-[color:var(--brass-deep)]' : 'bg-[color:var(--text-faint)]'
+                  active ? 'bg-[color:var(--m-accent)]' : 'bg-[color:var(--m-text-muted)] opacity-50'
                 }`}
               />
               <span className="truncate">

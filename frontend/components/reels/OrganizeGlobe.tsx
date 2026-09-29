@@ -67,14 +67,14 @@ export default function OrganizeGlobe({ message }: { message: string }) {
         role="status"
         aria-live="polite"
         aria-atomic="true"
-        className="max-w-[34ch] text-center text-sm tracking-[0.08em] text-[color:var(--starlight)]"
+        className="m-card max-w-[34ch] px-5 py-3 text-center font-[family-name:var(--font-ui)] text-[length:var(--t-body)] font-semibold text-[color:var(--m-text)]"
       >
         <span key={message} className="organize-word">{message}</span>
       </p>
 
-      <p className="text-xs tabular-nums tracking-[0.08em] text-[color:var(--muted)]">
+      <p className="m-pill-badge text-[length:var(--t-meta)] tabular-nums">
         {elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`}
-        <span className="ml-2 text-[color:var(--faint)]">this usually takes 1&ndash;3 minutes</span>
+        <span className="text-[color:var(--m-text-muted)]">this usually takes 1&ndash;3 minutes</span>
       </p>
     </main>
   )

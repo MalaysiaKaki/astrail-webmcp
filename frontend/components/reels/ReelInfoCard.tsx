@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReelCollection, SavedReelCard } from '@/lib/reels/backend-types'
 import { reelLabel, sourceLabel, statusExplanation, statusLabel } from '@/lib/reels/labels'
 import { safeHref } from '@/lib/safe-href'
+import { DIALOG_BACKDROP, DIALOG_PANEL, META, SECTION_TITLE, SHEET_HANDLE, SUBCARD, TAG, TEXT_BUTTON } from '@/lib/shell/ui'
 
 /* ReelInfoCard — a centered modal opened from the Library browse grid showing a saved reel's
    cover, its grounded places (name · country · evidence quote, read-only), a single header
@@ -32,7 +33,7 @@ const ImageIcon = ({ size = 15, opacity = 1 }: { size?: number; opacity?: number
 )
 
 const TRAY_ROW =
-  'flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-[color:var(--paper-line-2)] bg-transparent px-4 text-left text-[13px] font-medium text-[color:var(--text)] transition-colors hover:bg-[color:var(--surface-2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)] disabled:cursor-default disabled:opacity-60'
+  'flex min-h-11 w-full items-center justify-between gap-3 rounded-[var(--m-r-sub)] bg-[color:var(--m-card)] px-4 text-left font-[family-name:var(--font-ui)] text-[length:var(--t-body)] font-semibold text-[color:var(--m-text)] shadow-[var(--m-shadow-1)] transition-transform duration-[var(--m-dur-press)] active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[var(--m-focus)] motion-reduce:transition-none motion-reduce:active:scale-100 disabled:cursor-default disabled:opacity-60'
 
 export default function ReelInfoCard({
   card,
@@ -107,7 +108,7 @@ export default function ReelInfoCard({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(28,23,16,0.45)] p-4"
+      className={DIALOG_BACKDROP}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
       role="presentation"
     >
@@ -115,26 +116,27 @@ export default function ReelInfoCard({
         role="dialog"
         aria-modal="true"
         aria-labelledby="reel-info-heading"
-        className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-[color:var(--paper-line-2)] bg-[color:var(--surface-1)] shadow-[var(--shadow-paper)]"
+        className={DIALOG_PANEL}
       >
+        <div aria-hidden className={SHEET_HANDLE} />
         <button
           ref={closeButtonRef}
           type="button"
           aria-label="Close"
           onClick={onClose}
-          className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--paper-line-2)] bg-[color:var(--surface-1)] text-[color:var(--text-muted)] transition-colors hover:bg-[color:var(--surface-2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]"
+          className="m-btn-icon absolute right-3 top-3 z-10"
         >
           <span aria-hidden>✕</span>
         </button>
 
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           {/* Cover */}
-          <div className="relative h-[280px] w-full shrink-0 bg-[color:var(--surface-2)]">
+          <div className="relative mx-4 mt-3 h-[240px] shrink-0 overflow-hidden rounded-[var(--m-r-card)] bg-[color:var(--m-subcard)] md:mt-4">
             {card.thumbnail_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={card.thumbnail_url} alt="" className="h-full w-full object-cover" />
             ) : (
-              <div className="flex h-full w-full items-center justify-center text-[color:var(--brass-deep)]">
+              <div className="flex h-full w-full items-center justify-center text-[color:var(--m-accent)]">
                 <ImageIcon size={40} opacity={0.4} />
               </div>
             )}
@@ -142,12 +144,12 @@ export default function ReelInfoCard({
 
           {/* Heading */}
           <div className="px-6 pt-5">
-            <h2 id="reel-info-heading" className="line-clamp-2 font-display text-[20px] font-medium tracking-[-0.01em] text-[color:var(--text)]">
+            <h2 id="reel-info-heading" className={`${SECTION_TITLE} line-clamp-2`}>
               {reelLabel(card)}
             </h2>
             <div className="mt-1 flex items-center justify-between gap-3">
-              <span className="flex items-center gap-2 text-[13px] text-[color:var(--text-muted)]">
-                <span className="shrink-0 rounded-full border border-[color:var(--paper-line-2)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--text-faint)]">
+              <span className={`${META} flex items-center gap-2`}>
+                <span className={`${TAG} shrink-0`}>
                   {kind}
                 </span>
                 {statusLabel(card)}
@@ -156,7 +158,7 @@ export default function ReelInfoCard({
                 href={safeHref(card.normalized_url)}
                 target="_blank"
                 rel="noreferrer"
-                className="shrink-0 text-[12px] font-semibold uppercase tracking-wide text-[color:var(--brass-deep)] underline underline-offset-2"
+                className={`${TEXT_BUTTON} shrink-0 !text-[color:var(--m-accent)]`}
               >
                 {kind === 'Post' ? 'View post' : 'View Reel'}
               </a>
@@ -168,24 +170,24 @@ export default function ReelInfoCard({
             {card.places.length > 0 ? (
               <ul className="flex flex-col gap-2">
                 {card.places.map((place) => (
-                  <li key={place.place_id} className="rounded-lg border border-[color:var(--line-soft)] p-3">
-                    <span className="flex items-center gap-2 text-[15px] font-medium text-[color:var(--text)]">
-                      <span data-testid="place-pin" aria-hidden className="inline-block h-2 w-2 shrink-0 rounded-full bg-[color:var(--brass-deep)]" />
+                  <li key={place.place_id} className={SUBCARD}>
+                    <span className="t-card-title flex items-center gap-2 text-[color:var(--m-text)]">
+                      <span data-testid="place-pin" aria-hidden className="inline-block h-2 w-2 shrink-0 rounded-full bg-[color:var(--m-accent)]" />
                       {place.name}
                     </span>
-                    <span className="mt-0.5 block text-[12px] text-[color:var(--text-faint)]">{place.country_name}</span>
-                    <span className="mt-1.5 block text-[13px] text-[color:var(--text-muted)]">“{place.evidence_quote}”</span>
+                    <span className={`${META} mt-0.5 block`}>{place.country_name}</span>
+                    <span className={`${META} mt-1.5 block`}>“{place.evidence_quote}”</span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="rounded-lg border border-dashed border-[color:var(--line-soft)] p-3 text-[13px] text-[color:var(--text-muted)]">
+              <p className={`${SUBCARD} ${META}`}>
                 {/* statusLabel, NOT STATUS_LABELS: the raw map has no idea a failure was a used-up
                     daily allowance rather than a broken reel, and this is the surface someone
                     opens precisely to find out which. */}
                 {`No places found yet — ${statusLabel(card)}.`}
                 {statusExplanation(card) ? (
-                  <span className="mt-1.5 block text-[color:var(--text-faint)]">{statusExplanation(card)}</span>
+                  <span className="mt-1.5 block">{statusExplanation(card)}</span>
                 ) : null}
               </p>
             )}
@@ -193,20 +195,20 @@ export default function ReelInfoCard({
 
           {/* Add to a tray */}
           <div className="px-6 pb-6 pt-5">
-            <h3 className="mb-3 text-[13px] font-medium text-[color:var(--text)]">Add to a tray</h3>
+            <h3 className="t-card-title mb-3 text-[color:var(--m-text)]">Add to a tray</h3>
 
             {addError ? (
-              <p role="alert" className="mb-3 rounded-lg border border-dashed border-[color:var(--line-soft)] bg-[color:var(--surface-2)] p-3 text-[13px] text-[color:var(--text-muted)]">
+              <p role="alert" className={`${SUBCARD} ${META} mb-3`}>
                 {addError}
               </p>
             ) : null}
 
             {!listReady && traysState === 'loading' ? (
-              <p className="text-[13px] text-[color:var(--text-muted)]">Loading your trays…</p>
+              <p className={META}>Loading your trays…</p>
             ) : (
               <>
                 {listReady && traysState !== 'ready' ? (
-                  <p role="status" className="mb-2 text-[13px] text-[color:var(--text-muted)]">
+                  <p role="status" className={`${META} mb-2`}>
                     {traysState === 'loading'
                       ? 'Refreshing your trays…'
                       : "Couldn't refresh your trays — showing your last version."}
@@ -214,7 +216,7 @@ export default function ReelInfoCard({
                 ) : null}
                 <ul className="flex flex-col gap-2">
                   {!listReady && traysState === 'error' ? (
-                    <li className="rounded-lg border border-dashed border-[color:var(--line-soft)] p-3 text-[13px] text-[color:var(--text-muted)]">
+                    <li className={`${SUBCARD} ${META}`}>
                       {"Couldn't load your trays."}
                     </li>
                   ) : (
@@ -230,7 +232,7 @@ export default function ReelInfoCard({
                             className={TRAY_ROW}
                           >
                             <span className="truncate">{c.name}</span>
-                            <span className="shrink-0 text-[color:var(--brass-deep)]">
+                            <span className="shrink-0 text-[color:var(--m-accent)]">
                               {added ? 'Added ✓' : isAdding ? 'Adding…' : 'Add'}
                             </span>
                           </button>
@@ -243,7 +245,7 @@ export default function ReelInfoCard({
                       type="button"
                       disabled={addingId !== null}
                       onClick={onRequestNewTray}
-                      className={`${TRAY_ROW} border-dashed text-[color:var(--brass-deep)]`}
+                      className={`${TRAY_ROW} !text-[color:var(--m-accent)]`}
                     >
                       + New tray…
                     </button>

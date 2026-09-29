@@ -100,13 +100,13 @@ describe('RememberedPreferences', () => {
      utility, and a border written only in markup silently never renders. jsdom has no cascade at
      all, so that failure is invisible to every other test in this file — the most this suite can
      honestly do is refuse to let the class be dropped. */
-  it('keeps the panel class the styling actually hangs off', async () => {
+  it('keeps the panel hook the styling hangs off', async () => {
     getMemoryPreferences.mockResolvedValue({ status: 'ok', facts: [fact('Prefers walkable days')] })
     const { container } = render(<RememberedPreferences />)
     await screen.findByText(/Prefers walkable days/)
     expect(
-      container.querySelector('.memory-panel'),
-      'restyled with utilities the scoped surface rules will swallow',
+      container.querySelector('[data-memory-panel]'),
+      'the panel lost its data-memory-panel hook',
     ).not.toBeNull()
   })
 })

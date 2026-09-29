@@ -18,6 +18,7 @@ import TrayDetail from './TrayDetail'
 import LibraryPanel from './LibraryPanel'
 import CreateTrayDialog from './CreateTrayDialog'
 import ReelInfoCard from './ReelInfoCard'
+import { BODY, CARD, INPUT, META, PAGE_TITLE, SECTION_TITLE, SUBCARD, TEXT_BUTTON } from '@/lib/shell/ui'
 
 /* TraysScreen — the /app home. Replaces the old DashboardHome inbox body with:
    greeting + quick-capture + a Library banner + a "Your trays" grid (one TrayCard per
@@ -30,8 +31,13 @@ import ReelInfoCard from './ReelInfoCard'
    survive (plan T1.2 / B2 / DECISION B). LibraryPanel (T1.3) and CreateTrayDialog (T1.4)
    are not built yet, so their seams here are interim placeholders, not the real panels. */
 
-const BTN_PRIMARY =
-  'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[color:var(--accent)] bg-[color:var(--accent)] px-4 text-[13px] font-medium text-[color:var(--accent-text)] transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]'
+// Disabled stays visible: the kit pill dims but keeps its shape, so Save reads as "not yet".
+const BTN_SAVE = 'm-btn-secondary flex-none disabled:cursor-default disabled:opacity-50'
+const CHEVRON = (
+  <svg className="m-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="m9 6 6 6-6 6" />
+  </svg>
+)
 
 // Quick capture takes up to 5 links per save — the same cap as MAX_REELS on trip
 // generation, so one batch of pastes can feed a full trip. Each link still goes through
@@ -477,10 +483,10 @@ export default function TraysScreen({
           MAX_CAPTURE_LINKS link rows; the "+" below adds a row, Save submits them all. */}
       <form
         onSubmit={(e) => { e.preventDefault(); void capture() }}
-        className="mb-6 flex flex-col gap-2 rounded-2xl border border-dashed border-[color:var(--line-soft)] bg-[color:var(--surface-2)] p-3"
+        className={`${CARD} mb-6 flex flex-col gap-3`}
       >
         {urls.map((value, i) => (
-          <div key={i} className="flex items-center gap-3">
+          <div key={i} className="relative flex items-center gap-2">
             <label htmlFor={`capture-input-${i}`} className="sr-only">
               {i === 0 ? 'Paste a Reel or post link' : `Paste a Reel or post link ${i + 1}`}
             </label>
@@ -494,16 +500,16 @@ export default function TraysScreen({
                 if (spreadPastedLinks(i, text)) e.preventDefault()
               }}
               placeholder={i === 0 ? 'Paste an Instagram Reel or post link to save it for later…' : 'Paste another Reel or post link…'}
-              className="min-h-11 flex-1 rounded-lg border border-[color:var(--line-soft)] bg-[color:var(--surface-1)] px-4 text-[color:var(--text)] placeholder:text-[color:var(--text-faint)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]"
+              className={`${INPUT} w-full min-w-0 flex-1`}
             />
             {i === 0 ? (
-              <button type="submit" disabled={busy || !urls.some((u) => u.trim())} className={BTN_PRIMARY}>Save</button>
+              <button type="submit" disabled={busy || !urls.some((u) => u.trim())} className={BTN_SAVE}>Save</button>
             ) : (
               <button
                 type="button"
                 onClick={() => setUrls((prev) => prev.filter((_, j) => j !== i))}
                 aria-label={`Remove link ${i + 1}`}
-                className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-[color:var(--text-faint)] transition-colors hover:text-[color:var(--text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]"
+                className="m-btn-icon flex-none"
               >
                 ✕
               </button>
@@ -518,7 +524,7 @@ export default function TraysScreen({
           <button
             type="button"
             onClick={() => { setLibraryMode('select'); setLibraryOpen(true) }}
-            className="mt-4 w-full rounded-full bg-[color:var(--brass-deep)] px-4 py-2.5 text-sm font-semibold text-[color:var(--paper-0)] transition hover:opacity-90"
+            className="m-btn-primary w-full"
           >
             Plan a trip from your {cards.length} saved {cards.length === 1 ? 'reel' : 'reels'}
           </button>
@@ -528,22 +534,22 @@ export default function TraysScreen({
           <button
             type="button"
             onClick={() => setUrls((prev) => [...prev, ''])}
-            className="inline-flex min-h-11 items-center gap-2 self-start rounded-lg px-1 text-[13px] font-medium text-[color:var(--brass-deep)] transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]"
+            className={`${TEXT_BUTTON} self-start`}
           >
             <span aria-hidden className="text-[16px] leading-none">+</span>
             Add another link
-            <span className="font-normal text-[color:var(--text-faint)]">({urls.length}/{MAX_CAPTURE_LINKS})</span>
+            <span className="font-normal text-[color:var(--m-text-muted)]">({urls.length}/{MAX_CAPTURE_LINKS})</span>
           </button>
         ) : (
-          <p className="px-1 text-[13px] text-[color:var(--text-faint)]">Max {MAX_CAPTURE_LINKS} links at a time.</p>
+          <p className={`${META} px-1`}>Max {MAX_CAPTURE_LINKS} links at a time.</p>
         )}
         {/* Honest "Soon" teaser (matches the landing's Telegram line) — no date promised. */}
-        <p className="border-t border-dashed border-[color:var(--line-soft)] px-1 pt-2.5 text-[13px] text-[color:var(--text-faint)]">
-          <span className="font-medium text-[color:var(--brass-deep)]">Coming soon:</span> share Reels to the
+        <p className={`${META} border-t border-[color:var(--line-soft)] pt-3`}>
+          <span className="font-semibold text-[color:var(--m-accent)]">Coming soon:</span> share Reels to the
           Astrail Telegram bot and they&rsquo;ll land in your library automatically — no more pasting one by one.
         </p>
       </form>
-      {message ? <p role="status" className="-mt-3 mb-6 text-[13px] text-[color:var(--text-muted)]">{message}</p> : null}
+      {message ? <p role="status" className={`${META} -mt-3 mb-6 px-1`}>{message}</p> : null}
     </>
   )
 
@@ -551,26 +557,26 @@ export default function TraysScreen({
      has an agent. Compact on purpose: the <details> below it has to stay above the fold on a
      laptop, or a judge without WebMCP concludes there is no manual route at all. */
   const agentInvitation = (
-    <section className="mb-4 rounded-2xl border border-[color:var(--brass-deep)] bg-[color:var(--brass-wash)] p-5">
-      <h2 className="font-display text-[18px] font-medium text-[color:var(--text)]">
+    <section className={`${CARD} mb-4`}>
+      <h2 className={SECTION_TITLE}>
         No Reels of your own? Start here.
       </h2>
-      <p className="mt-1.5 max-w-[62ch] text-[14px] text-[color:var(--text-muted)]">
+      <p className={`${BODY} mt-1.5 max-w-[62ch]`}>
         Astrail is built to be driven by an AI agent. With this page open, paste the prompt below
         into ChatGPT &mdash; it already carries three real Tokyo Reels, so you do not need any of
         your own.
       </p>
       {/* Selectable text, not an input: it is the fallback when the clipboard is unavailable,
           and it must never look like one more field waiting to be filled in. */}
-      <pre className="mt-3 overflow-x-auto whitespace-pre-wrap rounded-lg border border-[color:var(--line-soft)] bg-[color:var(--surface-1)] p-3 font-mono text-[12px] leading-[1.6] text-[color:var(--text)]">
+      <pre className={`${SUBCARD} mt-3 overflow-x-auto whitespace-pre-wrap font-mono text-[length:var(--t-label)] leading-[1.6] text-[color:var(--m-text)]`}>
         {starterPrompt}
       </pre>
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        <button type="button" onClick={() => void copyStarterPrompt()} className={BTN_PRIMARY}>
+        <button type="button" onClick={() => void copyStarterPrompt()} className="m-btn-primary">
           Copy prompt
         </button>
         {copyState !== 'idle' ? (
-          <p role="status" className="text-[13px] text-[color:var(--text-muted)]">
+          <p role="status" className={META}>
             {copyState === 'copied'
               ? 'Copied. Paste it into ChatGPT with this page open.'
               : 'Copy did not work in this browser — select the prompt above and copy it yourself.'}
@@ -584,7 +590,7 @@ export default function TraysScreen({
           names that step and claims nothing wider. It still says nothing about SPEND, unlike the
           band on a populated home: this screen is shown to accounts whose trip entitlement may
           already be gone, and promising them an allowance to spend is its own false claim. */}
-      <p className="mt-3 text-[13px] text-[color:var(--text-faint)]">
+      <p className={`${META} mt-3`}>
         Astrail will ask you to approve the plan on this page before it starts building the trip.
       </p>
     </section>
@@ -606,12 +612,9 @@ export default function TraysScreen({
         />
       ) : null}
 
-      <header className="mb-10">
-        <p className="text-[14px] text-[color:var(--text-muted)]">Welcome back,</p>
-        <span
-          className="mt-1.5 block font-display text-[36px] font-medium leading-[1.1] tracking-[-0.015em] text-[color:var(--text)]"
-          style={{ fontVariationSettings: "'SOFT' 36, 'WONK' 0, 'opsz' 36" }}
-        >
+      <header className="mb-8">
+        <p className={META}>Welcome back,</p>
+        <span className={`${PAGE_TITLE} mt-1 block`}>
           {name}
         </span>
       </header>
@@ -627,7 +630,7 @@ export default function TraysScreen({
               disclosure triangle, and without it the summary reads as a link that goes somewhere
               else rather than a section that opens here. `list-inside` keeps the marker inside
               the padding box so it lines up with the content above. */}
-          <summary className="w-fit list-inside rounded-lg px-1 py-2.5 text-[13px] font-medium text-[color:var(--brass-deep)] transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]">
+          <summary className={`${TEXT_BUTTON} w-fit list-inside`}>
             Prefer to paste Reel links here?
           </summary>
           <div className="mt-3">{capturePanel}</div>
@@ -636,7 +639,7 @@ export default function TraysScreen({
         capturePanel
       )}
       {error ? (
-        <p role="alert" className="mb-6 rounded-lg border border-dashed border-[color:var(--line-soft)] bg-[color:var(--surface-2)] p-3 text-[13px] text-[color:var(--text-muted)]">
+        <p role="alert" className={`${META} m-subcard mb-6 p-4`}>
           {error}
         </p>
       ) : null}
@@ -645,10 +648,10 @@ export default function TraysScreen({
           stacking "No trays yet" under it would push the details summary below the fold to
           re-explain an absence the user is already being given a way out of. */}
       {agentFirst ? null : isEmpty ? (
-        <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-[color:var(--line-soft)] px-6 py-16 text-center">
-          <span aria-hidden className="h-[72px] w-[72px] rounded-full border border-dashed border-[color:var(--line-soft)]" />
-          <h2 className="font-display text-[18px] font-medium text-[color:var(--text)]">No trays yet</h2>
-          <p className="max-w-[42ch] text-[14px] text-[color:var(--text-muted)]">
+        <div className={`${CARD} flex flex-col items-center gap-4 px-6 py-12 text-center`}>
+          <span aria-hidden className="h-[72px] w-[72px] rounded-full bg-[color:var(--m-subcard)]" />
+          <h2 className={SECTION_TITLE}>No trays yet</h2>
+          <p className={`${BODY} max-w-[42ch]`}>
             A tray is a group of saved Reels &mdash; one per trip you are thinking about. Paste the
             Reels you saved and Astrail will pull out the real places, check they exist, and connect
             them into a route you can follow.
@@ -670,20 +673,20 @@ export default function TraysScreen({
           <button
             type="button"
             onClick={() => setLibraryOpen(true)}
-            className="mb-6 flex w-full flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-lg px-1 py-2 text-left transition-colors hover:bg-[color:var(--surface-2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]"
+            className="m-card-link mb-6 w-full text-left"
           >
-            <span className="flex min-w-0 flex-wrap items-baseline gap-x-2.5">
-              <span className="font-display text-[18px] font-medium text-[color:var(--text)]">Your inspiration starts here</span>
-              <span className="text-[13px] text-[color:var(--text-muted)]">Every reel you saved, in one place.</span>
+            <span className="flex min-w-0 flex-col">
+              <span className="t-card-title">Your inspiration starts here</span>
+              <span className="t-meta">Every reel you saved, in one place.</span>
             </span>
-            <span aria-hidden className="text-[13px] font-medium text-[color:var(--brass-deep)]">Open</span>
+            {CHEVRON}
           </button>
 
           {/* Your trays */}
           <section>
             <div className="mb-4 flex items-baseline justify-between gap-4">
-              <h2 className="font-display text-[18px] font-medium text-[color:var(--text)]">Your trays</h2>
-              <span className="text-[13px] text-[color:var(--text-faint)]">{collections.length} {collections.length === 1 ? 'tray' : 'trays'}</span>
+              <h2 className={SECTION_TITLE}>Your trays</h2>
+              <span className={META}>{collections.length} {collections.length === 1 ? 'tray' : 'trays'}</span>
             </div>
 
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -711,10 +714,10 @@ export default function TraysScreen({
                 type="button"
                 onClick={() => setCreateOpen(true)}
                 aria-label="Create a tray"
-                className="flex min-h-[264px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-[color:var(--paper-line-2)] bg-transparent text-[color:var(--text-muted)] transition-colors hover:bg-[color:var(--surface-2)] hover:text-[color:var(--text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]"
+                className="m-subcard flex min-h-[200px] flex-col items-center justify-center gap-3 transition-transform duration-[var(--m-dur-press)] active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[var(--m-focus)] motion-reduce:transition-none motion-reduce:active:scale-100"
               >
-                <span aria-hidden className="flex h-12 w-12 items-center justify-center rounded-full border border-[color:var(--brass-deep)] text-[24px] leading-none text-[color:var(--brass-deep)]">+</span>
-                <span className="text-[14px] font-medium">New tray</span>
+                <span aria-hidden className="m-btn-icon pointer-events-none text-[24px] leading-none">+</span>
+                <span className="t-body font-semibold text-[color:var(--m-text)]">New tray</span>
               </button>
             </div>
 

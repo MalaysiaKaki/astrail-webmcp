@@ -48,41 +48,33 @@ export default function TrayCard({
   const cover = photos.find((p) => p.image) ?? null
 
   return (
-    <article className="relative h-[264px]">
-      {/* Depth — a second reel edge peeking behind, only when the tray holds >1.
-          A shifted clone of the cover (up + right, slight rotate) so it peeks the
-          same at any card width instead of sprawling on narrow 2-col tiles. */}
-      {reelCount > 1 ? (
-        <div
-          aria-hidden
-          className="absolute inset-x-4 top-0 h-[160px] -translate-y-[7px] translate-x-[11px] rotate-[3deg] rounded-xl border border-[color:var(--paper-line)] bg-[color:var(--surface-2)] shadow-[0_4px_12px_rgba(28,23,16,0.08)]"
-        />
-      ) : null}
-
-      {/* Cover peeking out of the top pocket. */}
-      <div className="absolute inset-x-4 top-0 h-[160px] overflow-hidden rounded-xl border border-[color:var(--paper-line-2)] bg-[color:var(--surface-2)] shadow-[0_6px_16px_rgba(28,23,16,0.12)]">
-        {cover?.image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={cover.image} alt={cover.alt ?? ''} className="h-full w-full object-cover" />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-[color:var(--brass-deep)]">
-            <ImageIcon size={28} opacity={0.4} />
-          </div>
-        )}
+    <article className="m-card relative flex flex-col gap-3 p-3">
+      {/* Cover — a rounded image area; a tray with two or more reels gets a stacked-edge hint. */}
+      <div className="relative">
+        {reelCount > 1 ? (
+          <div aria-hidden className="absolute inset-x-3 -top-1.5 h-full rounded-[var(--m-r-sub)] bg-[color:var(--m-subcard)]" />
+        ) : null}
+        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[var(--m-r-sub)] bg-[color:var(--m-subcard)]">
+          {cover?.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={cover.image} alt={cover.alt ?? ''} className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-[color:var(--m-accent)]">
+              <ImageIcon size={28} opacity={0.5} />
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Folder front — the pocket. Name (Open control) + count sit on the body. */}
-      <div className="absolute inset-x-0 bottom-0 z-10 flex h-[176px] flex-col justify-end gap-1.5 rounded-2xl border border-[color:var(--paper-line-2)] bg-[color:var(--surface-1)] p-4 shadow-[0_2px_10px_rgba(28,23,16,0.12)]">
-        {/* Brass thread on the lip — the single accent (palette: brass deep in paper). */}
-        <div aria-hidden className="absolute inset-x-5 top-0 h-px bg-[color:var(--brass-deep)] opacity-40" />
+      <div className="flex flex-col gap-1 px-1 pb-1">
         <button
           type="button"
           onClick={() => onOpen(collection)}
-          className="block w-full truncate text-left font-display text-[17px] font-medium leading-tight text-[color:var(--text)] underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]"
+          className="t-card-title -mx-1 block min-h-11 w-[calc(100%+0.5rem)] truncate rounded-[var(--m-r-sub)] px-1 text-left text-[color:var(--m-text)] focus-visible:outline-none focus-visible:shadow-[var(--m-focus)]"
         >
           {collection.name}
         </button>
-        <span className="flex items-center gap-1.5 text-[13px] text-[color:var(--text-muted)]">
+        <span className="t-meta -mt-2 flex items-center gap-1.5">
           <ImageIcon />
           {reelCount}
           <span className="sr-only"> {reelCount === 1 ? 'reel' : 'reels'}</span>

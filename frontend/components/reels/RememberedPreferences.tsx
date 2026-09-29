@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { getMemoryPreferences } from '@/lib/trip/supabase-api'
 import { summarizeMemoryFacts } from '@/lib/trip/memory-summary'
+import { ACCENT_TAG, EYEBROW } from '@/lib/shell/ui'
 
 /**
  * What Astrail already knows about how you travel, said on the screen you start from.
@@ -78,27 +79,20 @@ export default function RememberedPreferences() {
   return (
     <section
       aria-label="What Astrail remembers about you"
-      /* `memory-panel` carries the border, tint and glow — see globals.css. Written as a class
-         rather than utilities because the scoped surface rules out-rank single-class utilities
-         and would swallow them, which is how this app has lost a visible border before. */
-      className="memory-panel mb-6 px-4 py-3.5"
+      data-memory-panel
+      className="m-card mx-auto mb-6 w-full max-w-5xl p-5"
     >
-      <div className="mb-2 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-        {/* The same breathing dot the activity rail uses for a live agent action. Memory is the
-            one thing on this screen acting on the user's behalf before they have asked for
-            anything, so it gets the app's "something is live here" signal. Reduced-motion
+      <div className="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+        {/* The same breathing dot the activity rail uses for a live agent action: memory is
+            acting on the user's behalf before they have asked for anything. Reduced-motion
             switches the animation off in globals.css; the dot itself stays. */}
         <span aria-hidden className="pulse-dot pulse-dot--live" />
-        <span className="type-evidence inline-flex items-center rounded-[var(--radius-chip)] bg-[var(--chip-bg)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--brass-deep)]">
-          Memory
-        </span>
-        <span className="type-label text-[11px] uppercase tracking-wide text-[color:var(--brass-deep)]">
-          Astrail remembers how you travel
-        </span>
+        <span className={ACCENT_TAG}>Memory</span>
+        <span className={EYEBROW}>Astrail remembers how you travel</span>
       </div>
       {/* Clipped, not scrolled: an account with a lot remembered must not be able to push the
           library off the screen this sits above. */}
-      <p className="line-clamp-3 text-[15px] leading-relaxed text-[color:var(--text)]">{remembered}</p>
+      <p className="t-body line-clamp-3 text-[color:var(--m-text)]">{remembered}</p>
     </section>
   )
 }

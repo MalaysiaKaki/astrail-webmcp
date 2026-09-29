@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { addReelsToCollection, createCollection } from '@/lib/reels/collections'
 import type { SavedReelCard } from '@/lib/reels/backend-types'
 import { reelLabel, sourceLabel } from '@/lib/reels/labels'
+import { DIALOG_BACKDROP, DIALOG_PANEL, INPUT, META, SECTION_TITLE, SHEET_HANDLE, SUBCARD, TAG } from '@/lib/shell/ui'
 
 /* CreateTrayDialog — a lightweight accessible modal to name a new tray and (optionally) pick
    reels for it, then create it via the data layer. Replaces TraysScreen's interim createOpen
@@ -34,14 +35,12 @@ function isDuplicateNameError(err: unknown): boolean {
 const NAME_MAX = 80
 const DUPLICATE_HINT = "That name's already used"
 
-const BTN_PRIMARY =
-  'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[color:var(--accent)] bg-[color:var(--accent)] px-4 text-[13px] font-medium text-[color:var(--accent-text)] transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]'
-const BTN_SECONDARY =
-  'inline-flex min-h-11 items-center justify-center rounded-lg border border-[color:var(--paper-line-2)] bg-transparent px-4 text-[13px] font-medium text-[color:var(--text)] transition-colors hover:bg-[color:var(--surface-2)] disabled:cursor-default disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]'
+const BTN_PRIMARY = 'm-btn-primary disabled:cursor-default disabled:opacity-50'
+const BTN_SECONDARY = 'm-btn-secondary disabled:cursor-default disabled:opacity-50'
 const CHIP_BASE =
-  'inline-flex min-h-11 items-center rounded-full border px-4 text-[13px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]'
-const CHIP_ON = 'border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-text)]'
-const CHIP_OFF = 'border-[color:var(--paper-line-2)] bg-transparent text-[color:var(--text)] hover:bg-[color:var(--surface-2)]'
+  'inline-flex min-h-11 items-center rounded-[var(--m-r-pill)] px-4 font-[family-name:var(--font-ui)] text-[length:var(--t-meta)] font-semibold transition-transform duration-[var(--m-dur-press)] active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[var(--m-focus)] motion-reduce:transition-none motion-reduce:active:scale-100'
+const CHIP_ON = 'bg-[color:var(--m-ink)] text-[color:var(--m-on-ink)]'
+const CHIP_OFF = 'bg-[color:var(--m-card)] text-[color:var(--m-text)] shadow-[var(--m-shadow-1)]'
 
 export default function CreateTrayDialog({
   cards,
@@ -153,7 +152,7 @@ export default function CreateTrayDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(28,23,16,0.45)] p-4"
+      className={DIALOG_BACKDROP}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
       onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
       role="presentation"
@@ -162,13 +161,14 @@ export default function CreateTrayDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="create-tray-heading"
-        className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[color:var(--paper-line-2)] bg-[color:var(--surface-1)] shadow-[var(--shadow-paper)]"
+        className={`${DIALOG_PANEL} md:!max-w-2xl`}
       >
-        <header className="border-b border-[color:var(--line-soft)] px-6 py-5">
-          <h2 id="create-tray-heading" className="font-display text-[20px] font-medium tracking-[-0.01em] text-[color:var(--text)]">
+        <div aria-hidden className={SHEET_HANDLE} />
+        <header className="px-6 pb-3 pt-4 md:pt-6">
+          <h2 id="create-tray-heading" className={SECTION_TITLE}>
             Name a new tray
           </h2>
-          <p className="mt-1 text-[13px] text-[color:var(--text-muted)]">
+          <p className={`${META} mt-1`}>
             Name it, and optionally pick the reels to start it with.
           </p>
         </header>
@@ -176,7 +176,7 @@ export default function CreateTrayDialog({
         <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-6 py-5">
           {/* Name field */}
           <div>
-            <label htmlFor="tray-name" className="mb-1.5 block text-[13px] font-medium text-[color:var(--text)]">
+            <label htmlFor="tray-name" className="t-body mb-1.5 block font-semibold text-[color:var(--m-text)]">
               Tray name
             </label>
             <input
@@ -192,10 +192,10 @@ export default function CreateTrayDialog({
               onChange={(e) => setName(e.target.value)}
               placeholder="Tokyo winter 2026"
               aria-invalid={isDuplicate}
-              className="min-h-11 w-full rounded-lg border border-[color:var(--line-soft)] bg-[color:var(--surface-1)] px-4 text-[color:var(--text)] placeholder:text-[color:var(--text-faint)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)] disabled:cursor-default disabled:opacity-60"
+              className={`${INPUT} w-full disabled:cursor-default`}
             />
             {isDuplicate ? (
-              <p className="mt-1.5 text-[12px] text-[color:var(--text-muted)]">{DUPLICATE_HINT}</p>
+              <p className={`${META} mt-1.5`}>{DUPLICATE_HINT}</p>
             ) : null}
           </div>
 
@@ -203,8 +203,8 @@ export default function CreateTrayDialog({
           {cards.length > 0 ? (
             <div>
               <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-                <span className="text-[13px] font-medium text-[color:var(--text)]">Add reels (optional)</span>
-                <span className="text-[12px] text-[color:var(--text-muted)]">{selected.length} selected</span>
+                <span className="t-body font-semibold text-[color:var(--m-text)]">Add reels (optional)</span>
+                <span className={META}>{selected.length} selected</span>
               </div>
 
               {countries.length > 0 ? (
@@ -242,30 +242,30 @@ export default function CreateTrayDialog({
                         aria-pressed={on}
                         aria-label={`Select ${label}`}
                         onClick={() => toggleSelect(c.id)}
-                        className={`w-full overflow-hidden rounded-lg border text-left transition-transform hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)] ${
-                          on ? 'border-[color:var(--accent)]' : 'border-[color:var(--paper-line-2)]'
+                        className={`rounded-[var(--m-r-card)] bg-[color:var(--m-card)] shadow-[var(--m-shadow-1)] w-full overflow-hidden text-left transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:shadow-[var(--m-focus)] motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${
+                          on ? 'shadow-[0_0_0_2px_var(--m-ink),var(--m-shadow-1)]' : ''
                         }`}
                       >
-                        <div className="relative aspect-[9/16] bg-[color:var(--surface-2)]">
+                        <div className="relative m-2 aspect-[9/16] overflow-hidden rounded-[var(--m-r-sub)] bg-[color:var(--m-subcard)]">
                           {c.thumbnail_url ? (
                             /* eslint-disable-next-line @next/next/no-img-element */
                             <img src={c.thumbnail_url} alt="" className="h-full w-full object-cover" />
                           ) : null}
-                          <span className="absolute left-1.5 top-1.5 rounded-full border border-[color:var(--paper-line-2)] bg-[color:var(--surface-1)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--text-faint)]">
+                          <span className={`${TAG} absolute left-1.5 top-1.5 !bg-[color:var(--m-card)]`}>
                             {sourceLabel(c.normalized_url)}
                           </span>
                           <span
                             aria-hidden
-                            className={`absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full border text-[11px] ${
+                            className={`absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full text-[length:var(--t-label)] shadow-[var(--m-shadow-1)] ${
                               on
-                                ? 'border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-text)]'
-                                : 'border-[color:var(--paper-line-2)] bg-[color:var(--surface-1)]'
+                                ? 'bg-[color:var(--m-ink)] text-[color:var(--m-on-ink)]'
+                                : 'bg-[color:var(--m-card)]'
                             }`}
                           >
                             {on ? '✓' : ''}
                           </span>
                         </div>
-                        <span className="block truncate px-3 py-2 text-[13px] text-[color:var(--text)]">{label}</span>
+                        <span className="t-card-title block truncate px-3 pb-3 pt-1 text-[color:var(--m-text)]">{label}</span>
                       </button>
                     </li>
                   )
@@ -275,13 +275,13 @@ export default function CreateTrayDialog({
           ) : null}
 
           {error ? (
-            <p role="alert" className="rounded-lg border border-dashed border-[color:var(--line-soft)] bg-[color:var(--surface-2)] p-3 text-[13px] text-[color:var(--text-muted)]">
+            <p role="alert" className={`${SUBCARD} ${META}`}>
               {error}
             </p>
           ) : null}
         </div>
 
-        <footer className="flex items-center justify-end gap-3 border-t border-[color:var(--line-soft)] px-6 py-4">
+        <footer className="flex items-center justify-end gap-3 px-6 pb-5 pt-3">
           <button type="button" className={BTN_SECONDARY} onClick={onClose}>Cancel</button>
           <button type="button" disabled={!canSubmit} className={BTN_PRIMARY} onClick={() => void submit()}>
             {createdId ? 'Retry' : 'Create'}

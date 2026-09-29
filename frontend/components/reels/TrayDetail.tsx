@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReelCollection, SavedReelCard } from '@/lib/reels/backend-types'
 import { reelLabel, sourceLabel } from '@/lib/reels/labels'
+import { CARD, DESTRUCTIVE_BUTTON, INPUT, META, SECTION_TITLE, SUBCARD, TAG, TEXT_BUTTON } from '@/lib/shell/ui'
 
 /* TrayDetail — the full-surface view reached by Opening a tray from the "Your trays" grid
    (TraysScreen keys it by openTrayId and derives the collection from state, so a rename
@@ -34,14 +35,10 @@ const ImageIcon = ({ size = 18, opacity = 1 }: { size?: number; opacity?: number
   </svg>
 )
 
-const BTN_PRIMARY =
-  'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[color:var(--accent)] bg-[color:var(--accent)] px-4 text-[13px] font-medium text-[color:var(--accent-text)] transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]'
-const BTN_SECONDARY =
-  'inline-flex min-h-11 items-center justify-center rounded-lg border border-[color:var(--paper-line-2)] bg-transparent px-4 text-[13px] font-medium text-[color:var(--text)] transition-colors hover:bg-[color:var(--surface-2)] disabled:cursor-default disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]'
-const BTN_DANGER =
-  'inline-flex min-h-11 items-center justify-center rounded-lg border border-[color:var(--fail)] bg-transparent px-4 text-[13px] font-medium text-[color:var(--fail)] transition-colors hover:bg-[color:var(--surface-2)] disabled:cursor-default disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]'
-const BTN_BACK =
-  'mb-4 inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-[color:var(--text-muted)] transition-colors hover:text-[color:var(--text)] disabled:cursor-default disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]'
+const BTN_PRIMARY = 'm-btn-primary disabled:cursor-default disabled:opacity-50'
+const BTN_SECONDARY = 'm-btn-secondary disabled:cursor-default disabled:opacity-50'
+const BTN_DANGER = DESTRUCTIVE_BUTTON
+const BTN_BACK = 'm-btn-secondary mb-4 gap-1.5 disabled:cursor-default disabled:opacity-50'
 
 export default function TrayDetail({
   collection,
@@ -163,7 +160,7 @@ export default function TrayDetail({
             {editing ? (
               <form
                 onSubmit={(e) => { e.preventDefault(); void submitRename() }}
-                className="flex flex-wrap items-center gap-2"
+                className="relative flex flex-wrap items-center gap-2"
               >
                 <label htmlFor="tray-rename" className="sr-only">Tray name</label>
                 <input
@@ -175,7 +172,7 @@ export default function TrayDetail({
                   maxLength={NAME_MAX}
                   onChange={(e) => setRenameValue(e.target.value)}
                   aria-invalid={isDuplicate}
-                  className="min-h-11 min-w-0 flex-1 rounded-lg border border-[color:var(--line-soft)] bg-[color:var(--surface-1)] px-4 text-[color:var(--text)] placeholder:text-[color:var(--text-faint)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)] disabled:cursor-default disabled:opacity-60"
+                  className={`${INPUT} min-w-0 flex-1 disabled:cursor-default`}
                 />
                 <button type="submit" disabled={mutating || !nameValid} className={BTN_PRIMARY}>Save</button>
                 <button
@@ -189,7 +186,7 @@ export default function TrayDetail({
               </form>
             ) : (
               <div className="flex flex-wrap items-center gap-3">
-                <h1 className="min-w-0 truncate font-display text-[26px] font-medium tracking-[-0.01em] text-[color:var(--text)]">
+                <h1 className={`${SECTION_TITLE} min-w-0 truncate`}>
                   {collection.name}
                 </h1>
                 <button type="button" disabled={mutating} onClick={startRename} className={BTN_SECONDARY}>
@@ -198,9 +195,9 @@ export default function TrayDetail({
               </div>
             )}
             {editing && isDuplicate ? (
-              <p className="mt-1.5 text-[12px] text-[color:var(--text-muted)]">{DUPLICATE_HINT}</p>
+              <p className={`${META} mt-1.5`}>{DUPLICATE_HINT}</p>
             ) : (
-              <p className="mt-1.5 text-[13px] text-[color:var(--text-muted)]">
+              <p className={`${META} mt-1.5`}>
                 {reelCount} {reelCount === 1 ? 'reel' : 'reels'}
               </p>
             )}
@@ -208,7 +205,7 @@ export default function TrayDetail({
 
           {confirmingDelete ? (
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[13px] text-[color:var(--text-muted)]">Delete this tray?</span>
+              <span className={META}>Delete this tray?</span>
               <button type="button" disabled={mutating} onClick={() => void confirmDelete()} className={BTN_DANGER}>
                 Confirm delete
               </button>
@@ -235,14 +232,14 @@ export default function TrayDetail({
       </header>
 
       {error ? (
-        <p role="alert" className="mb-4 rounded-lg border border-dashed border-[color:var(--line-soft)] bg-[color:var(--surface-2)] p-3 text-[13px] text-[color:var(--text-muted)]">
+        <p role="alert" className={`${SUBCARD} ${META} mb-4`}>
           {error}
         </p>
       ) : null}
 
       {/* Reels list */}
       {cards.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-[color:var(--line-soft)] px-6 py-16 text-center text-[14px] text-[color:var(--text-muted)]">
+        <p className={`${CARD} ${META} px-6 py-16 text-center`}>
           {cardsStatus === 'loading'
             ? "Loading this tray's reels…"
             : cardsStatus === 'error'
@@ -256,9 +253,9 @@ export default function TrayDetail({
             return (
               <li
                 key={card.id}
-                className="flex items-center gap-4 rounded-xl border border-[color:var(--paper-line-2)] bg-[color:var(--surface-1)] p-3"
+                className="m-card flex items-center gap-4 p-3"
               >
-                <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[color:var(--surface-2)] text-[color:var(--brass-deep)]">
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[var(--m-r-sub)] bg-[color:var(--m-subcard)] text-[color:var(--m-accent)]">
                   {card.thumbnail_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={card.thumbnail_url} alt="" className="h-full w-full object-cover" />
@@ -266,10 +263,10 @@ export default function TrayDetail({
                     <ImageIcon opacity={0.4} />
                   )}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-[color:var(--text)]">
+                <span className="t-card-title min-w-0 flex-1 truncate text-[color:var(--m-text)]">
                   {label}
                 </span>
-                <span className="shrink-0 rounded-full border border-[color:var(--paper-line-2)] bg-[color:var(--surface-1)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--text-faint)]">
+                <span className={`${TAG} shrink-0`}>
                   {sourceLabel(card.normalized_url)}
                 </span>
                 <button
@@ -277,7 +274,7 @@ export default function TrayDetail({
                   disabled={mutating}
                   aria-label={`Remove ${label}`}
                   onClick={() => void handleRemove(card.id)}
-                  className={BTN_SECONDARY}
+                  className={`${TEXT_BUTTON} shrink-0 !text-[color:var(--fail)]`}
                 >
                   Remove
                 </button>
@@ -306,7 +303,7 @@ export default function TrayDetail({
           </button>
         ) : null}
         {createTrailHint ? (
-          <span className="text-[13px] text-[color:var(--text-muted)]">{createTrailHint}</span>
+          <span className={META}>{createTrailHint}</span>
         ) : null}
       </div>
     </div>

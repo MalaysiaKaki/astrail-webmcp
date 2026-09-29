@@ -1058,8 +1058,9 @@ describe('TraysScreen', () => {
       const library = await screen.findByRole('button', { name: /your inspiration starts here/i })
       const title = within(library).getByText('Your inspiration starts here')
 
-      expect(title.className).toContain('text-[18px]')
-      expect(screen.getByRole('heading', { name: 'Your trays' }).className).toContain('text-[18px]')
+      expect(title.className).toContain('t-card-title')
+      expect(screen.getByRole('heading', { name: 'Your trays' }).className).toContain('t-title')
+      expect(library.className).toContain('m-card-link')
       expect(library.className).not.toContain('brass-wash')
       // …and the band that replaced it is a band, not a new hero in the same spot.
       expect(band().className).not.toContain('brass-wash')

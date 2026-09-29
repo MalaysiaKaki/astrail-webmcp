@@ -21,8 +21,7 @@ import { useEffect, useRef, useState } from 'react'
    No chat panel here, on purpose: the agent lives in ChatGPT's browser, and every OpenAI
    reference app leaves it there. This band is the handoff, not a second front end. */
 
-const BTN_COPY =
-  'inline-flex min-h-9 flex-none items-center justify-center rounded-lg border border-[color:var(--brass-deep)] px-3 text-[12px] font-semibold uppercase tracking-wide text-[color:var(--brass-deep)] transition-colors hover:bg-[color:var(--brass-wash)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]'
+import { EYEBROW, META, SUBCARD } from '@/lib/shell/ui'
 
 const COPIED = 'Copied. Paste it into ChatGPT with this page open.'
 const COPY_FAILED = 'Copy did not work in this browser — select the prompt and copy it yourself.'
@@ -91,24 +90,20 @@ export default function AgentBand({
   return (
     <section
       aria-label="Astrail agent"
-      className="mb-5 rounded-xl border border-[color:var(--line-soft)] bg-[color:var(--surface-2)] px-4 py-3"
+      className="m-card mb-6 flex flex-col gap-3 px-5 pb-3 pt-5"
     >
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="flex-none text-[11px] font-semibold uppercase tracking-wide text-[color:var(--brass-deep)]">
-          Agent-ready
-        </span>
-        <p className="min-w-0 flex-1 text-[13px] leading-[1.5] text-[color:var(--text-muted)]">
-          {capabilitySentence(savedCount)}
-        </p>
+      <div className="flex flex-col gap-1.5">
+        <span className={EYEBROW}>Agent-ready</span>
+        <p className={META}>{capabilitySentence(savedCount)}</p>
       </div>
 
-      <div className="mt-2.5 flex flex-wrap items-start gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         {/* Selectable text, not an input: it is the fallback when the clipboard is unavailable,
             and it must never look like one more field waiting to be filled in. */}
-        <pre className="min-w-0 flex-1 overflow-x-auto whitespace-pre-wrap rounded-lg border border-[color:var(--line-soft)] bg-[color:var(--surface-1)] px-3 py-2 font-mono text-[12px] leading-[1.5] text-[color:var(--text)]">
+        <pre className={`${SUBCARD} min-w-0 flex-1 overflow-x-auto whitespace-pre-wrap font-mono text-[length:var(--t-label)] leading-[1.5] text-[color:var(--m-text)]`}>
           {prompt}
         </pre>
-        <button type="button" onClick={() => void copyPrompt()} className={BTN_COPY}>
+        <button type="button" onClick={() => void copyPrompt()} className="m-btn-secondary flex-none">
           Copy prompt
         </button>
       </div>
@@ -116,7 +111,7 @@ export default function AgentBand({
       {/* Present from first paint, empty until there is something to say: a live region that
           appears only on success announces nothing, and one that appears at all shoves the
           whole page down by a line the first time you touch the band at the top of it. */}
-      <p role="status" aria-live="polite" className="mt-2 min-h-[1.125rem] text-[12px] text-[color:var(--text-muted)]">
+      <p role="status" aria-live="polite" className={`${META} -mt-1 min-h-[1.125rem]`}>
         {copyState === 'copied' ? COPIED : copyState === 'failed' ? COPY_FAILED : ''}
       </p>
     </section>

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import ReelBrowseGrid from '@/components/reels/ReelBrowseGrid'
 import type { SavedReelCard } from '@/lib/reels/backend-types'
 import { reelLabel, sourceLabel, statusLabel } from '@/lib/reels/labels'
+import { CARD, INPUT, META, SECTION_TITLE, SUBCARD, TAG, TEXT_BUTTON } from '@/lib/shell/ui'
 
 /* LibraryPanel — the full-surface "Library" reached from the Trays home banner. It browses
    every saved reel with a country filter + search, in two modes:
@@ -22,16 +23,15 @@ const MAX_SELECTED = 5
 
 type Mode = 'browse' | 'select'
 
-const BTN_PRIMARY =
-  'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[color:var(--accent)] bg-[color:var(--accent)] px-4 text-[13px] font-medium text-[color:var(--accent-text)] transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]'
+const BTN_PRIMARY = 'm-btn-primary disabled:cursor-default disabled:opacity-50'
 const CHIP_BASE =
-  'inline-flex min-h-11 items-center rounded-full border px-4 text-[13px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]'
-const CHIP_ON = 'border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-text)]'
-const CHIP_OFF = 'border-[color:var(--paper-line-2)] bg-transparent text-[color:var(--text)] hover:bg-[color:var(--surface-2)]'
+  'inline-flex min-h-11 items-center rounded-[var(--m-r-pill)] px-4 font-[family-name:var(--font-ui)] text-[length:var(--t-meta)] font-semibold transition-transform duration-[var(--m-dur-press)] active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[var(--m-focus)] motion-reduce:transition-none motion-reduce:active:scale-100'
+const CHIP_ON = 'bg-[color:var(--m-ink)] text-[color:var(--m-on-ink)]'
+const CHIP_OFF = 'bg-[color:var(--m-card)] text-[color:var(--m-text)] shadow-[var(--m-shadow-1)]'
 const TOGGLE_BASE =
-  'min-h-11 rounded-lg px-4 text-[13px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]'
-const TOGGLE_ON = 'bg-[color:var(--surface-1)] text-[color:var(--text)] shadow-sm'
-const TOGGLE_OFF = 'text-[color:var(--text-muted)] hover:text-[color:var(--text)]'
+  'min-h-11 rounded-[var(--m-r-pill)] px-4 font-[family-name:var(--font-ui)] text-[length:var(--t-meta)] font-semibold transition-colors focus-visible:outline-none focus-visible:shadow-[var(--m-focus)] motion-reduce:transition-none'
+const TOGGLE_ON = 'bg-[color:var(--m-card)] text-[color:var(--m-text)] shadow-[var(--m-shadow-1)]'
+const TOGGLE_OFF = 'text-[color:var(--m-text-muted)] hover:text-[color:var(--m-text)]'
 
 export default function LibraryPanel({
   cards,
@@ -125,17 +125,17 @@ export default function LibraryPanel({
         <button
           type="button"
           onClick={onClose}
-          className="mb-4 inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-[color:var(--text-muted)] transition-colors hover:text-[color:var(--text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]"
+          className="m-btn-secondary mb-4 gap-1.5"
         >
           <span aria-hidden>←</span> Back
         </button>
 
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="font-display text-[26px] font-medium tracking-[-0.01em] text-[color:var(--text)]">
+            <h1 className={SECTION_TITLE}>
               Your saved reels live here
             </h1>
-            <p className="mt-1 text-[13px] text-[color:var(--text-muted)]">
+            <p className={`${META} mt-1`}>
               {cards.length} saved · browse your reels or select up to {MAX_SELECTED} to plan a trip.
             </p>
           </div>
@@ -144,7 +144,7 @@ export default function LibraryPanel({
           <div
             role="group"
             aria-label="Library mode"
-            className="inline-flex gap-1 rounded-xl border border-[color:var(--paper-line-2)] bg-[color:var(--surface-2)] p-1"
+            className="inline-flex gap-1 rounded-[var(--m-r-pill)] bg-[color:var(--m-subcard)] p-1"
           >
             <button
               type="button"
@@ -190,7 +190,7 @@ export default function LibraryPanel({
       </div>
 
       {/* Search */}
-      <div className="mb-6">
+      <div className="relative mb-6">
         <label htmlFor="library-search" className="sr-only">Search saved reels</label>
         <input
           id="library-search"
@@ -198,18 +198,18 @@ export default function LibraryPanel({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by caption, label, or place…"
-          className="min-h-11 w-full rounded-lg border border-[color:var(--line-soft)] bg-[color:var(--surface-1)] px-4 text-[color:var(--text)] placeholder:text-[color:var(--text-faint)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]"
+          className={`${INPUT} w-full`}
         />
       </div>
 
       {message ? (
-        <p role="alert" className="mb-4 rounded-lg border border-dashed border-[color:var(--line-soft)] bg-[color:var(--surface-2)] p-3 text-[13px] text-[color:var(--text-muted)]">
+        <p role="alert" className={`${SUBCARD} ${META} mb-4`}>
           {message}
         </p>
       ) : null}
 
       {filtered.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-[color:var(--line-soft)] px-6 py-16 text-center text-[14px] text-[color:var(--text-muted)]">
+        <p className={`${CARD} ${META} px-6 py-16 text-center`}>
           {cards.length === 0
             ? 'No saved reels yet. Paste a Reel or post link on your home to start your library.'
             : 'No saved reels match these filters.'}
@@ -229,31 +229,31 @@ export default function LibraryPanel({
                     aria-pressed={on}
                     aria-label={`Select ${label}`}
                     onClick={() => toggleSelect(c.id)}
-                    className={`w-full overflow-hidden rounded-lg border text-left transition-transform hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)] ${
-                      on ? 'border-[color:var(--accent)]' : 'border-[color:var(--paper-line-2)]'
+                    className={`rounded-[var(--m-r-card)] bg-[color:var(--m-card)] shadow-[var(--m-shadow-1)] w-full overflow-hidden text-left transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:shadow-[var(--m-focus)] motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${
+                      on ? 'shadow-[0_0_0_2px_var(--m-ink),var(--m-shadow-1)]' : ''
                     }`}
                   >
-                    <div className="relative aspect-[9/16] bg-[color:var(--surface-2)]">
+                    <div className="relative m-2 aspect-[9/16] overflow-hidden rounded-[var(--m-r-sub)] bg-[color:var(--m-subcard)]">
                       {c.thumbnail_url ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img src={c.thumbnail_url} alt="" className="h-full w-full object-cover" />
                       ) : null}
-                      <span className="absolute left-1.5 top-1.5 rounded-full border border-[color:var(--paper-line-2)] bg-[color:var(--surface-1)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--text-faint)]">
+                      <span className={`${TAG} absolute left-1.5 top-1.5 !bg-[color:var(--m-card)]`}>
                         {sourceLabel(c.normalized_url)}
                       </span>
                       <span
                         aria-hidden
-                        className={`absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full border text-[11px] ${
+                        className={`absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full text-[length:var(--t-label)] shadow-[var(--m-shadow-1)] ${
                           on
-                            ? 'border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-text)]'
-                            : 'border-[color:var(--paper-line-2)] bg-[color:var(--surface-1)]'
+                            ? 'bg-[color:var(--m-ink)] text-[color:var(--m-on-ink)]'
+                            : 'bg-[color:var(--m-card)]'
                         }`}
                       >
                         {on ? '✓' : ''}
                       </span>
                     </div>
-                    <span className="block truncate px-3 pt-2 text-[13px] text-[color:var(--text)]">{label}</span>
-                    <span className="block px-3 pb-2 text-[12px] text-[color:var(--text-faint)]">{statusLabel(c)}</span>
+                    <span className="t-card-title block truncate px-3 pt-1 text-[color:var(--m-text)]">{label}</span>
+                    <span className={`${META} block px-3 pb-3`}>{statusLabel(c)}</span>
                   </button>
                 </li>
               )
@@ -261,14 +261,14 @@ export default function LibraryPanel({
           </ul>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
-            <span className="text-[12px] text-[color:var(--text-muted)]">{selected.length} / {MAX_SELECTED} selected</span>
+            <span className={META}>{selected.length} / {MAX_SELECTED} selected</span>
             <button type="button" disabled={busy || !selected.length} className={BTN_PRIMARY} onClick={() => void organize()}>
               Plan a trip
             </button>
             {selected.length ? (
               <button
                 type="button"
-                className="min-h-9 px-2 text-[13px] text-[color:var(--text-muted)] hover:underline"
+                className={TEXT_BUTTON}
                 onClick={() => setSelected([])}
               >
                 Clear
