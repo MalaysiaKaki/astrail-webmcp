@@ -242,7 +242,12 @@ export default function MapProvider({ children }: { children: React.ReactNode })
       <div
         ref={containerRef}
         data-testid="shared-map"
-        aria-hidden
+        // Exposed only while a route drives it interactively (the trip map: its pins are buttons,
+        // and the desktop place card is a dialog inside this container, which no role on the card
+        // could un-hide). The inert generation globe is decoration and stays hidden.
+        aria-hidden={interactive ? undefined : true}
+        aria-label={interactive ? 'Trip map' : undefined}
+        role={interactive ? 'region' : undefined}
         className={[
           'shared-map',
           visible && ready ? 'shared-map--visible' : '',

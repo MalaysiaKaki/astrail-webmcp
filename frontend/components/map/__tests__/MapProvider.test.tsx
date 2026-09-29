@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { act, render } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { useEffect } from 'react'
 import MapProvider, { useSharedMap, type SharedMapContextValue } from '@/components/map/MapProvider'
 
@@ -172,6 +172,31 @@ describe('MapProvider', () => {
 
     expect(mapInstance.setConfigProperty).toHaveBeenCalledWith('basemap', 'lightPreset', 'dawn')
     expect(mapInstance.setConfigProperty).not.toHaveBeenCalledWith('basemap', 'lightPreset', 'night')
+  })
+
+  // A10 item 1 (Codex map-card review, High): the desktop place card is a Popup INSIDE this
+  // container, and no role on it can undo an aria-hidden ancestor. The interactive trip map (its
+  // pins are buttons, its card a dialog) is exposed; the inert generation globe stays hidden.
+  it('hides the map from assistive tech while inert and exposes it while interactive', async () => {
+    const view = render(
+      <MapProvider>
+        <Consumer key="generation" interactive={false} lightPreset="night" />
+      </MapProvider>,
+    )
+    await flush()
+    const host = screen.getByTestId('shared-map')
+    expect(host).toHaveAttribute('aria-hidden', 'true')
+    view.rerender(
+      <MapProvider>
+        <Consumer key="trip" interactive lightPreset="dawn" />
+      </MapProvider>,
+    )
+    await flush()
+    expect(host).not.toHaveAttribute('aria-hidden')
+    expect(host).toHaveAttribute('aria-label', 'Trip map')
+    view.rerender(<MapProvider><div /></MapProvider>)
+    await flush()
+    expect(host).toHaveAttribute('aria-hidden', 'true')
   })
 
   it('disables every gesture handler for a non-interactive consumer', async () => {
