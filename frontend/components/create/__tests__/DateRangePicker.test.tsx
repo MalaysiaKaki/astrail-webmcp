@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
-import DateRangePicker from '@/components/create/DateRangePicker'
+import DateRangePicker, { popoverPlacement } from '@/components/create/DateRangePicker'
 
 function openOn(startDate = '', endDate = '') {
   const onChange = vi.fn()
@@ -149,5 +149,65 @@ describe('DateRangePicker', () => {
       render(<DateRangePicker startDate="not-a-date" endDate="" onChange={vi.fn()} />),
     ).not.toThrow()
     expect(screen.getByRole('button', { name: /select trip dates/i })).toHaveTextContent('Add trip dates')
+  })
+})
+
+/* C6: the calendar is portaled and fixed-positioned against the trigger. On a short viewport
+   (844x390 landscape) with a six-week month, the top-placed picker used to run off the top of the
+   screen: its header, month navigation and early dates were unreachable. It now picks the side with
+   room, caps its height to that side, and scrolls inside with the month header pinned. */
+describe('popoverPlacement', () => {
+  const trigger = (top: number, bottom: number) => ({ top, bottom })
+
+  it('keeps the preferred side when it has comfortable room, capped to it', () => {
+    const p = popoverPlacement(trigger(700, 744), 900, 'top')
+    expect(p).toEqual({ bottom: 900 - 700 + 8, maxHeight: 700 - 8 - 8 })
+  })
+
+  it('flips to the roomier side when the preferred one is cramped', () => {
+    const p = popoverPlacement(trigger(120, 164), 900, 'top')
+    expect(p).toEqual({ top: 164 + 8, maxHeight: 900 - 164 - 8 - 8 })
+  })
+
+  it('never lets the popover extend past the viewport on the chosen side', () => {
+    for (const [top, bottom, vh, pref] of [[200, 244, 390, 'top'], [300, 344, 390, 'top'], [40, 84, 390, 'bottom'], [150, 194, 390, 'bottom']] as const) {
+      const p = popoverPlacement(trigger(top, bottom), vh, pref)
+      const topEdge = 'top' in p ? p.top! : vh - p.bottom! - p.maxHeight
+      const bottomEdge = 'top' in p ? p.top! + p.maxHeight : vh - p.bottom!
+      expect(topEdge, `${top}/${pref}`).toBeGreaterThanOrEqual(8)
+      expect(bottomEdge, `${top}/${pref}`).toBeLessThanOrEqual(vh - 8)
+    }
+  })
+
+  it('pins to the whole viewport height when neither side fits a full month (short landscape)', () => {
+    // 667x375 with the trigger low in the sheet: 189px above would show barely two weeks.
+    expect(popoverPlacement(trigger(205, 249), 375, 'top')).toEqual({ top: 8, maxHeight: 375 - 16 })
+    expect(popoverPlacement(trigger(140, 184), 330, 'top')).toEqual({ top: 8, maxHeight: 330 - 16 })
+  })
+})
+
+describe('DateRangePicker on a short viewport (844x390, six-week month)', () => {
+  it('pins the calendar to the viewport height and scrolls inside it', () => {
+    const vh = window.innerHeight
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 390 })
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      top: 300, bottom: 344, left: 16, right: 336, width: 320, height: 44, x: 16, y: 300, toJSON: () => ({}),
+    } as DOMRect)
+    try {
+      // May 2027 starts on a Saturday and spans six weeks.
+      render(<DateRangePicker startDate="2027-05-01" endDate="2027-05-03" onChange={vi.fn()} placement="top" />)
+      fireEvent.click(screen.getByRole('button', { name: /trip dates/i }))
+      const dialog = screen.getByRole('dialog')
+      // Neither side of a trigger at 300px fits a full month in 390px, so it takes the viewport.
+      expect(dialog.style.maxHeight).toBe(`${390 - 16}px`)
+      expect(dialog.style.top).toBe('8px')
+      expect(dialog.style.overflowY).toBe('auto')
+      // Month navigation stays in the DOM order first and is pinned while the grid scrolls.
+      expect(within(dialog).getByRole('button', { name: /previous month/i }).closest('[data-picker-header]')).toHaveClass('sticky')
+      expect(within(dialog).getByRole('button', { name: 'May 31, 2027' })).toBeInTheDocument()
+    } finally {
+      rectSpy.mockRestore()
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: vh })
+    }
   })
 })

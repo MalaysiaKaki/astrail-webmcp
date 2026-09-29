@@ -70,6 +70,45 @@ const THEME: Record<Variant, {
 // 7 columns of 44px day targets + p-3; capped so it still fits a 360px phone (8px gutters).
 const POPOVER_W = 336
 
+// Viewport fitting for the portaled, fixed-position calendar (web revamp C6). A six-week month is
+// about COMFORT_H tall (p-3 + header + weekdays + 6 rows of 44px days).
+const GAP = 8 // between the trigger and the calendar
+const EDGE = 8 // kept free at the viewport edge
+const COMFORT_H = 380
+
+function roundPlacement(p: PopoverPlacement): { top?: number; bottom?: number; maxHeight: number } {
+  return {
+    ...(p.top !== undefined ? { top: Math.round(p.top) } : { bottom: Math.round(p.bottom!) }),
+    maxHeight: Math.floor(p.maxHeight),
+  }
+}
+
+export type PopoverPlacement = ({ top: number; bottom?: never } | { bottom: number; top?: never }) & { maxHeight: number }
+
+/**
+ * Where the calendar goes for a trigger at `rect` in a viewport `viewportH` tall: the preferred side
+ * if a full month fits there, else the other side if it fits there, else the whole viewport height
+ * (it covers its own trigger, as a dialog may; a side-hugging sliver of two weeks is worse). The
+ * height is always capped to the space taken and the calendar scrolls inside it, so the month
+ * navigation and every date stay reachable on a short screen (844x390 landscape) instead of
+ * running off the edge.
+ */
+export function popoverPlacement(
+  rect: { top: number; bottom: number },
+  viewportH: number,
+  preferred: 'top' | 'bottom',
+): PopoverPlacement {
+  const above = rect.top - GAP - EDGE
+  const below = viewportH - rect.bottom - GAP - EDGE
+  const room = { top: above, bottom: below }
+  const other = preferred === 'top' ? 'bottom' : 'top'
+  const side = room[preferred] >= COMFORT_H ? preferred : room[other] >= COMFORT_H ? other : null
+  if (side === null) return { top: EDGE, maxHeight: viewportH - 2 * EDGE }
+  return side === 'top'
+    ? { bottom: viewportH - rect.top + GAP, maxHeight: above }
+    : { top: rect.bottom + GAP, maxHeight: below }
+}
+
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const MONTHS_LONG = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -318,15 +357,17 @@ export default function DateRangePicker({
           style={{
             position: 'fixed',
             left: Math.round(Math.max(8, Math.min(rect.left, window.innerWidth - Math.min(POPOVER_W, window.innerWidth - 16) - 8))),
-            ...(placement === 'top'
-              ? { bottom: Math.round(window.innerHeight - rect.top + 8) }
-              : { top: Math.round(rect.bottom + 8) }),
+            ...roundPlacement(popoverPlacement(rect, window.innerHeight, placement)),
+            overflowY: 'auto',
+            overscrollBehavior: 'contain',
             width: `min(${POPOVER_W}px, calc(100vw - 16px))`,
             zIndex: 50,
           }}
           className={cx(t.popover)}
         >
-          <div className="mb-2 flex items-center justify-between">
+          {/* Pinned while a capped calendar scrolls, so month navigation is always in reach; it
+              bleeds over the popover's padding so no scrolled dates peek above it. */}
+          <div data-picker-header className="sticky top-0 z-10 -mx-3 -mt-3 mb-2 flex items-center justify-between bg-inherit px-3 pt-3">
             <button
               type="button"
               onClick={() => goToMonth(-1, false)}
