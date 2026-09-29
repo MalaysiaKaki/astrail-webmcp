@@ -7,7 +7,7 @@ import { DateStrip, TripPanelBody, type MobileTripViewProps } from './MobileTrip
 import TripHero from '../panel/TripHero'
 import { tripTitle } from '@/lib/trip/trip-presenters'
 import TripTabs, { panelId, tabId } from '../panel/TripTabs'
-import { ForYouInterim, BuildInterim, placeholderBadge } from '../panel/InterimTabs'
+import { BuildTimeline, ForYouTab, heroPreferenceBadge } from '../insights'
 
 /** Longer than the 300ms slide, so a measurement lands on the settled box. */
 export const PANEL_SETTLE_MS = 340
@@ -23,10 +23,13 @@ export type FloatingTripPanelProps = MobileTripViewProps & {
  * full-bleed map. A fixed header — the back and hide controls, the hero (Reel covers, title,
  * dates, stat chips, the personalised badge) and the segmented tabs — over one scroller per tab.
  *
- *   Trip           the date strip, a day header card with its weather, the stop cards with their
- *                  legs (the phone's own components), the day overview, About this trip.
- *   For you        what the trip was planned with and what it chose for you.
- *   How it was     the build story.
+ *   Trip           the navigator (A10): the date strip, the day header (weather, summary), compact
+ *                  stop rows with their legs, the day's places to eat, the day overview, and the
+ *                  trip summary and feedback. A stop's detail is the place card at its pin on the
+ *                  map; it expands here only when the map cannot show it, or on request.
+ *   For you        Tab B's ForYouTab: what the trip was planned with, what it sent to memory, what
+ *                  Astrail picked, the trade-offs. Mounted only while open (it re-reads memory).
+ *   How it was     Tab B's BuildTimeline, with the full log.
  *   built
  *
  * The map and the agent tools live outside this panel (TripWorkspace), so switching tabs never
@@ -100,7 +103,7 @@ export default function FloatingTripPanel(p: FloatingTripPanelProps) {
             </button>
           </div>
           <div className="[@media(max-height:560px)]:sr-only">
-            <TripHero bundle={p.bundle} readOnly={p.readOnly} badge={placeholderBadge(p.bundle.trip)} />
+            <TripHero bundle={p.bundle} readOnly={p.readOnly} badge={heroPreferenceBadge(p.bundle)} />
           </div>
           <TripTabs tab={p.tab} onTab={p.onTab} />
         </header>
@@ -126,7 +129,9 @@ export default function FloatingTripPanel(p: FloatingTripPanelProps) {
             tabIndex={0}
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-6 pt-1 focus-visible:outline-none focus-visible:shadow-[inset_var(--m-focus)]"
           >
-            {p.tab === 'for-you' ? <ForYouInterim {...p} /> : <BuildInterim {...p} />}
+            {p.tab === 'for-you'
+              ? <ForYouTab bundle={p.bundle} readOnly={p.readOnly} onRevealPlace={p.onRevealPlace} />
+              : <BuildTimeline bundle={p.bundle} />}
           </div>
         )}
       </aside>

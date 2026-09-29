@@ -280,7 +280,7 @@ describe('the panel tabs (plan v2 §2, amendment 9)', () => {
     await openTab('How it was built')
     expect(window.location.search).toBe('?tab=build')
     expect(window.sessionStorage.getItem(KEY)).toBe('build')
-    expect(screen.getByTestId('build-interim')).toBeInTheDocument()
+    expect(document.querySelector('[data-build-timeline]')).not.toBeNull()   // A10: Tab B's timeline
     await openTab('Trip')
     expect(window.location.search).toBe('')
     expect(push).not.toHaveBeenCalled()

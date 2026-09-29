@@ -1,9 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { TripBundle } from '@/lib/trip/backend-types'
 import { heroCovers, heroStats } from '@/lib/trip/hero'
 import { tripDateRange, tripTitle } from '@/lib/trip/trip-presenters'
+import { stopsMissingDetails } from '@/lib/trip/trip-stats'
+import { MissingDetails } from '../mobile/AboutThisTrip'
 
 /* Fixed, not random: a cluster that reshuffles on every render reads as a glitch. */
 const TILT = ['-rotate-6', 'rotate-3', '-rotate-2', 'rotate-6'] as const
@@ -27,6 +29,11 @@ export default function TripHero({ bundle, readOnly, badge }: {
   const stats = heroStats(bundle)
   const dates = tripDateRange(bundle.trip)
   const origin = bundle.trip.origin_city?.trim() || null
+  // About's "Some stops are missing details" as a hero badge that opens its list (plan v2 §6).
+  const gaps = bundle.trip.status === 'saved_with_gaps'
+  const missing = gaps ? stopsMissingDetails(bundle).length : 0
+  const [gapsOpen, setGapsOpen] = useState(false)
+  const gapsId = useId()
   return (
     <div data-testid="trip-hero" className="flex flex-col gap-3">
       <div className="flex min-w-0 items-center gap-4">
@@ -64,7 +71,24 @@ export default function TripHero({ bundle, readOnly, badge }: {
             {badge}
           </p>
         ) : null}
+        {gaps ? (
+          <button
+            type="button"
+            aria-expanded={gapsOpen}
+            aria-controls={gapsId}
+            onClick={() => setGapsOpen((v) => !v)}
+            className="type-body inline-flex min-h-11 items-center gap-1.5 rounded-full bg-[var(--m-subcard)] px-3 text-[length:var(--t-meta)] font-semibold text-[var(--m-accent)] focus-visible:outline-none focus-visible:shadow-[var(--m-focus)]"
+          >
+            <span aria-hidden className="h-2 w-2 rounded-full bg-[var(--m-accent)]" />
+            {missing > 0 ? `${missing} ${missing === 1 ? 'stop' : 'stops'} missing details` : 'Some details missing'}
+          </button>
+        ) : null}
       </div>
+      {gaps && gapsOpen ? (
+        <div id={gapsId} className="max-h-48 overflow-y-auto overscroll-contain [@media(max-height:560px)]:hidden">
+          <MissingDetails bundle={bundle} label="Stops missing details" />
+        </div>
+      ) : null}
     </div>
   )
 }

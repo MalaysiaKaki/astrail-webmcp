@@ -25,6 +25,11 @@ const { getTrip, MapCtor, mapInstance, mapProps } = vi.hoisted(() => {
 })
 
 vi.mock('@/lib/trip/supabase-api', () => ({ getTrip }))
+// For you (A10) reads memory_events for a real trip; no Supabase here, so a settled empty read.
+vi.mock('@/lib/trip/insights/memory-events', async (orig) => ({
+  ...(await orig<object>()),
+  useTripMemoryWrites: () => ({ state: { kind: 'none' }, checkAgain: async () => {} }),
+}))
 vi.mock('@/components/map/TripMap', () => ({
   default: (props: { onSelectPlace: (id: string) => void }) => {
     mapProps.current = props
@@ -315,11 +320,15 @@ describe('TripWorkspace', () => {
   // once (inside "Where to stay", not also at the top), and the pacing notes render as "Heads up".
   // Merge-lite (2026-08-06): ONE hotel decision surface. A6: price-vs-rating lives in the Stay view
   // (with the hotels it compares), the pacing notes in About › Trade-offs, each exactly once.
-  it('renders the price-vs-rating card once, with pacing notes under Heads up', async () => {
+  // A10 migration: on desktop the pacing notes moved from About ("Heads up") to For you's
+  // "Trade-offs to know about" (plan v2 §6); the price-vs-rating comparison stays in Stay only.
+  it('renders the price-vs-rating card once in Stay, with the pacing notes in For you', async () => {
     getTrip.mockResolvedValueOnce(TOKYO_TRIP_WITH_HOTELS)
     renderWorkspace(TOKYO_TRIP.trip.id)
-    await screen.findByRole('heading', { name: 'Heads up' })
-    expect(screen.getAllByRole('heading', { name: 'Heads up' })).toHaveLength(1)
+    fireEvent.click(await screen.findByRole('tab', { name: 'For you' }))
+    expect(screen.getAllByRole('heading', { name: 'Trade-offs to know about' })).toHaveLength(1)
+    expect(screen.queryByRole('heading', { name: 'Heads up' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: 'Trip' }))
     expect(screen.queryByRole('heading', { name: 'Price vs rating' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Stay' }))
     expect(screen.getAllByRole('heading', { name: 'Price vs rating' })).toHaveLength(1)
@@ -396,8 +405,8 @@ describe('TripWorkspace', () => {
     getTrip.mockResolvedValueOnce(bundleWith('complete'))
     renderWorkspace(TOKYO_TRIP.trip.id)
     expect(await screen.findByTestId('trip-feedback-panel')).toBeInTheDocument()
-    // A6: an About row (a card-link disclosure), no longer a rail section heading.
-    expect(screen.getByText(/how was this trail/i).closest('summary')).not.toBeNull()
+    // A10: on desktop a card in the Trip tab's About section (the phone keeps its About row).
+    expect(screen.getByText(/how was this trail/i).closest('section')).toHaveAccessibleName('About this trip')
   })
 
   it('mounts the feedback panel on saved_with_gaps trips', async () => {

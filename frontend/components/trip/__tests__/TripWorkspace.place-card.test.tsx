@@ -193,7 +193,7 @@ describe('desktop: the card\'s links and the agent\'s show_on_map', () => {
     expect(mapProps.current!.fitNonce).toBe(fit)
   })
 
-  it.skip('Picked for you opens the Trip tab at the stop\'s day with its card', async () => {
+  it('Picked for you opens the Trip tab at the stop\'s day with its card', async () => {
     mount()
     await flush()
     await act(async () => { screen.getByRole('tab', { name: 'For you' }).click() })
@@ -234,5 +234,66 @@ describe('desktop: the card\'s links and the agent\'s show_on_map', () => {
     const section = document.querySelector<HTMLElement>('[data-day-eats]')!
     const dayOne = TOKYO_TRIP.restaurants.filter((r) => r.trip_day_id === 'day_1')
     expect(section.querySelectorAll('[data-eat-card]')).toHaveLength(dayOne.length)
+  })
+})
+
+/* A10 item 5: Tab B's insights wired in, and About redistributed on desktop (plan v2 §6): the
+   summary and feedback stay at the end of the Trip tab, preferences and trade-offs go to For you,
+   decisions to How it was built, missing details to a hero badge. Nothing is lost. */
+describe('desktop: For you, How it was built and the About redistribution', () => {
+  it('For you is Tab B\'s tab, mounted only while open', async () => {
+    mount()
+    await flush()
+    expect(document.querySelector('[data-for-you-tab]')).toBeNull()
+    await act(async () => { screen.getByRole('tab', { name: 'For you' }).click() })
+    expect(document.querySelector('[data-for-you-tab]')).not.toBeNull()
+    expect(screen.getByRole('heading', { name: 'Picked for you' })).toBeInTheDocument()
+    expect(screen.getByText('Trade-offs to know about')).toBeInTheDocument()
+    await act(async () => { screen.getByRole('tab', { name: 'Trip' }).click() })
+    expect(document.querySelector('[data-for-you-tab]')).toBeNull()
+  })
+
+  it('How it was built is Tab B\'s timeline, with the full log', async () => {
+    mount()
+    await flush()
+    await act(async () => { screen.getByRole('tab', { name: 'How it was built' }).click() })
+    expect(document.querySelector('[data-build-timeline]')).not.toBeNull()
+    expect(screen.getByText('Show full log')).toBeInTheDocument()
+  })
+
+  it('the hero badge comes from the corroborated preference helper', async () => {
+    const { heroPreferenceBadge } = await import('@/components/trip/insights')
+    mount()
+    await flush()
+    const expected = heroPreferenceBadge(TOKYO_TRIP)
+    const badge = screen.queryByTestId('personal-badge')
+    if (expected) expect(badge).toHaveTextContent(expected)
+    else expect(badge).toBeNull()
+  })
+
+  it('the Trip tab ends with the trip summary and feedback, without the moved sections', async () => {
+    const b = { ...TOKYO_TRIP, trip: { ...TOKYO_TRIP.trip, status: 'complete' as const } }
+    render(<MapProvider><TripWorkspace tripId={b.trip.id} bundle={b} /></MapProvider>)
+    await flush()
+    const scroll = document.querySelector<HTMLElement>('[data-trip-scroll]')!
+    const about = within(scroll).getByRole('region', { name: 'About this trip' })
+    expect(within(about).getByTestId('trip-feedback-panel')).toBeInTheDocument()
+    expect(within(scroll).queryByText('Your preferences')).toBeNull()
+    expect(within(scroll).queryByText('Trade-offs')).toBeNull()
+    expect(within(scroll).queryByText('How Astrail built this')).toBeNull()
+  })
+
+  it('a trip saved with gaps shows a hero badge that opens the list of stops missing details', async () => {
+    const b = structuredClone(TOKYO_TRIP)
+    b.trip.status = 'saved_with_gaps'
+    b.places[1].place.lat = 0
+    b.places[1].place.lng = 0
+    mount(b)
+    await flush()
+    const badge = screen.getByRole('button', { name: /missing details/i })
+    expect(badge).toHaveAttribute('aria-expanded', 'false')
+    await act(async () => { badge.click() })
+    expect(badge).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('list', { name: /stops missing details/i })).toHaveTextContent(b.places[1].place.name)
   })
 })

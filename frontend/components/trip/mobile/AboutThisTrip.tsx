@@ -145,7 +145,7 @@ function StatGrid({ bundle }: { bundle: TripBundle }) {
   )
 }
 
-function MissingDetails({ bundle }: { bundle: TripBundle }) {
+export function MissingDetails({ bundle, label }: { bundle: TripBundle; label?: string }) {
   const missing = stopsMissingDetails(bundle)
   if (missing.length === 0) {
     return (
@@ -156,7 +156,7 @@ function MissingDetails({ bundle }: { bundle: TripBundle }) {
     )
   }
   return (
-    <ul className="flex flex-col gap-2">
+    <ul aria-label={label} className="flex flex-col gap-2">
       {missing.map((m) => (
         <li key={m.id} className="m-subcard flex flex-col px-4 py-3">
           <span className="type-body text-[15px] font-semibold text-[var(--m-text)]">{m.name}</span>

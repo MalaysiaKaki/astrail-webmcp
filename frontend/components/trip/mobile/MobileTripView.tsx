@@ -12,6 +12,7 @@ import MobileTripSheet, { type SheetState } from './MobileTripSheet'
 import StopTimeline from './StopTimeline'
 import type { FeedbackComposer } from '../use-feedback-composer'
 import AboutThisTrip from './AboutThisTrip'
+import DesktopAbout from '../panel/DesktopAbout'
 import SelectedPlaceCard from './SelectedPlaceCard'
 import { useRevealScroll } from './use-reveal-scroll'
 import DayHeaderCard from '../panel/DayHeaderCard'
@@ -348,7 +349,11 @@ export function TripPanelBody(p: MobileTripViewProps & {
           {p.activeDay ? <DayDisclosure day={p.activeDay} rewriting={p.summaryRewriting} request={p.panelRequest} /> : null}
         </>
       )}
-      <AboutThisTrip bundle={p.bundle} readOnly={p.readOnly} feedback={p.feedback} />
+      {/* Desktop (A10): About is redistributed across the tabs; only the trip summary and the
+          feedback stay here. The phone keeps its one About disclosure unchanged. */}
+      {desktop
+        ? <DesktopAbout bundle={p.bundle} readOnly={p.readOnly} feedback={p.feedback} />
+        : <AboutThisTrip bundle={p.bundle} readOnly={p.readOnly} feedback={p.feedback} />}
     </>
   )
 }
