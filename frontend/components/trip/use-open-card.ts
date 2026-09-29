@@ -55,14 +55,20 @@ export function useOpenCard() {
     setPanelRequest({ target, day, nonce: next() })
   }, [])
 
+  // In the commit that mounted the target, not a frame later: focus needs no layout, and a slow
+  // frame (the map animating) left focus on <body> meanwhile (A12). A target that only appears
+  // after this commit gets one more try on the next frame.
   useEffect(() => {
     if (!focusRequest) return
-    const frame = requestAnimationFrame(() => {
+    const tryFocus = () => {
       for (const sel of focusRequest.selectors) {
         const el = document.querySelector<HTMLElement>(sel)
-        if (el) { el.focus({ preventScroll: false }); return }
+        if (el) { el.focus({ preventScroll: false }); return true }
       }
-    })
+      return false
+    }
+    if (tryFocus()) return
+    const frame = requestAnimationFrame(() => { tryFocus() })
     return () => cancelAnimationFrame(frame)
   }, [focusRequest])
 

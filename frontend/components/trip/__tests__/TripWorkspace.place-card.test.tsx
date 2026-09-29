@@ -428,3 +428,18 @@ describe('Codex final: where the detail goes when the map cannot show it', () =>
     expect((mapProps.current as unknown as { focusNonce: number }).focusNonce).toBe(before + 1)
   })
 })
+
+/* A12 runtime flake: focus-return waited a frame, and a slow frame (a map animating) left focus on
+   <body> for that long. Focus needs no layout: it moves in the commit, with no frame gap. */
+describe('focus returns without waiting for a frame', () => {
+  it('Escape puts focus back on the row even if no animation frame ever runs', async () => {
+    mount()
+    await flush()
+    await act(async () => { row('pl_hpcafe')!.click() })
+    vi.stubGlobal('requestAnimationFrame', () => 0)      // frames stall (a busy map)
+    fireEvent.keyDown(dialog()!, { key: 'Escape' })
+    await act(async () => {})
+    expect(document.activeElement).toBe(row('pl_hpcafe'))
+    vi.unstubAllGlobals()
+  })
+})
