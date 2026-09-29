@@ -15,6 +15,7 @@ import { useTripLayout } from '@/lib/trip/use-trip-layout'
 import { useBottomNavHeight } from '@/lib/shell/bottom-nav'
 import { dockBottomOverNav, dockRoomUnderControls } from '@/lib/webmcp/dock-geometry'
 import { useControlRects } from '@/lib/trip/control-obstruction'
+import { useViewportHeight } from '@/lib/webmcp/viewport-height'
 
 /**
  * One dock, not three floating boxes.
@@ -170,9 +171,11 @@ export default function WebMcpDock() {
   // Desktop over the trip map: the room left under the right-hand map controls (measured), handed
   // to the dock's scrolling lists as --dock-room so the column never grows up over those buttons.
   const controlRects = useControlRects()
-  const dockRoom = typeof window === 'undefined' || !overCanvas
+  // Subscribed, not read in render: a height-only resize moves no control rect (fix 4).
+  const viewportHeight = useViewportHeight()
+  const dockRoom = viewportHeight === 0 || !overCanvas
     ? null
-    : dockRoomUnderControls(controlRects, window.innerWidth, window.innerHeight)
+    : dockRoomUnderControls(controlRects, window.innerWidth, viewportHeight)
 
   const registry = useOptionalWebMcpRegistry()
   const activity = registry?.activity ?? NO_ACTIVITY
@@ -332,45 +335,57 @@ export default function WebMcpDock() {
         ...(dockRoom === null ? {} : { ['--dock-room' as string]: `${dockRoom}px` }),
       }}
     >
-      {/* Order matters: the chip is last so it stays pinned to the bottom-right corner and never
-          moves when something above it appears. A control that jumps is a control you cannot hit. */}
-      {/* Dropped on a document route, not shrunk. It is the tallest panel here (~280px of opaque
-          black) and it is the one the page can replace: the /app home now leads with an in-content
-          agent band carrying the same "here is what to say" job and one prompt that runs as
-          written, laid out WITH the page instead of over it. Two prompt blocks with two different
-          texts is worse than either alone. Over a canvas there is no such band, so it stays. */}
-      {/* Minimising is only ever allowed to REMOVE chrome — there is no state reachable through
-          that control in which more is on screen than before it — so it cannot walk back the
-          route split above, and expanding on a document route brings back exactly what was
-          there: the rail, capped, and no prompts panel. */}
-      {overCanvas && !toolsOpen && !collapsed && <ExamplePrompts />}
-      {/* The rail and the tool list are alternatives on desktop too (as the prompts already were):
-          together they out-grew a 768px-tall viewport. */}
-      {!collapsed && !toolsOpen && <AgentActivityRail compact={!overCanvas} cleared={cleared} onClear={setCleared} raised />}
-      {foldable &&
-        (collapsed ? (
-          /* Folded, the rail is unmounted and the live region it carries goes with it, so the
-             count is the only thing left that can tell a screen reader an agent just acted. */
-          <div aria-live="polite" aria-label="Agent activity" className="pointer-events-none">
-            <FoldedPill
-              unread={unread.length}
-              hasChange={unread.some((e) => e.changes)}
-              onExpand={() => changeCollapsed(false)}
-            />
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => changeCollapsed(true)}
-            aria-label="Minimise agent activity"
-            // No aria-expanded: the kit paints [aria-expanded="true"] as a pressed ink control, and
-            // this is an action. The folded pill carries the disclosure state (aria-expanded=false).
-            className="m-btn-secondary pointer-events-auto"
-          >
-            Minimise
-          </button>
-        ))}
-      <WebMcpStatus open={toolsOpen} onOpenChange={setToolsOpen} />
+      {/* ONE bounded scroll area above a fixed footer, as the phone overlay has (Codex final-review
+          fix 3). The column is capped to the room under the map controls, and a capped column of
+          rigid children does not make them fit: at 844x390 (158px) the prompts card alone pushed
+          Minimise and the status chip below the viewport. Here the prompts, the rail and the tool
+          list shrink into a scroller (min-h-0), and the footer never shrinks.
+
+          Click-through, like the column: the cards inside re-enable pointer events, and a wheel
+          over a card still scrolls this ancestor. */}
+      <div
+        data-dock-scroll
+        className="pointer-events-none flex min-h-0 w-[min(22rem,100%)] flex-col items-end gap-2 overflow-y-auto overscroll-contain [scrollbar-width:thin]"
+      >
+        {/* Dropped on a document route, not shrunk. It is the tallest panel here and the one the
+            page can replace: the /app home leads with an in-content agent band carrying the same
+            "here is what to say" job. Over a canvas there is no such band, so it stays.
+            Minimising only ever REMOVES chrome, so expanding on a document route brings back
+            exactly what was there: the rail, capped, and no prompts panel. */}
+        {overCanvas && !toolsOpen && !collapsed && <ExamplePrompts />}
+        {/* The rail and the tool list are alternatives on desktop (as the prompts already were):
+            together they out-grew a 768px-tall viewport. */}
+        {!collapsed && !toolsOpen && <AgentActivityRail compact={!overCanvas} cleared={cleared} onClear={setCleared} raised />}
+        <WebMcpStatus open={toolsOpen} onOpenChange={setToolsOpen} part="panel" />
+      </div>
+      {/* The footer: the fold and the status chip in one row, bottom-right, so neither moves when
+          something above appears. A control that jumps is a control you cannot hit. */}
+      <div data-dock-footer className="pointer-events-none flex shrink-0 items-center justify-end gap-2">
+        {foldable &&
+          (collapsed ? (
+            /* Folded, the rail is unmounted and the live region it carries goes with it, so the
+               count is the only thing left that can tell a screen reader an agent just acted. */
+            <div aria-live="polite" aria-label="Agent activity" className="pointer-events-none">
+              <FoldedPill
+                unread={unread.length}
+                hasChange={unread.some((e) => e.changes)}
+                onExpand={() => changeCollapsed(false)}
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => changeCollapsed(true)}
+              aria-label="Minimise agent activity"
+              // No aria-expanded: the kit paints [aria-expanded="true"] as a pressed ink control, and
+              // this is an action. The folded pill carries the disclosure state (aria-expanded=false).
+              className="m-btn-secondary pointer-events-auto"
+            >
+              Minimise
+            </button>
+          ))}
+        <WebMcpStatus open={toolsOpen} onOpenChange={setToolsOpen} part="chip" />
+      </div>
     </div>
   )
 }

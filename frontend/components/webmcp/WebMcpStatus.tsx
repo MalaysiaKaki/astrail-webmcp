@@ -45,8 +45,10 @@ export default function WebMcpStatus({
           ✕
         </button>
       </div>
-      {/* Caps at 60% of the viewport and scrolls: the full list is already taller than a phone. */}
-      <div className="max-h-[min(60dvh,calc(var(--dock-room,100dvh)-13rem))] overflow-y-auto overscroll-contain p-3 text-[length:var(--t-meta)]">
+      {/* Caps at 60% of the viewport and scrolls: the full list is already taller than a phone. The
+          desktop dock's own scroll area now bounds it too, so the room-derived cap has a floor: a
+          budget under 13rem used to compute a zero-height list (fix 3). */}
+      <div data-tool-list-body className="max-h-[min(60dvh,max(10rem,calc(var(--dock-room,100dvh)-8rem)))] overflow-y-auto overscroll-contain p-3 text-[length:var(--t-meta)]">
         {supported ? (
           <>
             <ul className="space-y-2">

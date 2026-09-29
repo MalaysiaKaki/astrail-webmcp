@@ -121,7 +121,8 @@ describe('WebMcpStatus', () => {
     const scroller = document.querySelector('.overflow-y-auto')
     expect(scroller).toBeTruthy()
     // A7: still capped at 60dvh, and also by the room under the desktop map controls (--dock-room).
-    expect(scroller!.className).toContain('min(60dvh,calc(var(--dock-room,100dvh)')
+    // A9 (fix 3): that room-derived cap has a 10rem floor, so a short budget never zeroes the list.
+    expect(scroller!.className).toContain('min(60dvh,max(10rem,calc(var(--dock-room,100dvh)')
   })
 
   it('distinguishes tools that read from tools that change things', async () => {
