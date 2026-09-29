@@ -118,3 +118,25 @@ describe('desktop dock: the budget follows the viewport height (fix 4)', () => {
     expect(column().style.getPropertyValue('--dock-room')).toBe('268px')
   })
 })
+
+/* A10 item 3: the dock's visible cards are obstacles for the desktop place card, published to the
+   placement-only store (never the control store, whose right-half rects size the dock itself). */
+describe('desktop dock as a place-card obstacle', () => {
+  it('publishes its visible cards to the placement store and clears them on unmount', async () => {
+    const { getPlacementObstacles } = await import('@/lib/trip/placement-obstacles')
+    const { getControlRects } = await import('@/lib/trip/control-obstruction')
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1 })
+    vi.stubGlobal('cancelAnimationFrame', () => {})
+    viewport(1440, 900)
+    const rect = { left: 1070, top: 700, width: 350, height: 60, right: 1420, bottom: 760, x: 1070, y: 700, toJSON() {} } as DOMRect
+    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(rect)
+    const view = mount()
+    act(() => { window.dispatchEvent(new Event('resize')) })
+    expect(getPlacementObstacles().length).toBeGreaterThan(0)
+    expect(getControlRects()).toEqual([])
+    view.unmount()
+    expect(getPlacementObstacles()).toEqual([])
+    spy.mockRestore()
+    vi.unstubAllGlobals()
+  })
+})

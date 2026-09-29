@@ -15,6 +15,7 @@ import { useTripLayout } from '@/lib/trip/use-trip-layout'
 import { useBottomNavHeight } from '@/lib/shell/bottom-nav'
 import { dockBottomOverNav, dockRoomUnderControls } from '@/lib/webmcp/dock-geometry'
 import { useControlRects } from '@/lib/trip/control-obstruction'
+import { useReportPlacementObstacles } from '@/lib/trip/placement-obstacles'
 import { useViewportHeight } from '@/lib/webmcp/viewport-height'
 
 /**
@@ -68,6 +69,11 @@ const COLLAPSED_KEY = 'astrail:webmcp:dock-collapsed'
 
 /** Stable identity, so an absent registry does not re-run the effects below every render. */
 const NO_ACTIVITY: readonly ActivityEntry[] = []
+
+/** What the desktop dock actually paints: the cards in its scroller and its footer row. */
+function dockCards(column: Element): Element[] {
+  return Array.from(column.querySelectorAll(':scope > [data-dock-scroll] > *, :scope > [data-dock-footer] > *'))
+}
 
 /**
  * The dock folded away: one line, and never nothing.
@@ -179,6 +185,10 @@ export default function WebMcpDock() {
 
   const registry = useOptionalWebMcpRegistry()
   const activity = registry?.activity ?? NO_ACTIVITY
+  // The desktop column's visible cards are obstacles for the trip's place card (A10). The column
+  // itself spans the viewport's bottom edge and is click-through, so only its children count.
+  const columnRef = useRef<HTMLDivElement>(null)
+  useReportPlacementObstacles(columnRef, 'dock', [phone], dockCards)
   const latestId = activity.length ? activity[activity.length - 1].id : 0
 
   /**
@@ -327,6 +337,7 @@ export default function WebMcpDock() {
 
   return (
     <div
+      ref={columnRef}
       className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col items-end gap-2 p-4
                  pb-[max(1rem,env(safe-area-inset-bottom))] sm:inset-x-auto sm:right-0"
       style={{
