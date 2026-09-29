@@ -4,6 +4,7 @@ import { TOKYO_TRIP } from '@/lib/trip/fixtures'
 import { TOKYO_TRIP_WITH_HOTELS } from '@/lib/trip/fixtures/tokyo-hotels'
 import { markTripFramed } from '@/lib/trip/map-handoff'
 import { setSheetObstruction } from '@/lib/trip/sheet-obstruction'
+import { setPanelObstruction } from '@/lib/trip/panel-obstruction'
 import { buildTrailNumbers, hasRealCoords, placesForDay } from '@/lib/trip/selectors'
 import { thumbnailFor } from '@/components/map/popup-model'
 import { MOBILE_SHEET_GAP, MOBILE_TOP_CLEARANCE } from '@/components/map/frame-padding'
@@ -1229,6 +1230,43 @@ describe('TripMap across a live breakpoint switch', () => {
     expect(mapInstance.flyTo).not.toHaveBeenCalled()
     act(() => { first.click() })
     expect(onSelectPlace).toHaveBeenCalledTimes(1)
+  })
+
+  /* Codex final-review fix 2: the desktop panel publishes its right edge ~340ms after the first
+     fit, and that fit ran against a zero obstruction. Easing padding alone kept a zoom solved for
+     the whole canvas, so a wide trip left an endpoint behind the panel. The first measurement
+     re-fits the camera's current intent once, as the phone does for its sheet. */
+  it('desktop: the panel\'s first measurement re-fits once, then later changes only ease', async () => {
+    mobile = false
+    mapInstance.getCanvas.mockReturnValue({ clientWidth: 1440, clientHeight: 900 })
+    await loaded()
+    expect(mapInstance.fitBounds.mock.calls.at(-1)![1].padding.left).toBeLessThan(100)
+    mapInstance.fitBounds.mockClear(); mapInstance.easeTo.mockClear(); mapInstance.flyTo.mockClear()
+    act(() => { setPanelObstruction(460) })
+    expect(mapInstance.fitBounds).toHaveBeenCalledTimes(1)
+    expect(mapInstance.fitBounds.mock.calls[0][1].padding.left).toBeGreaterThanOrEqual(460)
+    expect(mapInstance.easeTo).not.toHaveBeenCalled()
+    mapInstance.fitBounds.mockClear()
+    act(() => { setPanelObstruction(0) })                     // collapsed: ease
+    act(() => { setPanelObstruction(460) })                   // reopened: ease
+    expect(mapInstance.fitBounds).not.toHaveBeenCalled()
+    expect(mapInstance.easeTo).toHaveBeenCalledTimes(2)
+    act(() => { setPanelObstruction(0) })
+  })
+
+  it('phone → desktop rotation: the panel\'s first measurement on desktop re-fits too', async () => {
+    mobile = true
+    mapInstance.getCanvas.mockReturnValue({ clientWidth: 1440, clientHeight: 900 })
+    await loaded()
+    act(() => { setSheetObstruction(380) })                   // the phone's own first re-fit
+    mapInstance.fitBounds.mockClear(); mapInstance.easeTo.mockClear(); mapInstance.flyTo.mockClear()
+    setMobile(false)
+    act(() => { setSheetObstruction(0) })                     // the phone sheet unmounts
+    expect(mapInstance.fitBounds).not.toHaveBeenCalled()
+    act(() => { setPanelObstruction(460) })                   // the desktop panel lands
+    expect(mapInstance.fitBounds).toHaveBeenCalledTimes(1)
+    expect(mapInstance.fitBounds.mock.calls[0][1].padding.left).toBeGreaterThanOrEqual(460)
+    act(() => { setPanelObstruction(0) })
   })
 
 })

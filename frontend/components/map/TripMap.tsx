@@ -170,10 +170,12 @@ export default function TripMap({
   // must see the layout as it is now, not as it was when the markers were drawn.
   const layoutRef = useRef(layout)
   layoutRef.current = layout
-  // Phone only: has the trip been framed against the sheet's REAL height yet? The first framing
-  // usually runs before the sheet has measured itself (it settles after its transition), so the
-  // first measurement triggers one proper re-fit; every later height change only eases padding.
-  const fitWithSheetRef = useRef(false)
+  // Which layout's obstruction the current framing was solved against: the phone sheet or the
+  // desktop panel. The first framing usually runs before either has measured itself (both settle
+  // after a transition), so that layout's first measurement triggers one proper re-fit; every later
+  // change only eases padding. Keyed by layout so a rotation re-fits once for the new obstruction
+  // (Codex final-review fix 2: the desktop panel's first measurement used to only ease).
+  const fittedForRef = useRef<'mobile' | 'desktop' | null>(null)
   // What the camera was last asked to show. The one-time re-fit above must re-frame THIS — a
   // selection, a day switch, or show_on_map can land between first framing and the sheet's first
   // measurement, and re-fitting the whole trip then would silently undo it. 'other' (a restaurant
@@ -607,7 +609,8 @@ export default function TripMap({
       // panel geometry (short) rather than re-fly the whole camera (full). Any other entry
       // (generation handoff, direct load) never marks the handoff, so it frames normally.
       const inherited = consumeTripFramed(bundle.trip.id)
-      fitWithSheetRef.current = getSheetObstruction() > 0
+      const lay = layoutRef.current
+      fittedForRef.current = lay && (lay === 'mobile' ? getSheetObstruction() : getPanelObstruction()) > 0 ? lay : null
       cameraIntentRef.current = 'trip'
       // This framing is solved at the mode's pitch; recording it means the mode effect never
       // follows with a pitch-only ease that would cut the pitched fit short mid-flight.
@@ -626,10 +629,11 @@ export default function TripMap({
     if (!ready || !framedRef.current) return
     const map = getMap()
     if (!map || typeof map.easeTo !== 'function') return
-    if (layout === 'mobile' && !fitWithSheetRef.current && sheetObstruction > 0) {
-      // The sheet's first real measurement: re-fit the trip into the band between the top bar
-      // and the sheet, once. Easing padding alone keeps a zoom chosen for the whole canvas.
-      fitWithSheetRef.current = true
+    const measured = layout === 'mobile' ? sheetObstruction : panelObstruction
+    if (layout && fittedForRef.current !== layout && measured > 0) {
+      // This layout's first real measurement (the phone sheet, or the desktop panel): re-fit into
+      // the visible band, once. Easing padding alone keeps a zoom chosen for the whole canvas.
+      fittedForRef.current = layout
       const intent = cameraIntentRef.current
       if (intent !== 'other') {
         cancelDeferredEaseRef.current?.()
