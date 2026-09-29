@@ -82,7 +82,9 @@ export default function TripsList() {
           </Link>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-6">
+        {/* The phone tab bar floats over this scroller's end: pad by the strip it covers
+            (--shell-nav-clear, 0 from 768) so the last trip scrolls clear of it. */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-[calc(1.5rem+var(--shell-nav-clear,0px))]">
           {error ? (
             <p role="alert" className="px-2 text-xs text-[color:var(--fail)]">
               {error}

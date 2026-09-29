@@ -1,45 +1,42 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import type { ComponentType } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { AstrailLogo } from '@/components/brand/AstrailLogo'
 import { readEntitlement, TRIAL_LIFETIME_LIMIT } from '@/lib/entitlement'
 import type { Entitlement } from '@/lib/entitlement'
 import { listTrips } from '@/lib/trip/supabase-api'
 import type { Trip } from '@/lib/trip/backend-types'
-import { TALLY_FEEDBACK_FORM_ID } from '@/lib/tally'
+import { TALLY_FEEDBACK_URL } from '@/lib/tally'
+import { isNavActive, SHELL_TABS } from '@/lib/shell/nav'
+import type { ShellTabId } from '@/lib/shell/nav'
+import { useSignOut } from '@/lib/shell/sign-out'
+import {
+  ChatIcon,
+  ExternalLinkIcon,
+  LogOutIcon,
+  PlusIcon,
+  SettingsIcon,
+  TAB_ICON,
+} from '@/components/dashboard/nav-icons'
 
 /* Persistent paper sidebar for the /app document routes (dashboard, trails, settings).
    Connected full-bleed rail (see (shell)/layout.tsx): an identity block up top, a primary
    "New trail" action, icon-led nav, a live Recent-trails list that fills the rail, and a
-   bottom account section (Settings + Log out) over a divider. Desktop = a vertical rail;
-   mobile = a horizontal top bar with icon-only rows (the CTA + recents are desktop-only so
-   the top bar stays lean). Palette role tokens keep the parent .app-shell scope from
+   bottom account section (Feedback + Settings + Log out) over a divider. Desktop only (>=768):
+   below that the phone tab bar (BottomTabBar) is the nav and Feedback/Log out live in Settings. Palette role tokens keep the parent .app-shell scope from
    bleeding in; the brand is the A-swoosh-star mark recoloured brass (AstrailLogo
    tone="brass") so it reads on the cream paper. */
 
-type IconProps = { className?: string }
-
-/* "Sample trail" reads as an example rather than one of the user's own — the row below it lists
-   their real trails, and the demo route's own <title> already calls it that. It sits in the rail,
-   not on a page, because README and SUBMISSION both send people to /app/trip/demo and nothing in
-   the running app linked there: from the rail it is reachable from every /app route.
-   Its own icon (not RouteIcon) because the mobile bar is icon-only, where two identical marks
-   would be indistinguishable from a duplicated Trails row. */
-const NAV: { href: string; label: string; Icon: ComponentType<IconProps> }[] = [
-  { href: '/app', label: 'Home', Icon: HomeIcon },
-  { href: '/app/trips', label: 'Trails', Icon: RouteIcon },
-  { href: '/app/trip/demo', label: 'Sample trail', Icon: CompassIcon },
-]
+/* The rail shows the same destinations as the phone tabs (lib/shell/nav) minus Settings, which
+   sits in the account section. "Sample trail" reads as an example rather than one of the user's
+   own: the Recent list below it holds their real trails. */
+const RAIL_LABEL: Partial<Record<ShellTabId, string>> = { sample: 'Sample trail' }
+const RAIL_NAV = SHELL_TABS.filter((tab) => tab.id !== 'settings')
 
 const RECENTS_LIMIT = 8
-
-function isActive(pathname: string, href: string): boolean {
-  return href === '/app' ? pathname === '/app' : pathname.startsWith(href)
-}
 
 // Best available human label for a trip row — narrator title first, then whatever
 // destination we inferred/were told, then a neutral fallback so a row never renders blank.
@@ -70,7 +67,7 @@ const iconClass = (active: boolean) =>
 
 export default function Sidebar() {
   const pathname = usePathname()
-  const router = useRouter()
+  const signOut = useSignOut()
   const [email, setEmail] = useState<string | null>(null)
   const [recents, setRecents] = useState<Trip[]>([])
   const [entitlement, setEntitlement] = useState<Entitlement | null>(null)
@@ -116,38 +113,34 @@ export default function Sidebar() {
     }
   }, [])
 
-  async function signOut() {
-    await createClient().auth.signOut()
-    router.push('/sign-in')
-  }
-
-  const settingsActive = isActive(pathname, '/app/settings')
+  const settingsActive = isNavActive(pathname, '/app/settings')
 
   return (
-    <aside className="relative z-10 flex flex-row items-center justify-between gap-2 border-b border-[color:var(--line-soft)] bg-[color:var(--surface-1)] p-3 sm:h-full sm:w-[256px] sm:flex-col sm:items-stretch sm:justify-start sm:gap-0 sm:border-b-0 sm:border-r">
+    <aside className="relative z-10 hidden h-full w-[256px] flex-none flex-col items-stretch border-r border-[color:var(--line-soft)] bg-[color:var(--surface-1)] p-3 md:flex">
       {/* Identity — the brand mark + signed-in account. Static header, not a switcher. */}
-      <div className="flex items-center gap-2.5 rounded-lg p-1 sm:mb-1">
+      <div className="mb-1 flex items-center gap-2.5 rounded-lg p-1">
         <span className="flex h-9 w-9 flex-none items-center justify-center rounded-[8px] border border-[color:var(--line-soft)] bg-[color:var(--surface-2)]">
           <AstrailLogo variant="mark" tone="brass" height={20} />
         </span>
-        <span className="hidden min-w-0 truncate text-[11px] leading-tight text-[color:var(--text-muted)] sm:block">
+        <span className="min-w-0 truncate text-[11px] leading-tight text-[color:var(--text-muted)]">
           {email ?? 'Account'}
         </span>
       </div>
 
-      {/* Primary action — start a new trail. Desktop-only so the mobile top bar stays lean. */}
+      {/* Primary action — start a new trail. */}
       <Link
         href="/app"
-        className="hidden items-center justify-center gap-2 rounded-lg border border-[color:var(--accent)] bg-[color:var(--accent)] px-3 py-2.5 text-[13px] font-medium text-[color:var(--accent-text)] transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)] sm:mt-4 sm:flex"
+        className="mt-4 flex items-center justify-center gap-2 rounded-lg border border-[color:var(--accent)] bg-[color:var(--accent)] px-3 py-2.5 text-[13px] font-medium text-[color:var(--accent-text)] transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]"
       >
         <PlusIcon className="h-4 w-4" />
         New trail
       </Link>
 
       {/* Main nav */}
-      <nav aria-label="Main" className="flex flex-row gap-1 sm:mt-4 sm:flex-col">
-        {NAV.map(({ href, label, Icon }) => {
-          const active = isActive(pathname, href)
+      <nav aria-label="Main" className="mt-4 flex flex-col gap-1">
+        {RAIL_NAV.map(({ id, href, label }) => {
+          const active = isNavActive(pathname, href)
+          const Icon = TAB_ICON[id]
           return (
             <Link
               key={href}
@@ -156,16 +149,16 @@ export default function Sidebar() {
               className={rowClass(active)}
             >
               <Icon className={iconClass(active)} />
-              <span className="hidden truncate sm:inline">{label}</span>
+              <span className="truncate">{RAIL_LABEL[id] ?? label}</span>
             </Link>
           )
         })}
       </nav>
 
-      {/* Recent trails — fills the rail. Desktop-only; grows to take the free space and
+      {/* Recent trails — fills the rail. Grows to take the free space and
           scrolls past the limit. When empty it's just flex space, pushing account to the
           floor exactly as the old spacer did. */}
-      <div className="hidden min-h-0 flex-1 flex-col sm:mt-6 sm:flex">
+      <div className="mt-6 flex min-h-0 flex-1 flex-col">
         {recents.length > 0 ? (
           <>
             <p className="px-2.5 pb-1.5 text-[11px] font-medium uppercase tracking-[0.06em] text-[color:var(--text-faint)]">
@@ -194,14 +187,13 @@ export default function Sidebar() {
       </div>
 
       {/* Account section */}
-      <div className="flex flex-row gap-1 sm:flex-col sm:border-t sm:border-[color:var(--line-soft)] sm:pt-3">
-        {/* Generations-left pill — advisory only (the atomic RPC is the enforcer). Desktop-only
-            like the recents; hidden entirely when the read fails rather than showing a guess.
+      <div className="flex flex-col gap-1 border-t border-[color:var(--line-soft)] pt-3">
+        {/* Generations-left pill — advisory only (the atomic RPC is the enforcer). Hidden entirely when the read fails rather than showing a guess.
             Trial plans only: a beta seat has no quota to report, so the whole <p> drops rather
             than leaving an empty dashed box in the rail. */}
         {entitlement?.plan === 'trial' ? (
           <p
-            className={`hidden sm:block rounded-lg border border-dashed border-[color:var(--line-soft)] bg-[color:var(--surface-0)] px-2.5 py-1.5 text-[11px] sm:mb-1 ${
+            className={`mb-1 rounded-lg border border-dashed border-[color:var(--line-soft)] bg-[color:var(--surface-0)] px-2.5 py-1.5 text-[11px] ${
               TRIAL_LIFETIME_LIMIT - entitlement.lifetimeTripCount <= 0
                 ? 'text-[color:var(--brass-deep)]'
                 : 'text-[color:var(--text-muted)]'
@@ -210,105 +202,32 @@ export default function Sidebar() {
             {`Free trial · ${Math.max(0, TRIAL_LIFETIME_LIMIT - entitlement.lifetimeTripCount)} of ${TRIAL_LIFETIME_LIMIT} trip generation${TRIAL_LIFETIME_LIMIT === 1 ? '' : 's'} left`}
           </p>
         ) : null}
-        {/* Beta feedback — opens the Tally feedback form (PdNreP) as a popup. Distinct
-            from the per-trip thumbs feedback; this is the "tell us anything" channel. */}
-        <button
-          type="button"
-          data-tally-open={TALLY_FEEDBACK_FORM_ID}
-          data-tally-emoji-text="👋"
-          data-tally-emoji-animation="wave"
+        {/* Beta feedback — the Tally form (PdNreP) in its own browser tab. Distinct from the
+            per-trip thumbs feedback; this is the "tell us anything" channel. */}
+        <a
+          href={TALLY_FEEDBACK_URL}
+          target="_blank"
+          rel="noopener noreferrer"
           className={rowClass(false)}
         >
           <ChatIcon className={iconClass(false)} />
-          <span className="hidden truncate sm:inline">Feedback</span>
-        </button>
+          <span className="truncate">Feedback</span>
+          <ExternalLinkIcon className="ml-auto h-3.5 w-3.5 shrink-0 text-[color:var(--text-faint)]" />
+          <span className="sr-only"> (opens in a new tab)</span>
+        </a>
         <Link
           href="/app/settings"
           aria-current={settingsActive ? 'page' : undefined}
           className={rowClass(settingsActive)}
         >
           <SettingsIcon className={iconClass(settingsActive)} />
-          <span className="hidden truncate sm:inline">Settings</span>
+          <span className="truncate">Settings</span>
         </Link>
         <button type="button" onClick={() => void signOut()} className={rowClass(false)}>
           <LogOutIcon className={iconClass(false)} />
-          <span className="hidden truncate sm:inline">Log out</span>
+          <span className="truncate">Log out</span>
         </button>
       </div>
     </aside>
-  )
-}
-
-/* ---- Icons: inline SVG, currentColor stroke so they inherit the row's text colour. ---- */
-
-function PlusIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden className={className}>
-      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function HomeIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden className={className}>
-      <path d="M3.5 10.5 12 3.5l8.5 7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M5.5 9.5V20h4.5v-5.5h4V20h4.5V9.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function RouteIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden className={className}>
-      <path d="M6.8 18C11 18 13 6 17.2 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      <circle cx="5" cy="18.5" r="2.1" fill="currentColor" />
-      <circle cx="19" cy="5.5" r="2.1" fill="none" stroke="currentColor" strokeWidth="1.6" />
-    </svg>
-  )
-}
-
-function CompassIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden className={className}>
-      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.6" />
-      <path d="m15 9-2 4-4 2 2-4Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function SettingsIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden className={className}>
-      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.6" />
-      <path
-        d="M12 2.8v2.4M12 18.8v2.4M21.2 12h-2.4M5.2 12H2.8M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7M18.5 18.5l-1.7-1.7M7.2 7.2 5.5 5.5"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-    </svg>
-  )
-}
-
-function ChatIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden className={className}>
-      <path
-        d="M20 11.5a7.5 7.5 0 0 1-10.9 6.7L4.5 19.5l1.3-4.1A7.5 7.5 0 1 1 20 11.5Z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-function LogOutIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden className={className}>
-      <path d="M9.5 4.5H6.5A2 2 0 0 0 4.5 6.5v11a2 2 0 0 0 2 2h3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M13.5 12h7M17.5 8.5l3.5 3.5-3.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
   )
 }

@@ -13,6 +13,11 @@ vi.mock('@/lib/trip/supabase-api', () => ({ getProfile, getMemoryPreferences }))
 const { useUser } = vi.hoisted(() => ({ useUser: vi.fn() }))
 vi.mock('@/lib/auth/use-user', () => ({ useUser }))
 
+// Settings now always renders the Log out row (AccountRows), which needs the app router and the
+// browser Supabase client; neither is exercised here (SettingsView.account.test covers them).
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({ auth: { signOut: vi.fn() } }) }))
+
 // When the flag is ON the mounted DeleteAccountCard fires the on-mount cross-session status read;
 // stub it to a benign active state so the flag test stays deterministic (no real network call).
 const { getAccountDeletionStatus } = vi.hoisted(() => ({ getAccountDeletionStatus: vi.fn() }))

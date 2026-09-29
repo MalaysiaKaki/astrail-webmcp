@@ -75,6 +75,19 @@ describe('Sidebar sample-trail link', () => {
   })
 })
 
+/* Feedback used to open a Tally popup that stacked over pages and followed navigation; it now opens
+   the form in its own browser tab. */
+describe('Sidebar feedback link', () => {
+  it('opens the Tally form in a new tab, with no popup hook left', async () => {
+    await show('/app')
+    const feedback = screen.getByRole('link', { name: /feedback/i })
+    expect(feedback).toHaveAttribute('href', 'https://tally.so/r/PdNreP')
+    expect(feedback).toHaveAttribute('target', '_blank')
+    expect(feedback).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(document.querySelector('[data-tally-open]')).toBeNull()
+  })
+})
+
 /* The rail's plan pill. A beta account is every judge and every seat-holder, and telling them
    they are on a beta is noise — but the trial line is a real quota (TRIAL_LIFETIME_LIMIT is 1,
    so "0 of 1 left" is the only warning before generation is refused). Beta must therefore drop

@@ -22,6 +22,11 @@ vi.mock('@/lib/trip/api', async (importOriginal) => {
 const { getAccessToken } = vi.hoisted(() => ({ getAccessToken: vi.fn() }))
 vi.mock('@/lib/supabase/session', () => ({ getAccessToken }))
 
+// Settings now always renders the Log out row (AccountRows), which needs the app router and the
+// browser Supabase client; neither is exercised here (SettingsView.account.test covers them).
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({ auth: { signOut: vi.fn() } }) }))
+
 import SettingsView from '@/components/settings/SettingsView'
 import { ApiError } from '@/lib/trip/api'
 

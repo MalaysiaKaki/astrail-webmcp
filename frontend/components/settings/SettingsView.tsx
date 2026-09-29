@@ -15,6 +15,7 @@ import {
   type TravelerProfile,
 } from '@/lib/trip/backend-types'
 import DeleteAccountCard from '@/components/settings/DeleteAccountCard'
+import AccountRows from '@/components/settings/AccountRows'
 
 // Self-serve account deletion is HIDDEN until go-live: Task 6 flips this frontend flag together
 // with the backend `_DELETION_EXECUTION_READY` gate. Read at render (not a module const) so it
@@ -55,6 +56,7 @@ const CARD = 'flex flex-col gap-4 rounded-2xl border border-[color:var(--paper-l
 
 export default function SettingsView() {
   const [data, setData] = useState<ProfileData | null>(null)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [clearStatus, setClearStatus] = useState<ClearStatus>('idle')
   const activeRef = useRef(true)
 
@@ -66,9 +68,11 @@ export default function SettingsView() {
       .then(([p, mem]) => {
         if (activeRef.current) setData({ profile: p.profile, status: mem.status, facts: mem.facts })
       })
-      .catch(() => {
-        /* A rejected profile read leaves the loading state; the page is auth-gated so a
-           signed-in user always resolves. mem0 failures degrade to status inside the read. */
+      .catch((e: unknown) => {
+        /* A rejected profile read (an expired session, RLS, the network) says so instead of
+           loading forever. mem0 failures degrade to a status inside the read and never land here. */
+        console.error('[settings] profile/preferences read failed', e)
+        if (activeRef.current) setLoadFailed(true)
       })
     return () => {
       activeRef.current = false
@@ -93,12 +97,8 @@ export default function SettingsView() {
     }
   }
 
-  if (!data) {
-    return <p className="text-[14px] text-[color:var(--text-muted)]">Loading your settings…</p>
-  }
-
-  const { profile, status, facts } = data
-
+  // The page frame (title + account rows) never waits on the reads: Feedback and Log out must work
+  // while profile/preferences are pending or have failed.
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-8">
       <h1
@@ -108,6 +108,39 @@ export default function SettingsView() {
         Settings
       </h1>
 
+      {data ? (
+        <LoadedSettings data={data} clearStatus={clearStatus} onClear={handleClear} />
+      ) : loadFailed ? (
+        <p role="alert" className="text-[14px] text-[color:var(--text-muted)]">
+          Couldn’t load your settings. Refresh the page to try again.
+        </p>
+      ) : (
+        <p className="text-[14px] text-[color:var(--text-muted)]">Loading your settings…</p>
+      )}
+
+      <AccountRows />
+
+      {/* Self-serve deletion — hidden until go-live (Task 6 flips NEXT_PUBLIC_DELETION_ENABLED).
+          Gated at the mount site so the control never renders in the current build. Still only
+          once the account's settings have loaded, as before. */}
+      {data && deletionUiEnabled() ? <DeleteAccountCard /> : null}
+    </div>
+  )
+}
+
+function LoadedSettings({
+  data,
+  clearStatus,
+  onClear,
+}: {
+  data: ProfileData
+  clearStatus: ClearStatus
+  onClear: () => void
+}) {
+  const { profile, status, facts } = data
+
+  return (
+    <>
       <section className={CARD}>
         <h2 className="font-display text-[18px] font-medium text-[color:var(--text)]">Using your saved travel preferences</h2>
         <dl className="flex flex-col gap-3">
@@ -156,7 +189,7 @@ export default function SettingsView() {
             the one place --fail belongs on a control (DESIGN.md §9 / palette). */}
         <button
           type="button"
-          onClick={handleClear}
+          onClick={onClear}
           disabled={clearStatus === 'cleared' || clearStatus === 'clearing'}
           className="mt-2 self-start rounded-lg border border-[color:var(--fail)] px-3 py-2 text-[12px] font-semibold uppercase tracking-wide text-[color:var(--fail)] transition-colors hover:bg-[color:var(--surface-2)] disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]"
         >
@@ -175,10 +208,6 @@ export default function SettingsView() {
           </p>
         ) : null}
       </section>
-
-      {/* Self-serve deletion — hidden until go-live (Task 6 flips NEXT_PUBLIC_DELETION_ENABLED).
-          Gated at the mount site so the control never renders in the current build. */}
-      {deletionUiEnabled() ? <DeleteAccountCard /> : null}
-    </div>
+    </>
   )
 }
