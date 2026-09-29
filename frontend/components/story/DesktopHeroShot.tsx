@@ -31,7 +31,7 @@ export default function DesktopHeroShot() {
             width={DESKTOP_SHOT_WIDTH}
             height={DESKTOP_SHOT_HEIGHT}
             className="story-desk-shot__img"
-            alt="Astrail's sample Tokyo trip on desktop: the day's stops in a panel on the left, each quoting the Reel it came from, and the route on the map beside it."
+            alt="Astrail's sample Tokyo trip on desktop: the day's stops in a floating panel on the left, the ones from a Reel quoting its caption, and the route on the map beside it."
           />
           {/* eslint-disable-next-line @next/next/no-img-element -- a decorative still, lazy */}
           <img

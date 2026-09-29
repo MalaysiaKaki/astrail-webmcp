@@ -50,7 +50,7 @@ export function PhoneHeroDevice() {
             width={SHOT_WIDTH}
             height={SHOT_HEIGHT}
             className="story-phone-device__shot"
-            alt="Astrail's sample Tokyo trip on a phone: the route on the map above, and the first day's stops below, each quoting the Reel it came from."
+            alt="Astrail's sample Tokyo trip on a phone: the route on the map above, and the first day's stops below, the first quoting the Reel it came from."
             priority
           />
           <span className="story-phone-device__island" aria-hidden="true" />
