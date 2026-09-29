@@ -182,6 +182,13 @@ MCP_ALLOWED_CLIENT_IDS    # comma-separated OAuth client UUIDs (the ChatGPT conn
 MCP_BACKEND_ORIGIN        # bare Render origin, https only (http://localhost allowed outside production)
 MCP_DELEGATION_SECRET     # base64 of >=48 random bytes: `openssl rand -base64 64`. SAME value on Render. NOT the Supabase JWT secret
 MCP_ALLOWED_ORIGINS       # optional, comma-separated extra browser Origins (e.g. a local MCP Inspector)
+MCP_WIDGET_IMAGE_DOMAINS  # optional, widget image origins for its CSP. UNSET = https://*.cdninstagram.com,https://*.fbcdn.net;
+                          # empty = none; else comma-separated https origins (one leading `*.` allowed). Invalid → /mcp 503.
+                          # Our own origin (widget JS/CSS at /mcp-widget/v3/) and the Supabase origin are always included.
+MCP_MAPBOX_STATIC_TOKEN   # optional, server-only. Enables the widget's per-day route maps (render_itinerary signs
+                          # /api/mcp/static-map URLs; the route proxies Mapbox Static Images). Unset = no maps, card
+                          # unaffected. Use a NEW Mapbox public token with NO URL restriction (server-to-Mapbox);
+                          # never NEXT_PUBLIC_*. A malformed value fails MCP config (503), like the others.
 ```
 
 Backend (Render) reads `MCP_DELEGATION_SECRET` (same value) and `MCP_BACKEND_ORIGIN` (its own

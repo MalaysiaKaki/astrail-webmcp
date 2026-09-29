@@ -165,6 +165,16 @@ Register the production client **first**, so the one frontend deploy already has
    - an ordinary website login and refresh
 
    An existing astrail-mcp token doesn't exercise the changed hook. Then run PLAN §7.4 step 5 on iOS and Android.
+6. **Optional: the widget's route maps** (`MCP_MAPBOX_STATIC_TOKEN`, off when unset; the card renders without them).
+   Each map is one paid Mapbox Static Images request, made by `GET /api/mcp/static-map`. What bounds that spend:
+   - Vercel's CDN caches each signed map for ≤ 24 h, never past its signed expiry: the main control. The route
+     only accepts the canonical `?p=&s=` query, and refuses requests carrying `Authorization` or `Range`
+     (they would bypass the CDN cache). After deploy, request one map twice and check `x-vercel-cache: HIT`.
+   - Per function instance only: identical in-flight requests share one fetch, and a small token bucket returns 429.
+     There is **no shared, cross-instance limiter**. The remaining ceilings are the Mapbox account itself (set a
+     usage alert or cap on the token's account) and, optionally, a **Vercel Firewall rate-limit rule** on
+     `/api/mcp/static-map` (e.g. per-IP, a few dozen requests per minute) — recommended before enabling the token.
+   - To turn maps off at once: unset `MCP_MAPBOX_STATIC_TOKEN` and redeploy (the route answers 404, cards hide the map).
 
 ## 4. Rollback
 

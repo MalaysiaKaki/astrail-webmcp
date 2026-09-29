@@ -194,7 +194,8 @@ ChatGPT ──POST /mcp (Bearer)──▶ Next route handler (frontend/lib/mcp)
             verify JWKS/iss/aud/role/permission/client/scope ─▶ fresh McpServer + stateless transport per request
             tool ─▶ HS256 delegation JWT (≤60 s, endpoint aud, body hash, jti) ─▶ FastAPI /internal/mcp/v1/*
                                                    (backend/auth_delegation.py: durable jti replay store)
-            render_itinerary ─▶ ui://astrail/itinerary-v2.html (frontend/mcp-app, single-file Vite build)
+            render_itinerary ─▶ ui://astrail/itinerary-v3.html (HTML shell; JS/CSS from /mcp-widget/v3/, frontend/mcp-app Vite build)
+                             _meta astrail/links: trip_url + signed day_maps ─▶ GET /api/mcp/static-map ─▶ Mapbox Static Images
 ```
 
 - Read-only v1 tools: `get_profile`, `list_trips`, `get_itinerary`, `list_saved_reels`, `render_itinerary`.
@@ -203,6 +204,15 @@ ChatGPT ──POST /mcp (Bearer)──▶ Next route handler (frontend/lib/mcp)
   (`backend/mcp_reads.py`, `mcp_projection.py`, `mcp_budget.py`), because the browser's RLS path is unavailable to a
   server acting for a remote client. Saved reels go through the service-only RPC `saved_reel_cards_for_user`.
 - The MCP access token is never forwarded upstream; the Next layer holds no Supabase client or service credential.
+- Widget route maps (optional, `MCP_MAPBOX_STATIC_TOKEN`): render_itinerary signs each located day's pins (HMAC,
+  key HKDF-derived from `MCP_DELEGATION_SECRET` with context `astrail-static-map-v1`, 30-day expiry); the route
+  verifies and proxies one raster Mapbox request. The token stays server-side; the image is served from our origin.
+  Spending controls: only the canonical `?p=&s=` query is accepted (no cache-busting variants), and requests carrying
+  `Authorization` or `Range` are refused (Vercel's CDN would not cache them); Vercel's CDN caches each map
+  (`Vercel-CDN-Cache-Control`, ≤ 24 h and never past the signed expiry) — the main control; per INSTANCE only,
+  concurrent identical requests share one upstream fetch and a small token bucket caps new fetches (429). There is
+  no shared cross-instance limiter: the remaining ceiling is the Mapbox account itself, plus an optional Vercel
+  Firewall rate-limit rule on `/api/mcp/static-map` (rollout runbook §3 step 6).
 
 ## Entitlement ledger (free trial + beta seats)
 

@@ -38,6 +38,8 @@ export const MCP_LIMITS = {
   titleChars: 160,
   urlChars: 512,
   bundleBytes: 256 * 1024,
+  /** Pins on one day's static route map (lib/mcp/static-map.ts); the widget captions a capped map. */
+  mapPins: 25,
 } as const
 
 /** Fields the MCP projection never carries, and the value it sends instead. Pinned by tests. */
@@ -378,7 +380,21 @@ export const renderSummarySchema = itinerarySummarySchema.extend({ focus_day: z.
 
 /** `_meta` key carrying the widget-only bundle on render_itinerary results (hidden from the model). */
 export const BUNDLE_META_KEY = 'astrail/bundle'
-export const ITINERARY_RESOURCE_URI = 'ui://astrail/itinerary-v2.html'
+
+/** `_meta` key carrying the widget's links on render_itinerary results (hidden from the model). */
+export const LINKS_META_KEY = 'astrail/links'
+const httpUrl = z.string().url().max(4096).regex(/^https?:\/\//)
+/**
+ * Optional, and validated apart from the bundle: a bad links block drops the links, never the card.
+ * `trip_url` opens the trip in Astrail; `day_maps` maps a day NUMBER to a signed static route-map
+ * URL on our own origin (lib/mcp/static-map.ts), present only for days with located stops.
+ */
+export const widgetLinksSchema = z.object({
+  trip_url: httpUrl,
+  day_maps: z.record(z.string().regex(/^\d{1,3}$/), httpUrl).optional(),
+})
+export type WidgetLinks = z.infer<typeof widgetLinksSchema>
+export const ITINERARY_RESOURCE_URI = 'ui://astrail/itinerary-v3.html'
 
 // ---- Compile-time proof that the bundle is a real TripBundle (N2) ----
 

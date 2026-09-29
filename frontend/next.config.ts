@@ -96,6 +96,20 @@ const nextConfig: NextConfig = {
         source: "/:path*",
         headers: securityHeaders,
       },
+      // The ChatGPT itinerary widget's JS and CSS (public/mcp-widget/, written by build:widgets).
+      // The host renders its HTML shell in a sandboxed frame with an OPAQUE origin, and a module
+      // script is always fetched in CORS mode, so these static files must allow any origin. They
+      // hold no user data (the trip arrives over postMessage) and are fetched credential-less.
+      // Added ON TOP of the global rule above, which still applies here; the version lives in
+      // the directory (v3/), so a short cache is enough.
+      {
+        source: "/mcp-widget/:path*",
+        headers: [
+          { key: "Access-Control-Allow-Origin", value: "*" },
+          { key: "Cross-Origin-Resource-Policy", value: "cross-origin" },
+          { key: "Cache-Control", value: "public, max-age=300" },
+        ],
+      },
     ];
   },
 };

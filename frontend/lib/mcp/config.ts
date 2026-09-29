@@ -14,6 +14,12 @@
 export const MCP_REQUIRED_SCOPES = ['openid'] as const
 
 const MIN_DELEGATION_SECRET_BYTES = 48
+
+/** Where Reel covers are served from when MCP_WIDGET_IMAGE_DOMAINS is unset (Instagram's CDNs). */
+export const DEFAULT_WIDGET_IMAGE_DOMAINS = ['https://*.cdninstagram.com', 'https://*.fbcdn.net'] as const
+
+/** An https origin whose host may start with ONE `*.` wildcard label: no path, port-free or with a port. */
+const IMAGE_DOMAIN_RE = /^https:\/\/(\*\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}(?::\d{1,5})?$/i
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export type McpConfig = {
@@ -29,6 +35,10 @@ export type McpConfig = {
   delegationSecret: Uint8Array
   /** Browser Origins allowed to call /mcp: the resource origin plus explicit extras. Never request-derived. */
   allowedOrigins: ReadonlySet<string>
+  /** Image origins the widget may load (its CSP resourceDomains, beside our own origin). */
+  widgetImageDomains: readonly string[]
+  /** Server-only Mapbox token for the widget's static route maps; null = maps off (optional). */
+  mapboxStaticToken: string | null
 }
 
 export type McpConfigResult = { ok: true; config: McpConfig } | { ok: false; problems: string[] }
@@ -71,6 +81,19 @@ function splitList(raw: string | undefined): string[] {
   return (raw ?? '').split(',').map((s) => s.trim()).filter(Boolean)
 }
 
+/**
+ * MCP_WIDGET_IMAGE_DOMAINS: unset → the Instagram CDN defaults; set but empty → none; otherwise a
+ * comma-separated list of https origins (a leading `*.` subdomain wildcard allowed). Any invalid
+ * entry makes the whole value invalid — a CSP that silently dropped an entry would hide covers
+ * with no signal, and one that kept a malformed entry could be rejected by the host.
+ */
+function parseImageDomains(raw: string | undefined): string[] | null {
+  if (raw === undefined) return [...DEFAULT_WIDGET_IMAGE_DOMAINS]
+  const entries = splitList(raw)
+  if (!entries.every((e) => IMAGE_DOMAIN_RE.test(e))) return null
+  return [...new Set(entries.map((e) => e.toLowerCase()))]
+}
+
 export function loadMcpConfig(env: Env = process.env): McpConfigResult {
   const production = env.NODE_ENV === 'production'
   const problems: string[] = []
@@ -96,7 +119,15 @@ export function loadMcpConfig(env: Env = process.env): McpConfigResult {
   const extraOrigins = splitList(env.MCP_ALLOWED_ORIGINS).map((o) => parseBareOrigin(o, production))
   if (extraOrigins.some((o) => o === null)) problems.push('MCP_ALLOWED_ORIGINS')
 
-  if (problems.length > 0 || !resource || !issuer || !jwks || !backendOrigin || !secret) {
+  const widgetImageDomains = parseImageDomains(env.MCP_WIDGET_IMAGE_DOMAINS)
+  if (!widgetImageDomains) problems.push('MCP_WIDGET_IMAGE_DOMAINS')
+
+  // Optional: unset or empty turns the widget's route maps off. A value that cannot be a token
+  // (whitespace, URL syntax) is a paste error, and fails closed like every other setting.
+  const mapboxToken = env.MCP_MAPBOX_STATIC_TOKEN?.trim() || null
+  if (mapboxToken && !/^[A-Za-z0-9._-]{20,512}$/.test(mapboxToken)) problems.push('MCP_MAPBOX_STATIC_TOKEN')
+
+  if (problems.length > 0 || !resource || !issuer || !jwks || !backendOrigin || !secret || !widgetImageDomains) {
     return { ok: false, problems }
   }
 
@@ -115,6 +146,8 @@ export function loadMcpConfig(env: Env = process.env): McpConfigResult {
       backendOrigin,
       delegationSecret: secret,
       allowedOrigins: new Set([resource.origin, ...(extraOrigins as string[])]),
+      widgetImageDomains,
+      mapboxStaticToken: mapboxToken,
     },
   }
 }

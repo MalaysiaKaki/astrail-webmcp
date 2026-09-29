@@ -1,15 +1,20 @@
 /**
- * Builds the MCP Apps itinerary widget (docs/mcp-app/PLAN.md §6) into ONE self-contained HTML
- * file: hosts load it from `resources/read`, so there is no server to fetch chunks from.
+ * Builds the MCP Apps itinerary widget (docs/mcp-app/PLAN.md §6) as TWO fixed-name files,
+ * dist/itinerary.js and dist/itinerary.css, from the entry src/main.tsx.
+ *
+ * v3: no longer one inlined HTML file. ChatGPT's widget service failed (HTTP 500 → "Could not
+ * open this app") on the ~735 KB single-file resource, so the resource is now a small HTML shell
+ * that loads these two files by absolute URL from our own origin (lib/mcp/widget/
+ * itinerary-resource.ts). scripts/emit-module.mjs checks the build is exactly these two files — no
+ * split chunk or emitted asset that would need a relative URL, which cannot resolve inside the
+ * host's sandboxed srcdoc frame — copies them to public/mcp-widget/v3/ and writes the shell module.
  *
  * `@` points at frontend/ so the widget renders the unchanged components/trip/* with the same
- * React install the app uses. `npm run build:widgets` then inlines dist/itinerary.html into a
- * TS module (scripts/emit-module.mjs) the gateway imports statically.
+ * React install the app uses.
  */
 import { fileURLToPath } from 'node:url'
-import { defineConfig } from 'vite'
+import { defineConfig, type UserConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { viteSingleFile } from 'vite-plugin-singlefile'
 
 const root = fileURLToPath(new URL('.', import.meta.url))
 const frontend = fileURLToPath(new URL('..', import.meta.url))
@@ -17,9 +22,9 @@ const frontend = fileURLToPath(new URL('..', import.meta.url))
 // frontend/package.json has no "type": "module", so Vite bundles this config as CommonJS, and
 // @tailwindcss/vite is ESM-only — a static import fails to `require` it. A dynamic import stays
 // a real `import()` in that output.
-export default defineConfig(async () => ({
+export default defineConfig(async (): Promise<UserConfig> => ({
   root,
-  plugins: [react(), (await import('@tailwindcss/vite')).default(), viteSingleFile()],
+  plugins: [react(), (await import('@tailwindcss/vite')).default()],
   resolve: {
     alias: { '@': frontend },
   },
@@ -30,8 +35,21 @@ export default defineConfig(async () => ({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    // A JS entry, not an HTML page: the shell is written by emit-module, with absolute URLs.
+    modulePreload: false,
+    // One bundle on purpose (see above); React + the MCP SDK's protocol schemas are most of it.
+    chunkSizeWarningLimit: 800,
+    // Every image and font the CSS uses must be inlined (the kit's are small data: URIs); an
+    // emitted file would be a third asset, which emit-module rejects.
+    assetsInlineLimit: 100_000,
     rollupOptions: {
-      input: fileURLToPath(new URL('./itinerary.html', import.meta.url)),
+      input: fileURLToPath(new URL('./src/main.tsx', import.meta.url)),
+      output: {
+        format: 'es',
+        inlineDynamicImports: true,
+        entryFileNames: 'itinerary.js',
+        assetFileNames: (asset) => (asset.name?.endsWith('.css') ? 'itinerary.css' : '[name][extname]'),
+      },
     },
   },
 }))

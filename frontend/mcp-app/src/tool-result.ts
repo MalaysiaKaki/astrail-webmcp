@@ -7,8 +7,8 @@
  */
 import type { AppEventMap } from '@modelcontextprotocol/ext-apps'
 import {
-  BUNDLE_META_KEY, itineraryResponseSchema, renderSummarySchema,
-  type ItineraryResponse,
+  BUNDLE_META_KEY, LINKS_META_KEY, itineraryResponseSchema, renderSummarySchema, widgetLinksSchema,
+  type ItineraryResponse, type WidgetLinks,
 } from '@/lib/mcp/contract'
 
 export type ToolResult = AppEventMap['toolresult']
@@ -16,6 +16,8 @@ export type ToolResult = AppEventMap['toolresult']
 export type WidgetData = ItineraryResponse & {
   /** The day the model asked to open on; validated against the view's days before use. */
   focusDay: number | null
+  /** "Open in Astrail" and the per-day route maps (`_meta["astrail/links"]`), or null without them. */
+  links: WidgetLinks | null
 }
 
 export type WidgetPhase =
@@ -42,5 +44,10 @@ export function phaseForToolResult(result: ToolResult): WidgetPhase {
   const response = itineraryResponseSchema.safeParse(result._meta?.[BUNDLE_META_KEY])
   if (!summary.success || !response.success) return { kind: 'malformed' }
   if (summary.data.trip.trip_id !== response.data.bundle.trip.id) return { kind: 'malformed' }
-  return { kind: 'ready', data: { ...response.data, focusDay: summary.data.focus_day } }
+  // Optional and separate: a missing or invalid links block costs the links, never the card.
+  const links = widgetLinksSchema.safeParse(result._meta?.[LINKS_META_KEY])
+  return {
+    kind: 'ready',
+    data: { ...response.data, focusDay: summary.data.focus_day, links: links.success ? links.data : null },
+  }
 }

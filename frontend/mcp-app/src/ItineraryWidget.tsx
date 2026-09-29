@@ -17,7 +17,9 @@ import EatCardLinks from '@/components/trip/mobile/EatCardLinks'
 import { LegConnector } from '@/components/trip/mobile/LegConnector'
 import type { Place, TransportLeg, TripDay, RestaurantSuggestion } from '@/lib/trip/backend-types'
 import { buildRouteLinks } from '@/lib/trip/route-links'
-import { buildPlaceIndex, buildTrailNumbers, orderedDays } from '@/lib/trip/selectors'
+import { MCP_LIMITS } from '@/lib/mcp/contract'
+import { safeHref } from '@/lib/safe-href'
+import { buildPlaceIndex, buildTrailNumbers, hasRealCoords, orderedDays } from '@/lib/trip/selectors'
 import DayStrip, { type ListView } from './DayStrip'
 import HotelSummary from './HotelSummary'
 import WidgetHero from './WidgetHero'
@@ -124,6 +126,73 @@ function PartialDay({ day, legs, restaurants, placeIndex }: {
   )
 }
 
+/**
+ * "Open in Astrail": the phone page's primary action (m-btn-primary, 48px). A plain anchor, so
+ * links.ts routes it through the host's ui/open-link when offered, and the anchor's own
+ * target=_blank otherwise. The URL is built server-side from configuration, and still gated.
+ */
+function OpenInAstrail({ url }: { url: string }) {
+  const href = safeHref(url)
+  if (!href) return null
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="m-btn-primary w-full">
+      Open in Astrail
+      <span aria-hidden>↗</span>
+      <span className="sr-only"> (opens in a new tab)</span>
+    </a>
+  )
+}
+
+/**
+ * The day's route as a static image (numbered pins in stop order, the line between them), where
+ * the phone page shows its live map. Signed and proxied by our own origin (lib/mcp/static-map.ts),
+ * so no Mapbox code or domain reaches the widget. Absent URL or a failed load: nothing at all —
+ * never a broken image. Tapping it opens the trip in Astrail.
+ */
+function DayMap({ src, dayNumber, tripUrl, capped }: {
+  src: string
+  dayNumber: number
+  tripUrl: string | null
+  /** More located stops than the map pins (MCP_LIMITS.mapPins): say so under the map. */
+  capped: boolean
+}) {
+  const [failed, setFailed] = useState(false)
+  const image = safeHref(src)
+  const href = tripUrl ? safeHref(tripUrl) : undefined
+  if (!image || failed) return null
+  const img = (
+    <img
+      src={image}
+      alt={`Route map for Day ${dayNumber}`}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="block aspect-[2/1] w-full rounded-[var(--m-r-card)] bg-[var(--m-subcard)] object-cover shadow-[var(--m-shadow-1)]"
+    />
+  )
+  // The timeline below still lists every stop; only the picture stops at the pin limit.
+  const caption = capped ? (
+    <p data-map-caption className="type-body mt-1.5 px-1 text-[14px] text-[var(--m-text-muted)]">
+      Map shows the first {MCP_LIMITS.mapPins} stops
+    </p>
+  ) : null
+  return href ? (
+    <div data-day-map className="mb-3">
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block rounded-[var(--m-r-card)] focus-visible:outline-none focus-visible:shadow-[var(--m-focus)]"
+      >
+        {img}
+        <span className="sr-only"> — open this trip in Astrail (opens in a new tab)</span>
+      </a>
+      {caption}
+    </div>
+  ) : (
+    <div data-day-map className="mb-3">{img}{caption}</div>
+  )
+}
+
 const ExpandIcon = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
     strokeLinejoin="round" aria-hidden>
@@ -151,6 +220,12 @@ export default function ItineraryWidget({
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null)
 
   const slice = dayNumber === null ? null : daySlice(bundle, dayNumber)
+  const tripUrl = data.links?.trip_url ?? null
+  const dayMap = slice ? data.links?.day_maps?.[String(slice.day.day_number)] ?? null : null
+  // Located stops, counted exactly as render_itinerary pins them (real coordinates and a trail number).
+  const locatedStops = slice
+    ? slice.places.filter((tp) => hasRealCoords(tp.place.lng, tp.place.lat) && trailNumbers.has(tp.id)).length
+    : 0
   const partial = Object.values(truncated).some(Boolean)
   const hasHotels = bundle.hotels.length > 0
 
@@ -183,6 +258,8 @@ export default function ItineraryWidget({
         ) : null}
       />
 
+      {tripUrl ? <OpenInAstrail url={tripUrl} /> : null}
+
       {partial ? (
         <p role="note" className="type-body m-subcard px-4 py-3 text-[14px] leading-snug text-[var(--m-text)]">
           Showing part of this trip ({days.length} of {Math.max(savedDays.length, days.length)} days).
@@ -202,6 +279,15 @@ export default function ItineraryWidget({
           />
           {view === 'stay' && hasHotels ? <div className="pt-2">{stay}</div> : (
             <section className="pt-2" aria-label={`Day ${slice.day.day_number}`}>
+              {dayMap ? (
+                <DayMap
+                  key={dayMap}
+                  src={dayMap}
+                  dayNumber={slice.day.day_number}
+                  tripUrl={tripUrl}
+                  capped={locatedStops > MCP_LIMITS.mapPins}
+                />
+              ) : null}
               <DayHeaderCard day={slice.day} />
               {slice.places.length === 0 && truncated.stops ? (
                 <PartialDay day={slice.day} legs={slice.legs} restaurants={slice.restaurants} placeIndex={placeIndex} />

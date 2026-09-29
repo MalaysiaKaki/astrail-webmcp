@@ -111,3 +111,32 @@ describe('middleware — signed in, onboarding not completed', () => {
     expect(redirectedTo(res)).toBe('/app/onboarding')
   })
 })
+
+/* ChatGPT's "Open in Astrail" opens /app/trip/<id>. Signed out, that must come back to the trip
+   after sign-in: the redirect carries ONLY a sanitised `next`, never the rest of the query. */
+describe('middleware — the sign-in return path', () => {
+  const TRIP = '/app/trip/3f1c9b2e-8d4a-4c7e-9b1a-2e6f0d5c4a7b'
+  const location = (res: Response) => new URL(res.headers.get('location')!)
+
+  it('sends a signed-out trip link to /sign-in with next = that trip, query included', async () => {
+    stubSupabase(null, null)
+    const res = await middleware(request(`${TRIP}?x=1`))
+    const to = location(res)
+    expect(to.pathname).toBe('/sign-in')
+    expect([...to.searchParams.keys()]).toEqual(['next'])
+    expect(to.searchParams.get('next')).toBe(`${TRIP}?x=1`)
+    expect(to.search).toBe(`?next=${encodeURIComponent(`${TRIP}?x=1`)}`)
+  })
+
+  it('carries the plain /app landing too', async () => {
+    stubSupabase(null, null)
+    expect(location(await middleware(request('/app'))).searchParams.get('next')).toBe('/app')
+  })
+
+  it('leaves the signed-in onboarding bounce as it was', async () => {
+    stubSupabase({ id: 'u1' }, { onboarding_completed: false })
+    const to = location(await middleware(request(TRIP)))
+    expect(to.pathname).toBe('/app/onboarding')
+    expect(to.searchParams.get('next')).toBeNull()
+  })
+})

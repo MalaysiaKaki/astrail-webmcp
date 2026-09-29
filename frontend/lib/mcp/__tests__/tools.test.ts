@@ -9,9 +9,14 @@ import {
   DAY_TWO_START_RESPONSE, MULTI_SOURCE_RESPONSE, TRUNCATED_RESPONSE,
 } from '@/mcp-app/src/__fixtures__/multi-source-bundle'
 import {
-  BUNDLE_META_KEY, ITINERARY_RESOURCE_URI, itinerarySummarySchema, renderSummarySchema, savedReelsPageSchema, tripsPageSchema,
+  BUNDLE_META_KEY, ITINERARY_RESOURCE_URI, LINKS_META_KEY, widgetLinksSchema, itinerarySummarySchema, renderSummarySchema, savedReelsPageSchema, tripsPageSchema,
 } from '../contract'
 import { handleMcpPost } from '../handler'
+import { loadMcpConfig } from '../config'
+import { widgetCsp, widgetHtml } from '../widget/itinerary-resource'
+import { verifyStaticMap } from '../static-map'
+import { WIDGET_ASSET_PATH, widgetAssetProblems, widgetShellProblems } from '../widget/shell-contract.mjs'
+import { ITINERARY_WIDGET_ASSET_PATH, ITINERARY_WIDGET_SHELL } from '../widget/generated/itinerary-v3'
 import { CLIENT_ID, ENV, USER_ID, fakeBackend, mintToken, rpcJson, rpcRequest, testKeys } from './helpers'
 
 type Tool = {
@@ -29,15 +34,15 @@ type CallResult = {
   _meta?: Record<string, unknown>
 }
 
-async function call(method: string, params: Record<string, unknown>, backend = fakeBackend(), tokenClaims = {}) {
+async function call(method: string, params: Record<string, unknown>, backend = fakeBackend(), tokenClaims = {}, env = ENV) {
   const { keys } = await testKeys()
   const token = await mintToken(tokenClaims)
-  const res = await handleMcpPost(rpcRequest(method, params, { token }), { env: ENV, keys, fetchImpl: backend.fetchImpl })
+  const res = await handleMcpPost(rpcRequest(method, params, { token }), { env, keys, fetchImpl: backend.fetchImpl })
   return rpcJson(res)
 }
 
-async function callTool(name: string, args: Record<string, unknown>, backend = fakeBackend(), tokenClaims = {}) {
-  return (await call('tools/call', { name, arguments: args }, backend, tokenClaims)).result as unknown as CallResult
+async function callTool(name: string, args: Record<string, unknown>, backend = fakeBackend(), tokenClaims = {}, env = ENV) {
+  return (await call('tools/call', { name, arguments: args }, backend, tokenClaims, env)).result as unknown as CallResult
 }
 
 describe('tools/list descriptors', () => {
@@ -200,21 +205,127 @@ describe('upstream failures become honest tool errors', () => {
 })
 
 describe('resources/read', () => {
-  it('serves the single-file widget with the MCP Apps MIME type and a narrow CSP', async () => {
-    const res = await call('resources/read', { uri: ITINERARY_RESOURCE_URI })
-    const content = (res.result?.contents as { uri: string; mimeType: string; text: string; _meta: { ui: { csp: Record<string, string[]>; prefersBorder: boolean } } }[])[0]
+  type Content = {
+    uri: string; mimeType: string; text: string
+    _meta: {
+      ui: { csp: Record<string, string[]>; prefersBorder: boolean }
+      'openai/widgetCSP': { connect_domains: string[]; resource_domains: string[] }
+    }
+  }
+  const read = async () => ((await call('resources/read', { uri: ITINERARY_RESOURCE_URI })).result?.contents as Content[])[0]
+
+  it('serves a small HTML shell that loads the widget JS and CSS from our own origin (v3)', async () => {
+    const content = await read()
+    expect(ITINERARY_RESOURCE_URI).toBe('ui://astrail/itinerary-v3.html')
     expect(content.mimeType).toBe(RESOURCE_MIME_TYPE)
     expect(content.mimeType).toBe('text/html;profile=mcp-app')
-    expect(content.text.length).toBeGreaterThan(1000)
-    expect(content.text).toContain('<html')
+    // v2 inlined ~735 KB and ChatGPT's widget service 500'd on it. The shell must stay tiny.
+    expect(Buffer.byteLength(content.text)).toBeLessThan(10 * 1024)
+    expect(content.text).toMatch(/^<!doctype html>/)
+    expect(content.text).toContain('<div id="astrail-itinerary-root"></div>')
+    expect(content.text).toContain('<script type="module" crossorigin="anonymous" src="https://astrail.test/mcp-widget/v3/itinerary.js"></script>')
+    expect(content.text).toContain('<link rel="stylesheet" crossorigin="anonymous" href="https://astrail.test/mcp-widget/v3/itinerary.css" />')
+    expect(content.text).not.toContain('%ASSET_BASE%')
+    // Nothing inline: no bundled script body and no inline style block.
+    expect(content.text).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/)
+    expect(content.text).not.toContain('<style')
+  })
+
+  it('declares a narrow CSP — our origin, Supabase Storage covers, the image CDNs — and mirrors it for ChatGPT', async () => {
+    const content = await read()
+    const expected = ['https://astrail.test', 'https://project.supabase.test', 'https://*.cdninstagram.com', 'https://*.fbcdn.net']
     expect(content._meta.ui.csp.connectDomains).toEqual([])
-    expect(content._meta.ui.csp.resourceDomains).toEqual(['https://*.cdninstagram.com', 'https://*.fbcdn.net', 'https://project.supabase.test'])
+    expect(content._meta.ui.csp.resourceDomains).toEqual(expected)
     expect(content._meta.ui.csp.frameDomains).toBeUndefined()
+    expect(content._meta['openai/widgetCSP']).toEqual({ connect_domains: [], resource_domains: expected })
+  })
+
+  it('takes image domains from MCP_WIDGET_IMAGE_DOMAINS, and none when it is set empty', () => {
+    const csp = (value: string | undefined) => {
+      const loaded = loadMcpConfig({ ...ENV, MCP_WIDGET_IMAGE_DOMAINS: value })
+      if (!loaded.ok) throw new Error(loaded.problems.join())
+      return widgetCsp(loaded.config).resourceDomains
+    }
+    expect(csp('')).toEqual(['https://astrail.test', 'https://project.supabase.test'])
+    expect(csp('https://images.example.com, https://*.cdn.example.net'))
+      .toEqual(['https://astrail.test', 'https://project.supabase.test', 'https://images.example.com', 'https://*.cdn.example.net'])
+  })
+
+  it('the smoke contract accepts the real generated shell on the production origin (G2)', () => {
+    const origin = 'https://astrail-webmcp.vercel.app'
+    const loaded = loadMcpConfig({ ...ENV, MCP_RESOURCE_URL: `${origin}/mcp` })
+    if (!loaded.ok) throw new Error(loaded.problems.join())
+    expect(WIDGET_ASSET_PATH).toBe(ITINERARY_WIDGET_ASSET_PATH)
+    expect(widgetShellProblems(widgetHtml(loaded.config), origin)).toEqual([])
+    // A v2-sized inline page, the wrong origin, or an unfilled placeholder all fail it.
+    expect(widgetShellProblems(`${widgetHtml(loaded.config)}<script>${'x'.repeat(4000)}</script>`, origin)[0]).toMatch(/max 2048/)
+    expect(widgetShellProblems(widgetHtml(loaded.config), 'https://evil.example').length).toBeGreaterThan(0)
+    expect(widgetShellProblems(ITINERARY_WIDGET_SHELL, origin)).toContain('unfilled %ASSET_BASE% placeholder')
+  })
+
+  it('the smoke contract checks each asset response: 200, media type, CORS *', () => {
+    const res = (status: number, headers: Record<string, string>) => ({ status, headers: new Headers(headers) })
+    expect(widgetAssetProblems('js', res(200, { 'content-type': 'application/javascript; charset=UTF-8', 'access-control-allow-origin': '*' }))).toEqual([])
+    expect(widgetAssetProblems('css', res(200, { 'content-type': 'text/css', 'access-control-allow-origin': '*' }))).toEqual([])
+    expect(widgetAssetProblems('js', res(200, { 'content-type': 'text/html' }))).toHaveLength(2)
+    expect(widgetAssetProblems('css', res(404, { 'content-type': 'text/css', 'access-control-allow-origin': '*' }))).toEqual(['css: HTTP 404'])
+  })
+
+  it('fills the asset base from the configured resource origin, never from the request', () => {
+    const loaded = loadMcpConfig({ ...ENV, MCP_RESOURCE_URL: 'http://localhost:3200/mcp' })
+    if (!loaded.ok) throw new Error(loaded.problems.join())
+    expect(widgetHtml(loaded.config)).toContain('src="http://localhost:3200/mcp-widget/v3/itinerary.js"')
   })
 
   it('every fixture cover origin is covered by the declared CSP', () => {
+    const loaded = loadMcpConfig(ENV)
+    if (!loaded.ok) throw new Error(loaded.problems.join())
+    const allowed = widgetCsp(loaded.config).resourceDomains
+    const covered = (url: string) => allowed.some((d) => {
+      const { origin, hostname } = new URL(url)
+      return d.startsWith('https://*.') ? hostname.endsWith(d.slice('https://*'.length)) : d === origin
+    })
     const covers = MULTI_SOURCE_RESPONSE.bundle.inspiration.map((i) => i.thumbnail_url).filter((u): u is string => Boolean(u))
-    for (const cover of covers) expect(new URL(cover).hostname).toMatch(/\.cdninstagram\.com$|\.fbcdn\.net$/)
+    expect(covers.length).toBeGreaterThan(0)
+    for (const cover of covers) expect(covered(cover), cover).toBe(true)
   })
 })
 
+
+describe('render_itinerary links (_meta["astrail/links"])', () => {
+  const tripId = MULTI_SOURCE_RESPONSE.bundle.trip.id
+  const TOKEN = 'pk.test-static-map-token-0123456789abcdef'
+
+  it('without a Mapbox token: only the Open-in-Astrail URL, on the configured origin, and no day_maps', async () => {
+    const result = await callTool('render_itinerary', { trip_id: tripId }, fakeBackend())
+    const links = widgetLinksSchema.parse(result._meta?.[LINKS_META_KEY])
+    expect(links).toEqual({ trip_url: `https://astrail.test/app/trip/${tripId}` })
+  })
+
+  it('with a token: a signed same-origin route map for each day with located stops, verifiable by the route', async () => {
+    const env = { ...ENV, MCP_MAPBOX_STATIC_TOKEN: TOKEN }
+    const result = await callTool('render_itinerary', { trip_id: tripId }, fakeBackend(), {}, env)
+    const links = widgetLinksSchema.parse(result._meta?.[LINKS_META_KEY])
+    expect(links.trip_url).toBe(`https://astrail.test/app/trip/${tripId}`)
+    // Days 1 and 2 have located stops; Day 3 has only a leg, so it gets no map.
+    expect(Object.keys(links.day_maps ?? {}).sort()).toEqual(['1', '2'])
+    for (const url of Object.values(links.day_maps ?? {})) {
+      expect(url.startsWith('https://astrail.test/api/mcp/static-map?p=')).toBe(true)
+      expect(url).not.toContain(TOKEN)                        // the token never leaves the server
+    }
+    // The minted URL verifies, and carries the day's pins in stop order with their trail numbers.
+    const loaded = loadMcpConfig(env)
+    if (!loaded.ok) throw new Error(loaded.problems.join())
+    const day2 = new URL(links.day_maps!['2']).searchParams
+    const verified = verifyStaticMap(loaded.config.delegationSecret, day2.get('p'), day2.get('s'), Math.floor(Date.now() / 1000))
+    expect(verified.ok).toBe(true)
+    if (verified.ok) expect(verified.payload.pins.map((p) => p[2])).toEqual([4, 5])
+  })
+
+  it('never puts the links in the model-visible structuredContent or text', async () => {
+    const env = { ...ENV, MCP_MAPBOX_STATIC_TOKEN: TOKEN }
+    const result = await callTool('render_itinerary', { trip_id: tripId }, fakeBackend(), {}, env)
+    expect(JSON.stringify(result.structuredContent)).not.toContain('static-map')
+    expect(result.content.map((c) => c.text).join()).not.toContain('static-map')
+  })
+})

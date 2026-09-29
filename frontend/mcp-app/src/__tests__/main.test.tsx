@@ -9,7 +9,7 @@ import type { McpUiHostCapabilities, McpUiHostContext } from '@modelcontextproto
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { startItineraryWidget, type StartedWidget } from '../main'
 import { FIXTURE_IDS, MULTI_SOURCE_RESPONSE, OTHER_TRIP_RESPONSE } from '../__fixtures__/multi-source-bundle'
-import { renderResult } from './tool-results'
+import { fixtureLinks, renderResult } from './tool-results'
 
 type Host = { bridge: AppBridge; container: HTMLElement; widget: StartedWidget }
 
@@ -126,6 +126,21 @@ describe('itinerary widget lifecycle', () => {
     const link = await waitFor(() => within(container).getByRole('link', { name: /^Evidence/ }))
     link.click()
     await waitFor(() => expect(opened).toEqual(['https://www.asakusaimahan.co.jp/']))
+  })
+
+  it('routes "Open in Astrail" and a tap on the day map through ui/open-link', async () => {
+    const opened: string[] = []
+    const { bridge, container } = await startHost({ capabilities: { openLinks: {} } })
+    bridge.onopenlink = async ({ url }) => {
+      opened.push(url)
+      return {}
+    }
+    await bridge.sendToolResult(renderResult(MULTI_SOURCE_RESPONSE, null, fixtureLinks(FIXTURE_IDS.trip)))
+    const open = await waitFor(() => within(container).getByRole('link', { name: /Open in Astrail/ }))
+    open.click()
+    within(container).getByRole('img', { name: 'Route map for Day 1' }).click()
+    const tripUrl = `https://astrail.test/app/trip/${FIXTURE_IDS.trip}`
+    await waitFor(() => expect(opened).toEqual([tripUrl, tripUrl]))
   })
 
   it('offers fullscreen only when the host lists it', async () => {

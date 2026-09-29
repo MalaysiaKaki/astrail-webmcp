@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { MOCK_AUTH_ENABLED } from '@/lib/auth/mock-auth'
+import { safeReturnPath } from '@/lib/auth/safe-return-path'
 
 export async function middleware(request: NextRequest) {
   // Mock-auth bypass: let the hardcoded shell run with zero backend.
@@ -44,6 +45,12 @@ export async function middleware(request: NextRequest) {
   if (!user && request.nextUrl.pathname.startsWith('/app')) {
     const url = request.nextUrl.clone()
     url.pathname = '/sign-in'
+    // Only `next` crosses to /sign-in — nothing else from the original query rides along — so a
+    // link like ChatGPT's "Open in Astrail" (/app/trip/<id>) lands on that trip after sign-in.
+    // Sanitised here AND wherever it is read (sign-in page, auth callback).
+    url.search = ''
+    const back = safeReturnPath(`${request.nextUrl.pathname}${request.nextUrl.search}`, '')
+    if (back) url.searchParams.set('next', back)
     return NextResponse.redirect(url)
   }
 

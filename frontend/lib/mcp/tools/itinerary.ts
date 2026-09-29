@@ -7,10 +7,13 @@
  */
 import { registerAppTool } from '@modelcontextprotocol/ext-apps/server'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { buildTrailNumbers, hasRealCoords, placesForDay } from '@/lib/trip/selectors'
 import {
-  BUNDLE_META_KEY, ITINERARY_RESOURCE_URI, itineraryResponseSchema, itineraryToolInput, itinerarySummarySchema,
-  renderSummarySchema, renderToolInput, type ItineraryResponse,
+  BUNDLE_META_KEY, ITINERARY_RESOURCE_URI, LINKS_META_KEY, itineraryResponseSchema, itineraryToolInput,
+  itinerarySummarySchema, renderSummarySchema, renderToolInput, type ItineraryResponse, type WidgetLinks,
 } from '../contract'
+import type { McpConfig } from '../config'
+import { STATIC_MAP_MAX_PINS, staticMapUrl, type MapPin } from '../static-map'
 import { BACKEND_PATHS, callBackend } from '../upstream'
 import { assertDayAvailable, itineraryText, summarize } from '../summarize'
 import { READ_ONLY_ANNOTATIONS, runTool, toolMeta, type ToolContext } from './shared'
@@ -20,6 +23,30 @@ async function loadItinerary(ctx: ToolContext, tripId: string, day?: number): Pr
   const resp = await callBackend(ctx, BACKEND_PATHS.itinerary, body, itineraryResponseSchema)
   if (day !== undefined) assertDayAvailable(resp, day)
   return resp
+}
+
+/**
+ * The widget's links, built HERE from configuration and the re-read bundle — never from model
+ * input. `trip_url` opens the trip in Astrail. `day_maps` (only when the Mapbox token is set) gives
+ * each day with located stops a signed route-map URL: its pins in stop order, each labelled with
+ * the trail number its card shows, capped at STATIC_MAP_MAX_PINS.
+ */
+export function widgetLinks(config: McpConfig, resp: ItineraryResponse, nowS = Math.floor(Date.now() / 1000)): WidgetLinks {
+  const { bundle } = resp
+  const tripUrl = `${config.resourceOrigin}/app/trip/${encodeURIComponent(bundle.trip.id)}`
+  if (!config.mapboxStaticToken) return { trip_url: tripUrl }
+  const trail = buildTrailNumbers(bundle)
+  const dayMaps: Record<string, string> = {}
+  for (const day of bundle.days) {
+    const pins: MapPin[] = placesForDay(bundle, day.day_number)
+      .filter((tp) => hasRealCoords(tp.place.lng, tp.place.lat) && trail.has(tp.id))
+      .slice(0, STATIC_MAP_MAX_PINS)
+      .map((tp) => [tp.place.lng, tp.place.lat, trail.get(tp.id)!])
+    if (pins.length > 0) {
+      dayMaps[String(day.day_number)] = staticMapUrl(config.resourceOrigin, config.delegationSecret, pins, nowS)
+    }
+  }
+  return { trip_url: tripUrl, day_maps: dayMaps }
 }
 
 export function registerItineraryTools(server: McpServer, ctx: ToolContext): void {
@@ -60,7 +87,7 @@ export function registerItineraryTools(server: McpServer, ctx: ToolContext): voi
         return {
           structuredContent: summary,
           content: [{ type: 'text', text: itineraryText(summary) }],
-          _meta: { [BUNDLE_META_KEY]: resp },
+          _meta: { [BUNDLE_META_KEY]: resp, [LINKS_META_KEY]: widgetLinks(ctx.config, resp) },
         }
       }),
   )
