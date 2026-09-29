@@ -110,6 +110,13 @@ function checkClaims(payload: JWTPayload, config: McpConfig, nowS: number): stri
  * fault: 401. jose 6 reports non-200 and invalid-JSON JWKS responses with the BASE JOSEError
  * (code ERR_JOSE_GENERIC); every token/key-selection failure is a subclass with its own code.
  */
+/** jose's fixed error code (+ claim name) for logs, e.g. ERR_JWT_EXPIRED:exp — never token content. */
+function joseReason(err: unknown): string {
+  if (!(err instanceof joseErrors.JOSEError)) return 'verify_failed'
+  const claim = (err as { claim?: unknown }).claim
+  return typeof claim === 'string' && /^[a-z_]{1,32}$/.test(claim) ? `${err.code}:${claim}` : err.code
+}
+
 function isKeySetOutage(err: unknown): boolean {
   if (err instanceof joseErrors.JWKSTimeout || err instanceof joseErrors.JWKSInvalid) return true
   if (err instanceof joseErrors.JOSEError) return err.code === joseErrors.JOSEError.code
@@ -136,7 +143,7 @@ export async function verifyMcpRequest(
   } catch (err) {
     // An unreachable key set is OUR outage, not the user's bad token: 503, never a reauth loop.
     if (isKeySetOutage(err)) return { ok: false, failure: { status: 503, challenge: null, reason: 'jwks_unavailable' } }
-    return unauthorized(config, 'verify_failed', true)
+    return unauthorized(config, joseReason(err), true)
   }
 
   const bad = checkClaims(payload, config, nowS)
