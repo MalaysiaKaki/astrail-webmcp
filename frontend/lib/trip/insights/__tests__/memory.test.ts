@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  MEMORY_SUMMARY_PREFIX, corroboratedPreferenceSource, heroPreferenceBadge, tripPreferenceModel,
+  MEMORY_SUMMARY_PREFIX, corroboratedPreferenceSource, heroPreferenceBadge, heroPreferenceItems, tripPreferenceModel,
 } from '@/lib/trip/insights/memory'
 import { TOKYO_TRIP } from '@/lib/trip/fixtures'
 import type { GenerationEvent, Trip, TripBundle } from '@/lib/trip/backend-types'
@@ -114,5 +114,87 @@ describe('heroPreferenceBadge', () => {
     expect(heroPreferenceBadge(bundle({ preference_summary: 'No preferences provided', preference_sources: ['inferred_default'] }, [prefEvent('inferred_default')]))).toBeNull()
     expect(heroPreferenceBadge(bundle({ preference_summary: 'No preferences provided', preference_sources: ['inferred_default'] }, []))).toBeNull()
     expect(heroPreferenceBadge(bundle({ preference_summary: null, preference_sources: ['memory'] }, [prefEvent('memory')]))).toBeNull()
+  })
+})
+
+/* The hero's chips: WHAT the trip was planned with, under exactly heroPreferenceBadge's gate. */
+describe('heroPreferenceItems', () => {
+  const explicit = (text: string, events = [prefEvent('explicit')]) =>
+    heroPreferenceItems(bundle({ preference_summary: `Using your preferences: ${text}`, preference_sources: ['explicit'] }, events))
+
+  it('the demo fixture: three chips and "+1" ("not" is not a restriction)', () => {
+    expect(TOKYO_TRIP.trip.preference_summary).toBe('Walkable days, ramen, not too rushed, mid-range budget.')
+    expect(heroPreferenceItems(TOKYO_TRIP)).toEqual({ items: ['Walkable days', 'Ramen', 'Not too rushed'], more: 1 })
+  })
+
+  it('Mem0 facts, one whole chip each — the same with the event (web) and without it (MCP/legacy)', () => {
+    const summary = `${MEMORY_SUMMARY_PREFIX}walkable days; ramen and gyoza; no peanuts and shellfish`
+    const expected = { items: ['Walkable days', 'Ramen and gyoza', 'No peanuts and shellfish'], more: 0 }
+    expect(heroPreferenceItems(bundle({ preference_summary: summary, preference_sources: ['memory'] }, [prefEvent('memory')]))).toEqual(expected)
+    expect(heroPreferenceItems(bundle({ preference_summary: summary, preference_sources: ['memory'] }, []))).toEqual(expected)
+  })
+
+  it('an explicit note splits on commas, ";" and sentence ends — never on "and"', () => {
+    expect(explicit('street food and night markets; temples, slow mornings.')).toEqual({
+      items: ['Street food and night markets', 'Temples', 'Slow mornings'], more: 0,
+    })
+  })
+
+  it.each([
+    ['no peanuts and shellfish', 'No peanuts and shellfish'],
+    ['Allergy: peanuts', 'Allergy: peanuts'],
+    ['avoid crowds, museums', 'Avoid crowds, museums'],
+    ['gluten-free food, markets', 'Gluten-free food, markets'],
+    ["don't book early flights, cafes", "Don't book early flights, cafes"],
+  ])('a restriction is never split or relabelled: %s', (note, chip) => {
+    expect(explicit(note)).toEqual({ items: [chip], more: 0 })
+  })
+
+  it('strips only the composer\'s own labels, at the start of a segment', () => {
+    const note = 'Travel style: food-led, walkable. Interests: ramen, markets\nThis trip: slow mornings'
+    expect(heroPreferenceItems(bundle({ preference_summary: note, preference_sources: ['memory', 'explicit'] }, [])))
+      .toEqual({ items: ['Food-led', 'Walkable', 'Ramen'], more: 2 })
+    // Any other "Label:" stays: it may carry meaning ("Budget: tight").
+    expect(explicit('Budget: tight, ramen')).toEqual({ items: ['Budget: tight', 'Ramen'], more: 0 })
+  })
+
+  it('a long prose note that does not split into short phrases → ONE truncated chip', () => {
+    const prose = 'We would love to spend most evenings wandering the old town slowly, with plenty of time to sit in cafés'
+    const got = heroPreferenceItems(bundle({ preference_summary: prose, preference_sources: ['explicit'] }, []))
+    expect(got?.more).toBe(0)
+    expect(got?.items).toHaveLength(1)
+    expect(got!.items[0].length).toBeLessThanOrEqual(48)
+    expect(got!.items[0]).toMatch(/^We would love to spend most evenings.*…$/)
+  })
+
+  it('de-duplicates case-insensitively', () => {
+    expect(explicit('Ramen, ramen; RAMEN, sushi')).toEqual({ items: ['Ramen', 'Sushi'], more: 0 })
+  })
+
+  it('de-duplicates FULL facts before truncating, so "+N" counts every distinct one', () => {
+    const facts = ['Prefer museums with accessible toilets', 'Prefer museums with accessible lifts', 'Vegetarian food', 'Quiet nights']
+    const got = heroPreferenceItems(bundle({ preference_summary: `${MEMORY_SUMMARY_PREFIX}${facts.join('; ')}`, preference_sources: ['memory'] }, [prefEvent('memory')]))
+    expect(got?.items).toHaveLength(3)
+    expect(got?.more).toBe(1)
+    expect(got?.items[0]).toMatch(/…$/)
+  })
+
+  it.each([
+    ['stale profile prose beside a memory event', 'Travel style: slow.\nInterests: ramen; temples.', 'memory'],
+    ['a mixed profile + trip summary beside an explicit event', 'Travel style: slow.\nThis trip: vegetarian; no hikes', 'explicit'],
+  ])('an event whose summary it cannot vouch for → the generic badge only: %s', (_, summary, source) => {
+    const b = bundle({ preference_summary: summary, preference_sources: ['memory', 'explicit'] }, [prefEvent(source)])
+    expect(tripPreferenceModel(b)).toMatchObject({ kind: 'note', source: null })
+    expect(heroPreferenceItems(b)).toEqual({ items: [heroPreferenceBadge(b)], more: 0, generic: true })
+  })
+
+  it.each([
+    ['no stored summary', { preference_summary: null, preference_sources: ['explicit' as const] }, []],
+    ['an inferred-default run', { preference_summary: 'No preferences provided — Astrail will infer a balanced first draft from your Reels.', preference_sources: [] }, [prefEvent('inferred_default')]],
+    ['a summary no source claims', { preference_summary: 'Walkable days, ramen', preference_sources: [] }, []],
+  ])('is null exactly when heroPreferenceBadge is: %s', (_, trip, events) => {
+    const b = bundle(trip as Partial<Trip>, events as GenerationEvent[])
+    expect(heroPreferenceBadge(b)).toBeNull()
+    expect(heroPreferenceItems(b)).toBeNull()
   })
 })

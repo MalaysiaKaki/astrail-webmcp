@@ -250,7 +250,7 @@ export default function ItineraryWidget({
     <div className="widget-frame paper-scope flex flex-col gap-4">
       <WidgetHero
         bundle={bundle}
-        omitted={{ inspiration: truncated.inspiration, quotes: truncated.quotes }}
+        omitted={{ inspiration: truncated.inspiration }}
         action={canFullscreen && onRequestFullscreen ? (
           <button type="button" onClick={onRequestFullscreen} aria-label="Expand" className="m-btn-icon self-start">
             {ExpandIcon}
