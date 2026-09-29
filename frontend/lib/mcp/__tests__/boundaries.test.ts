@@ -44,10 +44,28 @@ describe('loadMcpConfig', () => {
     ['MCP_ALLOWED_CLIENT_IDS', ''],
     ['MCP_ALLOWED_ORIGINS', 'not a url'],
     ['MCP_AUTH_JWKS_URL', ''],
+    ['MCP_WIDGET_IMAGE_DOMAINS', 'http://images.example.com'],
+    ['MCP_WIDGET_IMAGE_DOMAINS', 'https://images.example.com/covers'],
+    ['MCP_WIDGET_IMAGE_DOMAINS', 'https://*'],
+    ['MCP_WIDGET_IMAGE_DOMAINS', 'https://*.*.example.com'],
+    ['MCP_WIDGET_IMAGE_DOMAINS', 'https://ok.example.com,not a url'],
+    ['MCP_WIDGET_IMAGE_DOMAINS', '*'],
   ])('rejects %s=%s', (key, value) => {
     const loaded = loadMcpConfig({ ...ENV, [key]: value })
     expect(loaded.ok).toBe(false)
     if (!loaded.ok) expect(loaded.problems).toContain(key)
+  })
+
+  it('defaults the widget image domains to the Instagram CDNs, honours an empty value, and parses a list', () => {
+    const domains = (value: string | undefined) => {
+      const loaded = loadMcpConfig({ ...ENV, MCP_WIDGET_IMAGE_DOMAINS: value })
+      if (!loaded.ok) throw new Error(loaded.problems.join())
+      return loaded.config.widgetImageDomains
+    }
+    expect(domains(undefined)).toEqual(['https://*.cdninstagram.com', 'https://*.fbcdn.net'])
+    expect(domains('')).toEqual([])
+    expect(domains(' https://a.example.com , https://*.b.example.net:8443 ,https://a.example.com'))
+      .toEqual(['https://a.example.com', 'https://*.b.example.net:8443'])
   })
 
   it('allows loopback http only outside production', () => {

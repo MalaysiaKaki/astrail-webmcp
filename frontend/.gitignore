@@ -4,3 +4,4 @@
 # MCP App widget build output (npm run build:widgets)
 /mcp-app/dist/
 /lib/mcp/widget/generated/
+/public/mcp-widget/

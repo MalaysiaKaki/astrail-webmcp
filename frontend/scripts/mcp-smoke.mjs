@@ -6,6 +6,8 @@
 // consent) — never a website session token. The token is only sent as a Bearer header; it is
 // never printed. Exits non-zero on the first failed expectation.
 import assert from 'node:assert/strict'
+// Plain JS (with a .d.mts for TypeScript) so this runs on the repo's Node 20 baseline.
+import { widgetAssetProblems, widgetAssetUrls, widgetShellProblems } from '../lib/mcp/widget/shell-contract.mjs'
 
 const endpoint = process.env.MCP_URL || 'http://localhost:3100/mcp'
 const token = process.env.MCP_ACCESS_TOKEN
@@ -112,11 +114,23 @@ const reels = await call('list_saved_reels', { limit: 5 })
 assert.notEqual(reels.isError, true, text(reels))
 step('list_saved_reels', `${reels.structuredContent.reels.length} reel(s)`)
 
-const resource = await rpc('resources/read', { uri: 'ui://astrail/itinerary-v2.html' })
+const resource = await rpc('resources/read', { uri: 'ui://astrail/itinerary-v3.html' })
 const content = resource.contents?.[0]
 assert.equal(content?.mimeType, 'text/html;profile=mcp-app')
-assert.ok((content?.text?.length ?? 0) > 1000, 'widget HTML missing')
-step('resources/read', `widget ${Math.round(content.text.length / 1024)} KiB, CSP ${JSON.stringify(content._meta?.ui?.csp?.resourceDomains ?? [])}`)
+// v3: a small shell that loads its JS/CSS from the MCP server's own origin (lib/mcp/widget/shell-contract.mjs).
+const origin = new URL(endpoint).origin
+const shellProblems = widgetShellProblems(content?.text ?? '', origin)
+assert.deepEqual(shellProblems, [], `widget shell: ${shellProblems.join('; ')}`)
+step('resources/read', `shell ${Buffer.byteLength(content.text)} B, CSP ${JSON.stringify(content._meta?.ui?.csp?.resourceDomains ?? [])}`)
+
+// Fetched as the host's sandboxed frame would: no credentials, from an opaque ("null") origin.
+for (const [kind, url] of Object.entries(widgetAssetUrls(origin))) {
+  const res = await fetch(url, { credentials: 'omit', headers: { Origin: 'null' }, signal: AbortSignal.timeout(20_000) })
+  const problems = widgetAssetProblems(kind, res)
+  const bytes = (await res.arrayBuffer()).byteLength
+  assert.deepEqual(problems, [], problems.join('; '))
+  step(`widget ${kind}`, `200 ${res.headers.get('content-type')}, ${Math.round(bytes / 1024)} KiB, CORS *`)
+}
 
 const noAuth = await fetch(endpoint, {
   method: 'POST',

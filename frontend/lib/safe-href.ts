@@ -13,13 +13,38 @@
  *   {href ? <a href={href} ...>…</a> : null}
  */
 export function safeHref(url: string | null | undefined): string | undefined {
+  return safeHrefWithBase(url, typeof window !== 'undefined' ? window.location.origin : null)
+}
+
+const FALLBACK_BASE = 'https://astrail.xyz'
+
+/**
+ * safeHref's rule with the document origin passed in, so the opaque-origin case is testable.
+ *
+ * An absolute URL is parsed on its own, never against a base: inside a sandboxed iframe (the
+ * ChatGPT widget) `location.origin` is the string "null", and `new URL(abs, 'null')` THROWS even
+ * though the base would be ignored — which made every cover and evidence link disappear there.
+ * Only a relative URL needs a base: the page's own origin when it is a real http(s) origin, and
+ * astrail.xyz otherwise.
+ */
+export function safeHrefWithBase(url: string | null | undefined, origin: string | null): string | undefined {
   if (!url) return undefined
+  const protocol = parseProtocol(url, origin)
+  return protocol === 'http:' || protocol === 'https:' ? url : undefined
+}
+
+/** `new URL()` in try/catch rather than URL.canParse, which older mobile webviews lack. */
+function tryUrl(url: string, base?: string): URL | null {
   try {
-    // Resolve against a base so a legitimately relative URL still parses; absolute URLs ignore it.
-    const base = typeof window !== 'undefined' ? window.location.origin : 'https://astrail.xyz'
-    const protocol = new URL(url, base).protocol
-    return protocol === 'http:' || protocol === 'https:' ? url : undefined
+    return new URL(url, base)
   } catch {
-    return undefined
+    return null
   }
+}
+
+function parseProtocol(url: string, origin: string | null): string | null {
+  const absolute = tryUrl(url)
+  if (absolute) return absolute.protocol
+  const base = origin && /^https?:\/\//.test(origin) && tryUrl(origin) ? origin : FALLBACK_BASE
+  return tryUrl(url, base)?.protocol ?? null
 }

@@ -33,8 +33,12 @@ const I = FIXTURE_IDS
 
 export const REEL_ASAKUSA = 'https://www.instagram.com/reel/DAsakusa01'
 export const REEL_TEAMLAB = 'https://www.instagram.com/reel/DTeamlab02'
-export const COVER_ASAKUSA = 'https://scontent.cdninstagram.com/v/t51.2885-15/asakusa-cover.jpg'
-export const COVER_TEAMLAB = 'https://scontent.cdninstagram.com/v/t51.2885-15/teamlab-cover.jpg'
+/* Covers as production stores them: backend/pipeline/thumbnails.py copies each Reel's frame into
+   the project's PUBLIC Supabase Storage bucket. project.supabase.test is the test issuer's host, so
+   these are exactly the URLs the widget's declared CSP must allow. */
+const STORAGE = 'https://project.supabase.test/storage/v1/object/public/reel-covers'
+export const COVER_ASAKUSA = `${STORAGE}/DAsakusa01.jpg`
+export const COVER_TEAMLAB = `${STORAGE}/DTeamlab02.jpg`
 
 const NO_TRUNCATION: Truncation = {
   days: false, stops: false, legs: false, restaurants: false, restaurant_text: false,
