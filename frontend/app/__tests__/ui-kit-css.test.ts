@@ -17,7 +17,9 @@ describe('ui-kit.css', () => {
     const selectors = new Set<string>()
     const props = new Set<string>()
     root.walkRules((rule) => rule.selectors.forEach((s) => selectors.add(s)))
-    root.walkDecls((decl) => props.add(decl.prop))
+    root.walkDecls((decl) => {
+      props.add(decl.prop)
+    })
     for (const token of ['--t-display', '--t-body', '--t-label', '--m-shadow-1', '--m-shadow-2']) {
       expect(props).toContain(token)
     }
