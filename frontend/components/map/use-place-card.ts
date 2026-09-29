@@ -74,6 +74,10 @@ export function usePlaceCard({ getMap, ready, card, onFallback, onDismiss, mayTa
   const focusedRef = useRef<number | null>(null)
   /** The card's rect in map-container px while shown: a local obstacle for the name pills. */
   const rectRef = useRef<Box | null>(null)
+  /** The correction's pending moveend callback, cancelled with the request (Codex final #5). */
+  const cancelCorrectionRef = useRef<(() => void) | null>(null)
+  /** The route has left: nothing may place, fall back or build a shell any more. */
+  const disposedRef = useRef(false)
   const cbRef = useRef({ onFallback, onDismiss, mayTakeFocus, onLayout })
   cbRef.current = { onFallback, onDismiss, mayTakeFocus, onLayout }
 
@@ -115,7 +119,7 @@ export function usePlaceCard({ getMap, ready, card, onFallback, onDismiss, mayTa
   function place(allowShift: boolean): void {
     const map = getMap()
     const c = cardRef.current
-    if (!map || !c || !host) return
+    if (disposedRef.current || !map || !c || !host) return
     const canvas = typeof map.getCanvas === 'function' ? map.getCanvas() : null
     const container = typeof map.getContainer === 'function' ? map.getContainer() : null
     const origin = container?.getBoundingClientRect?.() ?? { left: 0, top: 0 }
@@ -151,14 +155,23 @@ export function usePlaceCard({ getMap, ready, card, onFallback, onDismiss, mayTa
       }
       return
     }
-    // Placed already and only the camera or content moved: keep following the pin. A user pan is
-    // not a reason to yank the card away (or the camera back); "Details in the sidebar" is on it.
-    if (placedRef.current === c.nonce) return
-    if (result.kind === 'shift' && allowShift && correctedRef.current !== c.nonce) {
+    // Placed already and only the camera, the chrome or the content moved. Never another camera
+    // move (a user pan is theirs). While the pin is still on the map the card follows it, even if
+    // chrome now covers part of it; once nothing can fit (the map shrank to 768) or the pin left
+    // the visible map (panned away, behind the camera), the detail moves to the sidebar (#4).
+    if (placedRef.current === c.nonce) {
+      const pinShown = !!pin && Number.isFinite(pin.x) && Number.isFinite(pin.y)
+        && pin.x > panelRight && pin.x < view.w && pin.y > 0 && pin.y < view.h
+      if (result.kind !== 'none' && pinShown) return
+    } else if (result.kind === 'shift' && allowShift && correctedRef.current !== c.nonce) {
       correctedRef.current = c.nonce
       const nonce = c.nonce
-      const after = () => { if (cardRef.current?.nonce === nonce) place(false) }
+      const after = () => {
+        cancelCorrectionRef.current = null
+        if (!disposedRef.current && cardRef.current?.nonce === nonce) place(false)
+      }
       map.once('moveend', after)
+      cancelCorrectionRef.current = () => { map.off?.('moveend', after); cancelCorrectionRef.current = null }
       map.panBy([-result.dx, -result.dy], { duration: reducedMotion() ? 0 : 450, essential: true })
       return
     }
@@ -176,6 +189,8 @@ export function usePlaceCard({ getMap, ready, card, onFallback, onDismiss, mayTa
       removePopup()
       placedRef.current = null
       if (was) cbRef.current.onLayout?.()
+      // An unloaded map (or one that never loads) is reported by TripMap as unavailable, and the
+      // owner then keeps the detail in the sidebar (Codex final #2); nothing to do here.
       return
     }
     const nonce = card.nonce
@@ -203,6 +218,7 @@ export function usePlaceCard({ getMap, ready, card, onFallback, onDismiss, mayTa
       cancelled = true
       cancelAnimationFrame(frame)
       map.off?.('moveend', settle)
+      cancelCorrectionRef.current?.()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, card?.nonce])
@@ -247,7 +263,16 @@ export function usePlaceCard({ getMap, ready, card, onFallback, onDismiss, mayTa
   }, deps)
 
   // Leaving the route: the shared map outlives it, so the shell must not.
-  useEffect(() => () => { removePopup() }, [])
+  // Declared before TripMap's own teardown effect, so this runs BEFORE release() stops the map:
+  // stop() emits moveend synchronously, and no pending callback may place on a departed route.
+  useEffect(() => {
+    disposedRef.current = false
+    return () => {
+      disposedRef.current = true
+      cancelCorrectionRef.current?.()
+      removePopup()
+    }
+  }, [])
 
   return { host, cardRect: () => rectRef.current, isOpen: () => placedRef.current !== null }
 }

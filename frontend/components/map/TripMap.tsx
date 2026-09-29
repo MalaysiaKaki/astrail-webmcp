@@ -30,6 +30,7 @@ import { addSpokeLayers, addTrailLayers } from './route-layers'
 import { addDayEmphasisLayers, applyDayEmphasis, removeChevronImage } from './day-emphasis'
 import { reconcileOnMap, type PinEntry } from './pin-reconcile'
 import { usePlaceCard, type MapCard } from './use-place-card'
+import { createDomSuggestionCard } from './dom-suggestion-card'
 import './place-card.css'
 import { usePlacementObstacles } from '@/lib/trip/placement-obstacles'
 import { useOptionalWebMcpRegistry } from '@/components/webmcp/WebMcpRegistry'
@@ -42,6 +43,9 @@ export type MapCardHandlers = {
   onDismiss: () => void
   onOpenEat: (restaurantPlaceId: string) => void
   onOpenHotel: (hotelId: string) => void
+  /** Whether a card can be shown at all: false until the shared map has loaded, and for good if
+   *  it never does (a rejected style, no WebGL). The owner keeps the detail in the sidebar. */
+  onAvailability?: (available: boolean) => void
 }
 
 export default function TripMap({
@@ -55,6 +59,7 @@ export default function TripMap({
   show3dNonce = 0,
   card = null,
   cards,
+  openSuggestion = null,
 }: {
   bundle: TripBundle
   activeDayNumber: number
@@ -87,12 +92,18 @@ export default function TripMap({
    *  at the pin in a Mapbox Popup this component owns. Ignored on a phone. */
   card?: (MapCard & { node: ReactNode }) | null
   cards?: MapCardHandlers
+  /** The eat or hotel whose detail is open, at every width (the owner's open card). A rotation
+   *  carries it across as ONE surface: the phone's DOM card or the desktop place card. */
+  openSuggestion?: { kind: 'eat' | 'hotel'; id: string } | null
 }) {
   const { hasToken, ready, getMap, acquire, release, setMarkers } = useSharedMap()
   const routeIdsRef = useRef<string[]>([])
   const markerLabelsRef = useRef<HTMLElement[]>([])
   const panelObstruction = usePanelObstruction()
-  const activePopupRef = useRef<mapboxgl.Popup | null>(null)
+  // The phone's eat/stay DOM card (./dom-suggestion-card); a user close closes the owner's card.
+  const domCardRef = useRef<ReturnType<typeof createDomSuggestionCard> | null>(null)
+  if (!domCardRef.current) domCardRef.current = createDomSuggestionCard(() => getMap(), () => cardsRef.current?.onDismiss())
+  const domCard = domCardRef.current
   const buildingLayerAddedRef = useRef(false)
   const framedRef = useRef(false)
   // Route teardown in progress, and the padding ease currently deferred to `moveend` (if any).
@@ -148,6 +159,7 @@ export default function TripMap({
   /** Desktop with an owner for the cards: eat and stay open as place cards, not DOM popups. */
   const desktopCards = () => layoutRef.current === 'desktop' && Boolean(cardsRef.current)
   const shownCard = layout === 'desktop' && cards ? card : null
+  useEffect(() => { cardsRef.current?.onAvailability?.(ready) }, [ready])
   const placeCard = usePlaceCard({
     getMap, ready,
     card: shownCard ? { nonce: shownCard.nonce, at: shownCard.at } : null,
@@ -198,21 +210,23 @@ export default function TripMap({
     return buildPlaceIndex(bundle).get(r.near_place_id)?.name ?? null
   }
 
-  /* One popup at a time across every layer — a stop, a restaurant and a hotel opening three
-     stacked cards over the map is how the panel-versus-map hierarchy falls apart. */
-  function openSuggestionPopup(at: [number, number], content: HTMLElement) {
-    const map = getMap()
-    if (!map) return
-    activePopupRef.current?.remove()
-    const popup = new mapboxgl.Popup({
-      // The light kit card (phone-map-cards.css) at every width since plan A6.
-      className: 'astrail-evidence-popup phone-popup',
-      closeButton: true, closeOnClick: true, offset: 16, maxWidth: '300px',
-    }).setLngLat(at).setDOMContent(content).addTo(map)
-    activePopupRef.current = popup
-    // Closed by its ✕ or a map click: forget it.
-    popup.on?.('close', () => { if (activePopupRef.current === popup) activePopupRef.current = null })
-  }
+  function openSuggestionPopup(at: [number, number], content: HTMLElement) { domCard.open(at, content) }
+  function dropDomPopup() { domCard.drop() }
+
+  // Crossing the breakpoint with an eat or hotel detail open (Codex final #6): one surface. Widening
+  // drops the phone's DOM card (the owner's place card takes over); narrowing builds the DOM card
+  // the desktop place card leaves behind. The effects that normally open it do not re-run.
+  const shownLayoutRef = useRef(layout)
+  const openSuggestionRef = useRef(openSuggestion)
+  openSuggestionRef.current = openSuggestion
+  useEffect(() => {
+    const prev = shownLayoutRef.current
+    shownLayoutRef.current = layout
+    if (!ready || !framedRef.current || !cardsRef.current || prev === layout || !prev || !layout) return
+    if (layout === 'desktop') dropDomPopup()
+    else if (openSuggestionRef.current) domCard.openFor(bundle, openSuggestionRef.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layout, ready])
 
   function syncMarkerLabelVisibility() {
     // Close pins would stack their name pills into an unreadable pile, and the panel already names
@@ -238,8 +252,7 @@ export default function TripMap({
     // Layers are ours, and the map outlives this component — leaving them behind would
     // paint this trip's routes over the next one.
     return () => {
-      activePopupRef.current?.remove()
-      activePopupRef.current = null
+      dropDomPopup()
       markerLabelsRef.current = []
       pinEntriesRef.current = []
       clearRoutes()
@@ -312,8 +325,7 @@ export default function TripMap({
           // The owner reveals the stop: on a phone its expanded sheet card is the detail, on
           // desktop its place card opens here at the pin. Never a DOM evidence popup.
           onSelectPlace(tp.place_id)
-          activePopupRef.current?.remove()
-          activePopupRef.current = null
+          dropDomPopup()
         })
         // No hover preview (A10): the active day's pills name the pins, and the card is the detail.
         const at: [number, number] = [tp.place.lng, tp.place.lat]
@@ -339,8 +351,10 @@ export default function TripMap({
         const at: [number, number] = [hub.lng, hub.lat]
         el.addEventListener('click', (e) => {
           e.stopPropagation()
-          if (desktopCards()) cardsRef.current!.onOpenHotel(hub.id)
-          else openSuggestionPopup(at, buildStayPopup(hub))
+          // The owner always learns which card is open (a rotation carries it); the phone also
+          // shows its DOM card.
+          cardsRef.current?.onOpenHotel(hub.id)
+          if (!desktopCards()) openSuggestionPopup(at, buildStayPopup(hub))
         })
         markers.push(new mapboxgl.Marker({ element: el }).setLngLat(at).addTo(map))
       }
@@ -363,8 +377,8 @@ export default function TripMap({
         el.addEventListener('click', (e) => {
           e.stopPropagation()
           onSelectRestaurant?.(place.id)      // keep the sidebar strip in step with the map
-          if (desktopCards()) cardsRef.current!.onOpenEat(place.id)
-          else openSuggestionPopup([place.lng, place.lat], buildEatPopup(r, place, nearName(r)))
+          cardsRef.current?.onOpenEat(place.id)
+          if (!desktopCards()) openSuggestionPopup([place.lng, place.lat], buildEatPopup(r, place, nearName(r)))
         })
         return new mapboxgl.Marker({ element: el }).setLngLat([place.lng, place.lat]).addTo(map)
       })
@@ -743,11 +757,8 @@ export default function TripMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRestaurantPlaceId])
 
-  // Hotel-hub map (T9): redraw when the hub selection or the layer mode changes — swap the itinerary
-  // trail for the hub's spokes (or back), (re)pin the hub, and toggle base-hotel marker suppression.
-  // Gated on framedRef so it never races the first paint on a SHARED map that is already loaded (the
-  // initial draw is owned by the [ready] effect above); by the time a user can toggle, framing is
-  // long done. No camera move — toggling the view stays put (scope: T9).
+  // Hotel-hub map (T9): the hub selection or layer mode changed — swap trail and spokes, (re)pin the
+  // hub, suppress the base-hotel marker. Gated on framedRef: the [ready] effect owns the first draw.
   useEffect(() => {
     if (!ready || !framedRef.current) return
     drawMarkers()

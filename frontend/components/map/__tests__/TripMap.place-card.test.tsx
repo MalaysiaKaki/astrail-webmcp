@@ -299,3 +299,206 @@ describe('TripMap desktop place card: capacity known before the flight', () => {
     expect(c.onFallback).toHaveBeenCalledWith(4)
   })
 })
+
+/* Codex final review (A11). */
+describe('TripMap place card: lifecycle and later geometry (Codex final #2, #4, #5)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    h.popups.length = 0
+    h.markers.length = 0
+    h.layer.replaceChildren()
+    document.body.append(h.layer)
+    h.listeners.clear()
+    h.onceListeners.clear()
+    h.state.moving = false
+    h.state.width = 1440
+    h.state.height = 900
+    h.state.pin = { x: 900, y: 270 }
+    layout.value = 'desktop'
+    process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN = 'pk.test'
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1 })
+    vi.stubGlobal('cancelAnimationFrame', () => {})
+    setPanelObstruction(472)
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    setPanelObstruction(0)
+    h.map.stop.mockImplementation(() => {})
+  })
+  const placeCards = () => live().filter((p) => String(p.options.className).includes('place-card'))
+
+  // #5: release() -> map.stop() emits moveend SYNCHRONOUSLY; a correction's pending callback must
+  // not run then, with the projection by now valid, and resurrect a shell on the departed route.
+  it('a pending correction does not resurrect a card or fall back after the route unmounts', async () => {
+    h.map.stop.mockImplementation(() => { h.fire('moveend') })
+    h.state.pin = { x: 470, y: 40 }
+    const c = cards()
+    const props = { bundle: TOKYO_TRIP, activeDayNumber: 1, onSelectPlace: () => {}, selectedPlaceId: 'pl_sandolab', cards: c,
+      card: { nonce: 1, at: [139.77, 35.7] as [number, number], node: <Card /> } }
+    // The shell (MapProvider, the shared map) stays; only the trip route leaves.
+    const Shell = ({ route }: { route: boolean }) => <MapProvider>{route ? <TripMap {...props} /> : null}</MapProvider>
+    const view = render(<Shell route />)
+    await flush()
+    fireLoad()
+    await flush()
+    expect(h.map.panBy).toHaveBeenCalledTimes(1)
+    const [[dx, dy]] = h.map.panBy.mock.calls[0] as [[number, number]]
+    h.state.pin = { x: 470 - dx, y: 40 - dy }      // the pan got far enough to fit
+    const before = h.PopupCtor.mock.calls.length
+    view.rerender(<Shell route={false} />)
+    expect(h.map.stop).toHaveBeenCalled()          // release() -> stop() -> moveend, synchronously
+    expect(h.PopupCtor.mock.calls.length).toBe(before)
+    expect(placeCards()).toHaveLength(0)
+    expect(c.onFallback).not.toHaveBeenCalled()
+  })
+
+  it('a new request cancels the previous request\'s pending correction', async () => {
+    h.state.pin = { x: 470, y: 40 }
+    const c = cards()
+    const view = await open({ selectedPlaceId: 'pl_sandolab', card: { nonce: 1, at: [139.77, 35.7], node: <Card /> }, cards: c })
+    expect(h.map.panBy).toHaveBeenCalledTimes(1)
+    h.state.pin = { x: 900, y: 270 }
+    view.rerender(<TripMapHarness selectedPlaceId="pl_sandolab" card={null} cards={c} />)
+    act(() => { h.fire('moveend') })
+    expect(placeCards()).toHaveLength(0)
+    expect(c.onFallback).not.toHaveBeenCalled()
+  })
+
+  // #2: a token, but the map never loads (a rejected style, no WebGL): nothing can present the
+  // card, so the detail goes to the sidebar instead of a detached host.
+  it('reports the map unavailable until it loads, and never available if it does not', async () => {
+    const c = { ...cards(), onAvailability: vi.fn() }
+    render(<TripMapHarness selectedPlaceId="pl_sandolab" card={{ nonce: 9, at: [139.77, 35.7], node: <Card /> }} cards={c} />)
+    await flush()                                   // no 'load' fired: a rejected style, no WebGL
+    expect(c.onAvailability).toHaveBeenLastCalledWith(false)
+    expect(c.onAvailability).not.toHaveBeenCalledWith(true)
+    expect(placeCards()).toHaveLength(0)
+    fireLoad()
+    await flush()
+    expect(c.onAvailability).toHaveBeenLastCalledWith(true)
+  })
+
+  // #4: geometry that turns impossible AFTER placement transfers the detail (no camera move).
+  it('a placed card whose map shrinks to 768 (still desktop) hands its detail to the sidebar', async () => {
+    const c = cards()
+    await open({ selectedPlaceId: 'pl_sandolab', card: { nonce: 2, at: [139.77, 35.7], node: <Card /> }, cards: c })
+    expect(placeCards()).toHaveLength(1)
+    h.state.width = 768
+    act(() => { setPanelObstruction(356) })
+    expect(c.onFallback).toHaveBeenCalledWith(2)
+    expect(placeCards()).toHaveLength(0)
+    expect(h.map.panBy).not.toHaveBeenCalled()
+  })
+
+  it('a placed card whose pin is panned off the map hands its detail to the sidebar, no camera fight', async () => {
+    const c = cards()
+    await open({ selectedPlaceId: 'pl_sandolab', card: { nonce: 3, at: [139.77, 35.7], node: <Card /> }, cards: c })
+    act(() => { h.fire('dragstart', { originalEvent: new MouseEvent('mousedown') }) })
+    h.state.pin = { x: -400, y: 300 }
+    act(() => { h.fire('moveend') })
+    expect(c.onFallback).toHaveBeenCalledWith(3)
+    expect(h.map.panBy).not.toHaveBeenCalled()
+  })
+
+  it('a small user pan that only obstructs the card keeps it following the pin', async () => {
+    const c = cards()
+    await open({ selectedPlaceId: 'pl_sandolab', card: { nonce: 4, at: [139.77, 35.7], node: <Card /> }, cards: c })
+    act(() => { h.fire('dragstart', { originalEvent: new MouseEvent('mousedown') }) })
+    h.state.pin = { x: 520, y: 60 }                 // near the panel edge: obstructed, still visible
+    act(() => { h.fire('moveend') })
+    expect(c.onFallback).not.toHaveBeenCalled()
+    expect(placeCards()).toHaveLength(1)
+  })
+})
+
+/* Codex final #6: an eat or hotel detail crosses the breakpoint as ONE surface: the phone's DOM
+   card and the desktop place card are never both open, and neither is lost. */
+describe('TripMap eat and hotel details across the breakpoint (Codex final #6)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    h.popups.length = 0
+    h.markers.length = 0
+    h.layer.replaceChildren()
+    document.body.append(h.layer)
+    h.listeners.clear()
+    h.onceListeners.clear()
+    h.state.moving = false
+    h.state.width = 1440
+    h.state.pin = { x: 900, y: 270 }
+    process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN = 'pk.test'
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1 })
+    vi.stubGlobal('cancelAnimationFrame', () => {})
+    setPanelObstruction(472)
+  })
+  afterEach(() => { vi.unstubAllGlobals(); setPanelObstruction(0) })
+  const phoneCards = () => live().filter((p) => String(p.options.className).includes('phone-popup'))
+  const placeCards = () => live().filter((p) => String(p.options.className).includes('place-card'))
+  const EAT = { kind: 'eat' as const, id: 'pl_popo' }
+  const HOTEL = { kind: 'hotel' as const, id: 'hotel_1' }
+
+  async function run(first: 'mobile' | 'desktop', props: Props, open1: Props, open2: Props) {
+    layout.value = first
+    const c = cards()
+    const view = await open({ ...props, ...open1, cards: c })
+    layout.value = first === 'mobile' ? 'desktop' : 'mobile'
+    view.rerender(<TripMapHarness {...props} {...open2} cards={c} />)
+    await flush()
+    return { view, c }
+  }
+
+  it('an eat card opened on a phone becomes the desktop place card on widening, with no DOM card left', async () => {
+    layout.value = 'mobile'
+    const c = cards()
+    const view = await open({ cards: c })
+    view.rerender(<TripMapHarness selectedRestaurantPlaceId="pl_popo" openSuggestion={EAT} cards={c} />)
+    await flush()
+    expect(phoneCards()).toHaveLength(1)            // the phone's DOM card is open
+    layout.value = 'desktop'
+    view.rerender(<TripMapHarness selectedRestaurantPlaceId="pl_popo" openSuggestion={EAT} cards={c}
+      card={{ nonce: 1, at: [139.765, 35.73], node: <Card /> }} />)
+    await flush()
+    expect(phoneCards()).toHaveLength(0)
+    expect(placeCards()).toHaveLength(1)
+  })
+
+  it('an eat place card opened on desktop becomes the phone DOM card on narrowing', async () => {
+    await run('desktop', { selectedRestaurantPlaceId: 'pl_popo', openSuggestion: EAT },
+      { card: { nonce: 1, at: [139.765, 35.73], node: <Card /> } }, { card: null })
+    expect(placeCards()).toHaveLength(0)
+    expect(phoneCards()).toHaveLength(1)
+    expect(phoneCards()[0].el.textContent).toContain('Popo')
+  })
+
+  it('a hotel does the same in both directions on an older hotel-bearing trip', async () => {
+    const base = { bundle: TOKYO_TRIP_WITH_HOTELS, layerMode: 'hub' as const, selectedHotelId: 'hotel_1', openSuggestion: HOTEL }
+    await run('desktop', base, { card: { nonce: 1, at: [139.7034, 35.6938], node: <Card /> } }, { card: null })
+    expect(placeCards()).toHaveLength(0)
+    expect(phoneCards()).toHaveLength(1)
+    h.popups.length = 0
+    h.layer.replaceChildren()
+    await run('mobile', base, { card: null }, { card: { nonce: 2, at: [139.7034, 35.6938], node: <Card /> } })
+    expect(phoneCards()).toHaveLength(0)
+    expect(placeCards()).toHaveLength(1)
+  })
+
+  it('a phone eat pin tells the owner (so a later rotation knows which card is open)', async () => {
+    layout.value = 'mobile'
+    const c = cards()
+    await open({ cards: c })
+    const eat = h.markers.find((m) => m.classList.contains('eat-pin'))!
+    act(() => { eat.click() })
+    expect(c.onOpenEat).toHaveBeenCalledWith('pl_popo')
+    expect(phoneCards()).toHaveLength(1)
+  })
+
+  it('closing the phone DOM card closes the open card too', async () => {
+    layout.value = 'mobile'
+    const c = cards()
+    await open({ cards: c })
+    act(() => { h.markers.find((m) => m.classList.contains('eat-pin'))!.click() })
+    const popup = h.PopupCtor.mock.results.at(-1)!.value as { on: ReturnType<typeof vi.fn> }
+    const close = popup.on.mock.calls.find((x) => x[0] === 'close')![1] as () => void
+    act(() => { close() })
+    expect(c.onDismiss).toHaveBeenCalled()
+  })
+})
