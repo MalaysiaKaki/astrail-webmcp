@@ -28,7 +28,9 @@ export default function PhoneDock({
   onExpand, onCollapse, toolsOpen, onToolsOpenChange, cleared, onClear,
 }: {
   collapsed: boolean
-  /** Folded chip position over the trip sheet (px above the viewport bottom), or null. */
+  /** Where the dock's bottom edge sits (px above the viewport bottom), or null for its corner:
+   *  folded over the trip sheet, the chip rides the sheet's top edge; on a shell route with the
+   *  bottom tab bar, the chip AND the open overlay sit above the bar (plan amendment 6). */
   chipBottom: number | null
   overCanvas: boolean
   toolCount: number
@@ -51,7 +53,10 @@ export default function PhoneDock({
           ? 'pb-[calc(max(1rem,env(safe-area-inset-bottom))+44px)]'
           : 'pb-[max(1rem,env(safe-area-inset-bottom))]',
       ].join(' ')}
-      style={{ maxHeight: '100dvh', bottom: chipBottom === null ? undefined : `${chipBottom - 16}px` }}
+      style={{
+        maxHeight: chipBottom === null ? '100dvh' : `calc(100dvh - ${chipBottom - 16}px)`,
+        bottom: chipBottom === null ? undefined : `${chipBottom - 16}px`,
+      }}
     >
       {collapsed ? (
         <div aria-live="polite" aria-label="Agent activity" className="pointer-events-none">
@@ -62,10 +67,14 @@ export default function PhoneDock({
           role="region"
           aria-label="Agent"
           className="pointer-events-auto m-card flex max-h-[80dvh] w-full flex-col overflow-hidden text-[var(--m-text)]"
-          style={{ boxShadow: 'var(--m-shadow-2)' }}
+          style={{
+            boxShadow: 'var(--m-shadow-2)',
+            // Anchored above the tab bar, the overlay gets the room left above it (less the notch).
+            ...(chipBottom === null ? {} : { maxHeight: `calc(100dvh - ${chipBottom + 16}px - env(safe-area-inset-top))` }),
+          }}
         >
           <div className="flex shrink-0 items-center justify-between border-b border-[var(--m-accent-wash)] py-2 pl-5 pr-2">
-            <p className="text-[16px] font-semibold tracking-[-0.01em] text-[var(--m-text)]">Agent</p>
+            <p className="text-[length:var(--t-body-lg)] font-semibold tracking-[-0.01em] text-[var(--m-text)]">Agent</p>
             <button
               type="button"
               onClick={onCollapse}
@@ -80,14 +89,14 @@ export default function PhoneDock({
             </button>
           </div>
           <div data-dock-scroll className="phone-dock flex min-h-0 flex-1 flex-col items-end gap-2 overflow-y-auto overscroll-contain p-3">
-            {overCanvas && !toolsOpen && <ExamplePrompts tone="paper" />}
-            <AgentActivityRail compact={!overCanvas} cleared={cleared} onClear={onClear} tone="paper" />
-            <WebMcpStatus open={toolsOpen} onOpenChange={onToolsOpenChange} tone="paper" part="panel" />
+            {overCanvas && !toolsOpen && <ExamplePrompts />}
+            <AgentActivityRail compact={!overCanvas} cleared={cleared} onClear={onClear} />
+            <WebMcpStatus open={toolsOpen} onOpenChange={onToolsOpenChange} part="panel" />
           </div>
           {/* The tools chip is a footer, outside the scroll: at the end of the scroll area a long
               prompts panel or tool list pushed it against the overlay's bottom edge and clipped it. */}
           <div data-dock-footer className="flex shrink-0 justify-end border-t border-[var(--m-accent-wash)] px-3 py-2.5">
-            <WebMcpStatus open={toolsOpen} onOpenChange={onToolsOpenChange} tone="paper" part="chip" />
+            <WebMcpStatus open={toolsOpen} onOpenChange={onToolsOpenChange} part="chip" />
           </div>
         </section>
       )}
@@ -161,7 +170,7 @@ function PhoneChip({ toolCount, unread, hasChange, onExpand }: {
       aria-label={label}
       // The light kit pill (m-pill-badge), like the rest of the phone chrome; phone-only by
       // construction (only PhoneDock renders it).
-      className="m-pill-badge pointer-events-auto h-11 text-[15px] font-semibold tracking-[-0.01em]"
+      className="m-pill-badge pointer-events-auto h-11 text-[length:var(--t-body)] font-semibold tracking-[-0.01em]"
     >
       <span
         aria-hidden

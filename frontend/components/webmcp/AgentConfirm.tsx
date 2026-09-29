@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PendingPrompt } from './WebMcpRegistry'
 import { useOptionalWebMcpRegistry } from './WebMcpRegistry'
-import { useTripLayout } from '@/lib/trip/use-trip-layout'
+import { useBottomNavHeight } from '@/lib/shell/bottom-nav'
+import { approvalBottomOverNav } from '@/lib/webmcp/dock-geometry'
 
 /**
  * How much the field will hold, matching the ceiling a stated preference already has.
@@ -19,51 +20,39 @@ const MAX_OVERRIDE = 280
    that scroll, so a long summary on a 360x640 phone with the keyboard up can never push Approve
    or Not now off screen.
 
-   Two surfaces, chosen by `useTripLayout() === 'mobile'` (desktop, and the `null` SSR/hydration
-   moment, both fall back to the original dark "night" look — see `usePaperTone` below). Every
-   NIGHT string here is byte-identical to what shipped before this prop existed, so desktop stays
-   pixel-identical. */
-const CARD_NIGHT =
+   One surface at every width since plan A7: the light UI kit card (the night skin is retired). */
+const CARD =
   'fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 mx-auto flex w-[min(28rem,calc(100%-2rem))] ' +
   'max-h-[calc(100dvh-6rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col ' +
-  'rounded-xl border border-[#C9974E]/60 bg-black/90 p-4 text-sm text-white/90 shadow-2xl backdrop-blur outline-none'
-const CARD_PAPER =
-  'fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 mx-auto flex w-[min(28rem,calc(100%-2rem))] ' +
-  'max-h-[calc(100dvh-6rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col ' +
-  'm-card p-4 text-sm text-[var(--m-text)] outline-none'
+  'm-card p-4 text-[length:var(--t-body)] text-[var(--m-text)] outline-none'
 /** `m-card`'s own shadow is the lighter `--m-shadow-1`; this floating approval card wants the
  *  heavier `--m-shadow-2` the kit reserves for overlay panels, so it is set inline — an inline
  *  style always wins the cascade, unlike a plain Tailwind utility against the kit's unlayered CSS. */
-const CARD_PAPER_STYLE = { boxShadow: 'var(--m-shadow-2)' } as const
+const CARD_STYLE = { boxShadow: 'var(--m-shadow-2)' } as const
 const BODY = 'min-h-0 overflow-y-auto overscroll-contain'
-const APPROVE_NIGHT = 'min-h-11 flex-1 rounded-lg bg-[#C9974E] px-3 py-2 font-medium text-black transition hover:bg-[#E8D5B0]'
-const APPROVE_PAPER = 'm-btn-primary flex-1'
-const DECLINE_NIGHT = 'min-h-11 flex-1 rounded-lg border border-white/25 px-3 py-2 text-white/80 transition hover:border-white/50'
-const DECLINE_PAPER = 'm-btn-secondary flex-1'
-const HEADER_NIGHT = 'mb-2 flex items-center gap-2 text-[11px] uppercase tracking-wider text-[#E8D5B0]'
-const HEADER_PAPER = 'mb-2 flex items-center gap-2 text-[13px] font-medium text-[var(--m-accent)]'
-const DOT_NIGHT = 'inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#C9974E]'
-const DOT_PAPER = 'inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--m-accent)]'
-const SUMMARY_NIGHT = 'whitespace-pre-line leading-relaxed text-white/85'
-const SUMMARY_PAPER = 'whitespace-pre-line leading-relaxed text-[var(--m-text)]'
-const FIELD_LABEL_NIGHT = 'mb-1 block text-[11px] uppercase tracking-wider text-white/55'
-const FIELD_LABEL_PAPER = 'mb-1 block text-[12px] text-[var(--m-text-muted)]'
-const FIELD_INPUT_NIGHT =
-  'w-full rounded-lg border border-white/25 bg-white/5 px-3 py-2 text-white/90 max-md:text-base outline-none ' +
-  'transition placeholder:text-white/35 focus:border-[#C9974E]'
-const FIELD_INPUT_PAPER =
+const APPROVE = 'm-btn-primary flex-1'
+const DECLINE = 'm-btn-secondary flex-1'
+const HEADER = 'mb-2 flex items-center gap-2 text-[length:var(--t-meta)] font-semibold text-[var(--m-accent)]'
+const DOT = 'inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--m-accent)]'
+const SUMMARY = 'whitespace-pre-line leading-relaxed text-[var(--m-text)]'
+const FIELD_LABEL = 'mb-1 block text-[length:var(--t-label)] text-[var(--m-text-muted)]'
+const FIELD_INPUT =
   'w-full rounded-lg border border-[var(--m-accent-wash)] bg-[var(--m-page)] px-3 py-2 text-[var(--m-text)] max-md:text-base ' +
   'outline-none transition placeholder:text-[var(--m-text-muted)] focus:border-[var(--m-accent)]'
 
 /**
- * Whether this card should paint itself with the light phone UI kit rather than the original dark
- * "night" look. `useTripLayout()` returns `null` during SSR/hydration — treated as desktop here,
- * same as everywhere else that hook is read, so there is no light-then-dark flash on a phone and
- * no dark-then-light flash on desktop; the card only ever renders once a real answer exists (it
- * is gated on `pending` above, well past first paint).
+ * The card's inline style: the overlay shadow, and — on a shell route with the phone bottom tab
+ * bar — a bottom edge above both the bar and the folded agent chip riding it (plan amendment 6),
+ * with the height budget shrunk to match. With no bar the class's own `bottom` stands.
  */
-function usePaperTone(): boolean {
-  return useTripLayout() === 'mobile'
+function useCardStyle(): React.CSSProperties {
+  const bottom = approvalBottomOverNav(useBottomNavHeight())
+  if (bottom === null) return CARD_STYLE
+  return {
+    ...CARD_STYLE,
+    bottom: `${bottom}px`,
+    maxHeight: `calc(100dvh - ${bottom + 16}px - env(safe-area-inset-top))`,
+  }
 }
 
 /**
@@ -110,7 +99,7 @@ export default function AgentConfirm() {
 
 function ConfirmCard({ summary, resolve }: { summary: string; resolve: (ok: boolean) => void }) {
   const ref = useCardBehaviour(() => resolve(false))
-  const paper = usePaperTone()
+  const cardStyle = useCardStyle()
   return (
     <div
       role="dialog"
@@ -118,29 +107,29 @@ function ConfirmCard({ summary, resolve }: { summary: string; resolve: (ok: bool
       aria-label="Astrail wants your approval"
       ref={ref}
       tabIndex={-1}
-      className={paper ? CARD_PAPER : CARD_NIGHT}
-      style={paper ? CARD_PAPER_STYLE : undefined}
+      className={CARD}
+      style={cardStyle}
     >
       <div data-confirm-body className={BODY}>
-      <p className={paper ? HEADER_PAPER : HEADER_NIGHT}>
-        <span aria-hidden className={paper ? DOT_PAPER : DOT_NIGHT} />
+      <p className={HEADER}>
+        <span aria-hidden className={DOT} />
         Astrail wants to
       </p>
       {/* Deliberately plain text, never innerHTML — this string can carry caption-derived content. */}
-      <p className={paper ? SUMMARY_PAPER : SUMMARY_NIGHT}>{summary}</p>
+      <p className={SUMMARY}>{summary}</p>
       </div>
       <div className="mt-4 flex shrink-0 gap-2">
         <button
           type="button"
           onClick={() => resolve(true)}
-          className={paper ? APPROVE_PAPER : APPROVE_NIGHT}
+          className={APPROVE}
         >
           Approve
         </button>
         <button
           type="button"
           onClick={() => resolve(false)}
-          className={paper ? DECLINE_PAPER : DECLINE_NIGHT}
+          className={DECLINE}
         >
           Not now
         </button>
@@ -178,7 +167,7 @@ function PreferenceCard({ pending }: { pending: PendingPrompt }) {
      because an explicit preference wins outright and nothing downstream vetoes it. */
   const override = text.trim().slice(0, MAX_OVERRIDE) || null
   const ref = useCardBehaviour(() => resolve({ approved: false, text: null }))
-  const paper = usePaperTone()
+  const cardStyle = useCardStyle()
 
   return (
     <div
@@ -187,25 +176,25 @@ function PreferenceCard({ pending }: { pending: PendingPrompt }) {
       aria-label="Astrail wants your approval"
       ref={ref}
       tabIndex={-1}
-      className={paper ? CARD_PAPER : CARD_NIGHT}
-      style={paper ? CARD_PAPER_STYLE : undefined}
+      className={CARD}
+      style={cardStyle}
     >
       <div data-confirm-body className={BODY}>
-      <p className={paper ? HEADER_PAPER : HEADER_NIGHT}>
-        <span aria-hidden className={paper ? DOT_PAPER : DOT_NIGHT} />
+      <p className={HEADER}>
+        <span aria-hidden className={DOT} />
         Astrail wants to
       </p>
       {/* Deliberately plain text, never innerHTML — this string can carry caption-derived content. */}
-      <p className={paper ? SUMMARY_PAPER : SUMMARY_NIGHT}>{summary}</p>
+      <p className={SUMMARY}>{summary}</p>
       <label className="mt-3 block">
-        <span className={paper ? FIELD_LABEL_PAPER : FIELD_LABEL_NIGHT}>{prompt.label}</span>
+        <span className={FIELD_LABEL}>{prompt.label}</span>
         <input
           type="text"
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder={prompt.placeholder}
           maxLength={MAX_OVERRIDE}
-          className={paper ? FIELD_INPUT_PAPER : FIELD_INPUT_NIGHT}
+          className={FIELD_INPUT}
         />
       </label>
       </div>
@@ -213,7 +202,7 @@ function PreferenceCard({ pending }: { pending: PendingPrompt }) {
         <button
           type="button"
           onClick={() => resolve({ approved: true, text: override })}
-          className={paper ? APPROVE_PAPER : APPROVE_NIGHT}
+          className={APPROVE}
         >
           {override ? 'Use this instead' : 'Try what it remembers'}
         </button>
@@ -222,7 +211,7 @@ function PreferenceCard({ pending }: { pending: PendingPrompt }) {
           /* `text: null`, whatever is in the field. Declining is a refusal to start, not a
              preference stated on the way out — and a declined run must carry nothing forward. */
           onClick={() => resolve({ approved: false, text: null })}
-          className={paper ? DECLINE_PAPER : DECLINE_NIGHT}
+          className={DECLINE}
         >
           Not now
         </button>

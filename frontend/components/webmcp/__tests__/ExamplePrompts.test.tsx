@@ -14,11 +14,11 @@ function Supported({ on }: { on: boolean }) {
   return null
 }
 
-const show = (supported = true, tone?: 'night' | 'paper') =>
+const show = (supported = true) =>
   render(
     <WebMcpRegistryProvider>
       <Supported on={supported} />
-      <ExamplePrompts tone={tone} />
+      <ExamplePrompts />
     </WebMcpRegistryProvider>,
   )
 
@@ -102,21 +102,18 @@ describe('ExamplePrompts', () => {
   })
 })
 
-/* Phone paper-kit restyle (`PhoneDock`'s overlay). `tone` defaults to `'night'`, the original dark
-   glass look, so desktop is byte-identical to before this prop existed; `PhoneDock` alone passes
-   `tone="paper"`. */
+/* A7 migration: the light UI kit at every width (the night skin and the `tone` prop are retired).
+   The "defaults to night" cases became "no night skin anywhere"; the kit assertions stand. */
 describe('ExamplePrompts tone', () => {
-  it('defaults to night — no kit classes on the panel or the dismiss control', async () => {
+  it('has no night skin anywhere, and its text is on the shared scale (>= 12px tokens)', async () => {
     const { container } = show()
-    await screen.findByText(/What can I do here\?/)
-    const panel = container.firstElementChild as HTMLElement
-    expect(panel.className).not.toMatch(/\bm-/)
-    const dismiss = screen.getByRole('button', { name: /dismiss example prompts/i })
-    expect(dismiss.className).not.toMatch(/\bm-/)
+    await screen.findByText(/Try asking the agent/i)
+    expect(container.innerHTML).not.toMatch(/bg-black|#E8D5B0|text-white/)
+    expect(container.innerHTML).not.toMatch(/text-\[(9|10|11)px\]|text-xs/)
   })
 
-  it('paper tone paints the panel as a white kit card and the dismiss control as a 44px kit icon button', async () => {
-    const { container } = show(true, 'paper')
+  it('paints the panel as a white kit card and the dismiss control as a 44px kit icon button', async () => {
+    const { container } = show(true)
     const heading = await screen.findByText(/Try asking the agent/i)
     // Sentence case, not an uppercase tracked label — the class drops, the string does not change.
     expect(heading.className).not.toMatch(/uppercase/)

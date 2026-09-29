@@ -64,7 +64,8 @@ describe.each<Variant>(['confirm', 'prompt'])('AgentConfirm (%s) on small screen
     expect(scroller.className).toMatch(/overflow-y-auto/)
     const decline = screen.getByRole('button', { name: /not now/i })
     expect(scroller.contains(decline)).toBe(false)
-    expect(decline.className).toMatch(/min-h-11/)
+    // A7: a kit button — `.m-btn-secondary` carries the 44px floor in ui-kit.css (was `min-h-11`).
+    expect(decline.className).toMatch(/\bm-btn-secondary\b/)
   })
 })
 

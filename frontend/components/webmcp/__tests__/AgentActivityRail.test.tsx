@@ -21,16 +21,16 @@ function Runner({ run }: { run: (r: ReturnType<typeof useWebMcpRegistry>) => voi
  * and it is deliberately NOT a default inside the component: the mount that survives a fold is
  * the behaviour, so it is proven where it lives (`WebMcpDock.test.tsx`), not simulated here.
  */
-function Rail({ compact, tone }: { compact?: boolean; tone?: 'night' | 'paper' }) {
+function Rail({ compact }: { compact?: boolean }) {
   const [cleared, setCleared] = useState<ClearedMark>(NOTHING_CLEARED)
-  return <AgentActivityRail compact={compact} cleared={cleared} onClear={setCleared} tone={tone} />
+  return <AgentActivityRail compact={compact} cleared={cleared} onClear={setCleared} />
 }
 
-const withRail = (run: (r: ReturnType<typeof useWebMcpRegistry>) => void, tone?: 'night' | 'paper') =>
+const withRail = (run: (r: ReturnType<typeof useWebMcpRegistry>) => void) =>
   render(
     <WebMcpRegistryProvider>
       <Runner run={run} />
-      <Rail tone={tone} />
+      <Rail />
     </WebMcpRegistryProvider>,
   )
 
@@ -522,26 +522,23 @@ describe('an entry says how old it is', () => {
   })
 })
 
-/* Phone paper-kit restyle (`PhoneDock`'s overlay). `tone` defaults to `'night'`, the original dark
-   glass look, so desktop is byte-identical to before this prop existed; `PhoneDock` alone passes
-   `tone="paper"`. */
+/* A7 migration: the light UI kit at every width (the night skin and the `tone` prop are retired).
+   The "defaults to night" cases became "no night skin anywhere"; the kit assertions stand. */
 describe('AgentActivityRail tone', () => {
-  it('defaults to night — no kit classes on the entry card or the earlier/clear controls', async () => {
+  it('has no night skin anywhere, and its text is on the shared scale (>= 12px tokens)', async () => {
     const { container } = withRail((r) => { r.endActivity(r.beginActivity('move_place'), 'done') })
     await screen.findByText('MOVED')
-    const card = container.querySelector('.rounded-lg')
-    expect(card).toBeTruthy()
-    expect(card!.className).not.toMatch(/\bm-/)
-    expect(screen.getByRole('button', { name: /clear agent activity/i }).className).not.toMatch(/\bm-/)
+    expect(container.innerHTML).not.toMatch(/bg-black|#E8D5B0|#C9974E|text-white/)
+    expect(container.innerHTML).not.toMatch(/text-\[(9|10|11)px\]|text-xs/)
   })
 
-  it('paper tone paints the entry as a kit subcard and the controls as kit secondary buttons', async () => {
+  it('paints the entry as a kit subcard and the controls as kit secondary buttons', async () => {
     const { container } = withRail((r) => {
       // An earlier entry first, so it stays hidden behind "N earlier" and `move_place` — done
       // last — is the one always-visible "latest" card the test can find without expanding it.
       r.endActivity(r.beginActivity('get_itinerary'), 'done', 'Kyoto · 3 days')
       r.endActivity(r.beginActivity('move_place'), 'done')
-    }, 'paper')
+    })
     await screen.findByText('MOVED')
     const card = container.querySelector('.m-subcard')
     expect(card).toBeTruthy()

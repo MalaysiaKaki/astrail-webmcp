@@ -6,9 +6,9 @@ import { useState } from 'react'
 import WebMcpStatusBase from '../WebMcpStatus'
 
 /** The dock owns the open state in the app; this mirrors that for the component under test. */
-function WebMcpStatus({ tone }: { tone?: 'night' | 'paper' } = {}) {
+function WebMcpStatus() {
   const [open, setOpen] = useState(false)
-  return <WebMcpStatusBase open={open} onOpenChange={setOpen} tone={tone} />
+  return <WebMcpStatusBase open={open} onOpenChange={setOpen} />
 }
 import { WebMcpRegistryProvider, useWebMcpRegistry } from '../WebMcpRegistry'
 
@@ -23,12 +23,11 @@ function Seed({ tools }: { tools: { name: string; description: string; readOnly:
 
 const withRegistry = (
   tools: { name: string; description: string; readOnly: boolean }[],
-  tone?: 'night' | 'paper',
 ) =>
   render(
     <WebMcpRegistryProvider>
       <Seed tools={tools} />
-      <WebMcpStatus tone={tone} />
+      <WebMcpStatus />
     </WebMcpRegistryProvider>,
   )
 
@@ -121,7 +120,8 @@ describe('WebMcpStatus', () => {
     await userEvent.click(await screen.findByRole('button', { name: /WebMCP active/ }))
     const scroller = document.querySelector('.overflow-y-auto')
     expect(scroller).toBeTruthy()
-    expect(scroller!.className).toContain('max-h-[60dvh]')
+    // A7: still capped at 60dvh, and also by the room under the desktop map controls (--dock-room).
+    expect(scroller!.className).toContain('min(60dvh,calc(var(--dock-room,100dvh)')
   })
 
   it('distinguishes tools that read from tools that change things', async () => {
@@ -135,21 +135,20 @@ describe('WebMcpStatus', () => {
   })
 })
 
-/* Phone paper-kit restyle (`PhoneDock`'s overlay). `tone` defaults to `'night'`, the original dark
-   glass look, so desktop is byte-identical to before this prop existed; `PhoneDock` alone passes
-   `tone="paper"`. */
+/* A7 migration: the light UI kit at every width (the night skin and the `tone` prop are retired).
+   The "defaults to night" cases became "no night skin anywhere"; the kit assertions stand. */
 describe('WebMcpStatus tone', () => {
-  it('defaults to night — no kit classes on the chip or the panel', async () => {
+  it('has no night skin anywhere, and its text is on the shared scale (>= 12px tokens)', async () => {
     withRegistry([{ name: 'get_app_state', description: 'Where you are', readOnly: true }])
     const chip = await screen.findByRole('button', { name: /WebMCP active/ })
-    expect(chip.className).not.toMatch(/\bm-/)
     await userEvent.click(chip)
-    const close = screen.getByRole('button', { name: /close tool list/i })
-    expect(close.className).not.toMatch(/\bm-/)
+    const html = document.body.innerHTML
+    expect(html).not.toMatch(/bg-black|#E8D5B0|#C9974E|text-white/)
+    expect(html).not.toMatch(/text-\[(9|10|11)px\]|text-xs/)
   })
 
-  it('paper tone paints the chip as a kit pill and the panel as a white kit card with a kit close button', async () => {
-    withRegistry([{ name: 'get_app_state', description: 'Where you are', readOnly: true }], 'paper')
+  it('paints the chip as a kit pill and the panel as a white kit card with a kit close button', async () => {
+    withRegistry([{ name: 'get_app_state', description: 'Where you are', readOnly: true }])
     const chip = await screen.findByRole('button', { name: /WebMCP active/ })
     expect(chip.className).toMatch(/\bm-pill-badge\b/)
     await userEvent.click(chip)

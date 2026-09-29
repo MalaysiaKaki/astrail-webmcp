@@ -12,6 +12,9 @@ import { useAgentTriggerSlot } from '@/lib/webmcp/agent-trigger-slot'
 import { useOptionalWebMcpRegistry, type ActivityEntry } from './WebMcpRegistry'
 import { dockChipBottom, useSheetExpanded, useSheetObstruction } from '@/lib/trip/sheet-obstruction'
 import { useTripLayout } from '@/lib/trip/use-trip-layout'
+import { useBottomNavHeight } from '@/lib/shell/bottom-nav'
+import { dockBottomOverNav, dockRoomUnderControls } from '@/lib/webmcp/dock-geometry'
+import { useControlRects } from '@/lib/trip/control-obstruction'
 
 /**
  * One dock, not three floating boxes.
@@ -110,17 +113,18 @@ function FoldedPill({
       onClick={onExpand}
       aria-expanded={false}
       aria-label={label}
-      className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-[#C9974E]/40 bg-black/70 px-3 py-1
-                 text-[10px] uppercase tracking-wider text-[#E8D5B0] backdrop-blur transition hover:border-[#C9974E]"
+      // The light kit pill, the same as the phone's folded chip (plan A7: one skin at every width).
+      className="m-pill-badge pointer-events-auto text-[length:var(--t-body)] font-semibold tracking-[-0.01em]"
     >
       <span
         aria-hidden
         className={[
-          'inline-block h-1.5 w-1.5 shrink-0 rounded-full',
-          hasChange ? 'bg-[#C9974E]' : unread > 0 ? 'bg-white/50' : 'bg-[#C9974E]/40',
+          'inline-block h-2 w-2 shrink-0 rounded-full',
+          hasChange ? 'bg-[var(--m-accent)]' : unread > 0 ? 'bg-[var(--m-ink)]' : 'bg-[var(--m-text-muted)]',
         ].join(' ')}
       />
-      Agent{unread > 0 ? ` · ${unread}` : ''}
+      Agent
+      {unread > 0 ? <span className="tabular-nums font-medium text-[var(--m-text-muted)]">{unread} new</span> : null}
     </button>
   )
 }
@@ -160,6 +164,15 @@ export default function WebMcpDock() {
   const collapsed = choice ?? phone
   const sheetObstruction = useSheetObstruction()
   const sheetExpanded = useSheetExpanded()
+  // The phone bottom tab bar on the shell routes (plan amendment 6): the dock rides one gap above
+  // it, folded or open. 0 — no bar — on trip routes, at >=768px and before the bar measures.
+  const navBottom = dockBottomOverNav(useBottomNavHeight())
+  // Desktop over the trip map: the room left under the right-hand map controls (measured), handed
+  // to the dock's scrolling lists as --dock-room so the column never grows up over those buttons.
+  const controlRects = useControlRects()
+  const dockRoom = typeof window === 'undefined' || !overCanvas
+    ? null
+    : dockRoomUnderControls(controlRects, window.innerWidth, window.innerHeight)
 
   const registry = useOptionalWebMcpRegistry()
   const activity = registry?.activity ?? NO_ACTIVITY
@@ -294,7 +307,7 @@ export default function WebMcpDock() {
     return (
       <PhoneDock
         collapsed={collapsed}
-        chipBottom={chipBottom}
+        chipBottom={navBottom ?? chipBottom}
         overCanvas={overCanvas}
         toolCount={registry?.tools.length ?? 0}
         unread={unread.length}
@@ -313,7 +326,11 @@ export default function WebMcpDock() {
     <div
       className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col items-end gap-2 p-4
                  pb-[max(1rem,env(safe-area-inset-bottom))] sm:inset-x-auto sm:right-0"
-      style={{ maxHeight: '100dvh', bottom: chipBottom === null ? undefined : `${chipBottom - 16}px` }}
+      style={{
+        maxHeight: dockRoom === null ? '100dvh' : `${dockRoom}px`,
+        bottom: chipBottom === null ? undefined : `${chipBottom - 16}px`,
+        ...(dockRoom === null ? {} : { ['--dock-room' as string]: `${dockRoom}px` }),
+      }}
     >
       {/* Order matters: the chip is last so it stays pinned to the bottom-right corner and never
           moves when something above it appears. A control that jumps is a control you cannot hit. */}
@@ -327,7 +344,9 @@ export default function WebMcpDock() {
           route split above, and expanding on a document route brings back exactly what was
           there: the rail, capped, and no prompts panel. */}
       {overCanvas && !toolsOpen && !collapsed && <ExamplePrompts />}
-      {!collapsed && <AgentActivityRail compact={!overCanvas} cleared={cleared} onClear={setCleared} />}
+      {/* The rail and the tool list are alternatives on desktop too (as the prompts already were):
+          together they out-grew a 768px-tall viewport. */}
+      {!collapsed && !toolsOpen && <AgentActivityRail compact={!overCanvas} cleared={cleared} onClear={setCleared} raised />}
       {foldable &&
         (collapsed ? (
           /* Folded, the rail is unmounted and the live region it carries goes with it, so the
@@ -343,10 +362,10 @@ export default function WebMcpDock() {
           <button
             type="button"
             onClick={() => changeCollapsed(true)}
-            aria-expanded
             aria-label="Minimise agent activity"
-            className="pointer-events-auto rounded-full border border-[#C9974E]/40 bg-black/60 px-3 py-1
-                       text-[10px] uppercase tracking-wider text-[#E8D5B0] backdrop-blur transition hover:border-[#C9974E]"
+            // No aria-expanded: the kit paints [aria-expanded="true"] as a pressed ink control, and
+            // this is an action. The folded pill carries the disclosure state (aria-expanded=false).
+            className="m-btn-secondary pointer-events-auto"
           >
             Minimise
           </button>

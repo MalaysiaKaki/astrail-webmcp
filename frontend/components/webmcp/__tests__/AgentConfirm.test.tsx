@@ -171,11 +171,14 @@ describe('AgentConfirm — phone paper tone', () => {
     await waitFor(() => expect(onAnswer).toHaveBeenCalledWith(false))
   })
 
-  it('renders no kit classes on desktop (the default matchMedia stub reports no match)', async () => {
+  /* A7 migration (was "no kit classes on desktop"): the approval card is the light kit at every
+     width — the same card, the same kit buttons, whatever the layout reports. */
+  it('renders the kit card and kit buttons on desktop too (no night skin)', async () => {
     ask('Spend the allowance')
     const dialog = await screen.findByRole('dialog')
-    expect(dialog.className).not.toMatch(/\bm-/)
-    expect(screen.getByRole('button', { name: /^approve$/i }).className).not.toMatch(/\bm-/)
-    expect(screen.getByRole('button', { name: /not now/i }).className).not.toMatch(/\bm-/)
+    expect(dialog.className).toMatch(/\bm-card\b/)
+    expect(dialog.className).not.toMatch(/bg-black/)
+    expect(screen.getByRole('button', { name: /^approve$/i }).className).toMatch(/\bm-btn-primary\b/)
+    expect(screen.getByRole('button', { name: /not now/i }).className).toMatch(/\bm-btn-secondary\b/)
   })
 })

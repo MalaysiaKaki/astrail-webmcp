@@ -6,12 +6,9 @@ import { NOTHING_CLEARED, type ClearedMark } from '../AgentActivityRail'
 import { WebMcpRegistryProvider, useWebMcpRegistry } from '../WebMcpRegistry'
 
 /* PhoneDock is phone-only by construction (WebMcpDock only ever mounts it inside its `if (phone)`
-   branch), so unlike its three siblings it carries no `tone` prop of its own — its own JSX (the
-   `region "Agent"` overlay wrapper, its header and its close button) is unconditionally the light
-   phone UI kit, and it passes `tone="paper"` down to ExamplePrompts, AgentActivityRail and
-   WebMcpStatus. The dark "night" look these three default to is proven byte-identical to before
-   this prop existed in their OWN test files; this file is only about what PhoneDock itself paints
-   and what it hands its children. */
+   branch). Since plan A7 its children (ExamplePrompts, AgentActivityRail, WebMcpStatus) have one
+   light-kit skin at every width, so there is no tone to pass down; this file is about what
+   PhoneDock itself paints and how it lays its children out. */
 
 vi.mock('next/navigation', () => ({ usePathname: () => '/app/trip/abc' }))
 
@@ -73,7 +70,7 @@ describe('PhoneDock — the overlay is the light phone UI kit', () => {
     expect(close.className).toMatch(/\bh-11\b/)
   })
 
-  it('passes the paper tone to the prompts panel', async () => {
+  it('shows the kit prompts panel in the overlay', async () => {
     open()
     const heading = await screen.findByText(/Try asking the agent/i)
     expect(heading.className).not.toMatch(/uppercase/)

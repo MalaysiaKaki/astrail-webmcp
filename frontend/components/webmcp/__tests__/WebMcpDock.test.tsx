@@ -80,7 +80,8 @@ describe('WebMcpDock', () => {
     mockPath.value = '/app/trip/abc'
     dock(4)
     await userEvent.click(screen.getByLabelText('Show earlier agent activity'))
-    expect(screen.getByLabelText('Earlier agent activity').className).toContain('max-h-[45dvh]')
+    // A7: still up to 45dvh over the map, and never taller than the room under the map controls.
+    expect(screen.getByLabelText('Earlier agent activity').className).toContain('min(45dvh,calc(var(--dock-room,100dvh)')
   })
 
   it('keeps the status chip on every route — the honest disconnected state stays visible', () => {
@@ -226,9 +227,10 @@ describe('WebMcpDock — the dock never swallows an invisible click', () => {
     return Array.from(el.querySelectorAll('.pointer-events-auto'))
       .filter((n) => {
         const cn = String(n.className)
-        // A button is its own affordance; `bg-` means the user can see what they are hitting;
-        // the read-back list must keep the wheel to scroll and is filled edge to edge by cards.
-        return n.tagName !== 'BUTTON' && !/\bbg-/.test(cn) && !cn.includes('overflow-y-auto')
+        // A button is its own affordance; `bg-` — or, since A7, a kit surface (m-card, m-subcard),
+        // which paints its own background in ui-kit.css — means the user can see what they are
+        // hitting; the read-back list must keep the wheel to scroll and is filled by cards.
+        return n.tagName !== 'BUTTON' && !/\bbg-|\bm-card\b|\bm-subcard\b/.test(cn) && !cn.includes('overflow-y-auto')
       })
       .map((n) => String(n.className).replace(/\s+/g, ' ').slice(0, 80))
   }
@@ -242,6 +244,19 @@ describe('WebMcpDock — the dock never swallows an invisible click', () => {
   it('paints every surface that accepts a pointer, on a document route', () => {
     dock()
     expect(invisibleCatchers()).toEqual([])
+  })
+
+  /* A7: over a 768px-tall map the rail plus the tool list out-grew the room under the map
+     controls, so on desktop they are alternatives — as the prompts panel and the list already were. */
+  it('steps the rail aside while the tool list is open, and brings it back when it closes', async () => {
+    mockPath.value = '/app/trip/abc'
+    dock(4)
+    expect(screen.getByLabelText('Clear agent activity')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /WebMCP/i }))
+    expect(screen.getByText(/Tools an agent can use here/)).toBeInTheDocument()
+    expect(screen.queryByLabelText('Clear agent activity')).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: /close tool list/i }))
+    expect(screen.getByLabelText('Clear agent activity')).toBeInTheDocument()
   })
 
   it('still holds with the tool list and the read-back both open', async () => {
