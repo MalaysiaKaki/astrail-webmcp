@@ -9,12 +9,21 @@ import {
   statusDotClass,
   budgetLabel,
 } from '@/lib/trip/trip-presenters'
+import { META, TAG } from '@/lib/shell/ui'
+import { ChevronRightIcon } from '@/components/dashboard/nav-icons'
 import RouteGlyph from './RouteGlyph'
 
-/* One row in the trip inventory (middle pane). The whole row is a select control — clicking
-   it drives the map on the right, it does NOT navigate. The selected row reveals an explicit
-   "Open trip" footer link into the full workspace, so selection and navigation stay distinct
-   (no nested interactives). Palette role tokens only — the inventory is a paper surface. */
+/* One trip card in the inventory (middle pane). The card body is a select control — clicking
+   it drives the map on the right, it does NOT navigate. The selected card reveals an explicit
+   "Open trip" row into the full workspace, so selection and navigation stay distinct (no nested
+   interactives).
+
+   Placify trip card (web revamp C4): a white elevated card with an avatar, a bold title, a status
+   tag and 14px meta. The list payload carries no Reel thumbnail and C4 adds no fetches, so the
+   avatar is the trip's own route glyph on a tinted tile rather than a photo. The card surface is
+   built from the kit tokens, not .m-card: the selected state adds an ink ring to the shadow, and
+   the unlayered .m-card box-shadow would win over it. Focus rings are inset because the card
+   clips its corners. */
 
 export default function TripRow({
   trip,
@@ -29,39 +38,31 @@ export default function TripRow({
 
   return (
     <li
-      className={[
-        'overflow-hidden rounded-xl border transition-colors',
-        selected
-          ? 'border-[color:var(--brass-deep)] bg-[color:var(--brass-wash)]'
-          : 'border-transparent hover:bg-[color:var(--surface-2)]',
-      ].join(' ')}
+      className={`overflow-hidden rounded-[var(--m-r-card)] bg-[color:var(--m-card)] transition-shadow duration-[var(--m-dur-press)] motion-reduce:transition-none ${
+        selected ? 'shadow-[0_0_0_2px_var(--m-ink),var(--m-shadow-1)]' : 'shadow-[var(--m-shadow-1)]'
+      }`}
     >
       <button
         type="button"
         onClick={onSelect}
         aria-pressed={selected}
-        className="flex w-full items-start gap-3 px-3 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[color:var(--brass-deep)]"
+        className="flex w-full items-center gap-3.5 p-3.5 text-left transition-colors duration-[var(--m-dur-press)] hover:bg-[color:var(--m-subcard)] focus-visible:outline-none focus-visible:shadow-[inset_0_0_0_2px_var(--m-accent)] motion-reduce:transition-none"
       >
-        <RouteGlyph tripId={trip.id} />
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center justify-between gap-2">
-            <span
-              className="font-display truncate text-[15px] text-[color:var(--text)]"
-              style={{ fontVariationSettings: "'SOFT' 28, 'WONK' 0, 'opsz' 16" }}
-            >
-              {title}
-            </span>
-            <span className="inline-flex shrink-0 items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--text-muted)]">
+        <span className="flex h-16 w-16 flex-none items-center justify-center rounded-[var(--m-r-sub)] bg-[color:var(--m-subcard)] [&_svg]:h-auto [&_svg]:w-[52px]">
+          <RouteGlyph tripId={trip.id} />
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="t-card-title truncate text-[color:var(--m-text)]">{title}</span>
+          <span className={META}>{tripDateRange(trip)}</span>
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className={TAG}>
               <span aria-hidden className={statusDotClass(trip.status)} />
               {tripStatusLabel(trip.status)}
             </span>
-          </span>
-          <span className="mt-0.5 block text-[13px] text-[color:var(--text-muted)]">
-            {tripDateRange(trip)}
-          </span>
-          <span className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] uppercase tracking-wide text-[color:var(--text-faint)]">
-            <span>{budgetLabel(trip.budget_level)}</span>
-            {trip.origin_city ? <span>from {trip.origin_city}</span> : null}
+            <span className={META}>
+              {budgetLabel(trip.budget_level)}
+              {trip.origin_city ? ` · from ${trip.origin_city}` : null}
+            </span>
           </span>
         </span>
       </button>
@@ -70,9 +71,10 @@ export default function TripRow({
         <Link
           href={`/app/trip/${trip.id}`}
           aria-label={`Open ${title} trip`}
-          className="flex items-center justify-center gap-1 border-t border-[color:var(--line)] px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--brass-deep)] transition-colors hover:bg-[color:var(--brass-wash)]"
+          className="flex min-h-12 items-center gap-2 border-t border-[color:var(--line-soft)] px-4 font-[family-name:var(--font-ui)] text-[length:var(--t-body)] font-semibold text-[color:var(--m-ink)] transition-colors duration-[var(--m-dur-press)] hover:bg-[color:var(--m-subcard)] focus-visible:outline-none focus-visible:shadow-[inset_0_0_0_2px_var(--m-accent)] motion-reduce:transition-none"
         >
-          Open trip →
+          Open trip
+          <ChevronRightIcon className="m-chevron" />
         </Link>
       ) : null}
     </li>

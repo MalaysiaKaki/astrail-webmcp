@@ -179,19 +179,19 @@ export default function TripMapDashboard({
   if (!hasToken) {
     return (
       <div className="flex h-full w-full items-center justify-center">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--text-faint)]">
+        <p className="font-[family-name:var(--font-ui)] text-[length:var(--t-meta)] text-[color:var(--m-text-muted)]">
           Map unavailable — token missing
         </p>
       </div>
     )
   }
 
-  // Small dark status pills float over the (dark) map; the canvas itself is the shell's
-  // fixed layer, so there's nothing else to render here.
+  // A small white kit pill floats over the map (Placify's floating-control language); the canvas
+  // itself is the shell's fixed layer, so there's nothing else to render here.
   if (status === 'loading' || status === 'no-coords') {
     return (
       <div className="pointer-events-none absolute inset-x-0 bottom-5 z-10 flex justify-center">
-        <span className="rounded-full bg-[rgba(18,22,31,0.82)] px-3 py-1.5 text-[11px] font-medium text-[color:var(--starlight)] shadow-[0_2px_12px_rgba(0,0,0,0.35)]">
+        <span className="m-pill-badge font-[family-name:var(--font-ui)] text-[length:var(--t-meta)] font-semibold">
           {status === 'loading' ? 'Loading trip…' : 'No mapped places yet'}
         </span>
       </div>
