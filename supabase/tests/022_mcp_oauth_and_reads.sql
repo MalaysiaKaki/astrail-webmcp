@@ -31,7 +31,8 @@ insert into public.mcp_oauth_clients (client_id, resource, enabled) values
 -- Run as the test user: the function is SECURITY INVOKER with an empty search_path and only reads
 -- two tables, so its output does not depend on the caller beyond privileges (asserted in §2). A DO
 -- block runs each case and records either the output or the error text. iat 1900000000 with a 1h exp, so
--- the 900 s cap is visible; 'short' has exp inside the cap.
+-- the 900 s cap is visible on NON-listed clients (listed ones keep their exp since 20260929140000);
+-- 'short' has exp inside the cap.
 insert into public.astrail_app_memberships (user_id) values ('00000000-0000-0000-0000-000000002201');
 
 create temporary table hook_case (label text primary key, event jsonb not null, out jsonb, err text);
@@ -81,18 +82,20 @@ select is((select out #>> '{claims,aud}' from hook_case where label = 'listed'),
   'listed client: aud is its mcp_oauth_clients resource');
 select is(
   (select out -> 'claims' from hook_case where label = 'listed'),
-  (select claims || '{"aud":"https://astrail.example/mcp"}'::jsonb from prior_claims where label = 'listed'),
-  'listed client: role astrail_mcp_resource, astrail_mcp_access true, exp capped at iat+900, all else kept');
-select is((select (out #>> '{claims,exp}')::bigint from hook_case where label = 'listed'), 1900000900::bigint,
-  'listed client: exp is capped at iat + 900');
+  (select claims || jsonb_build_object('aud', 'https://astrail.example/mcp', 'exp', 1900003600)
+     from prior_claims where label = 'listed'),
+  'listed client: role astrail_mcp_resource, astrail_mcp_access true, own aud, exp NOT capped, all else kept');
+select is((select (out #>> '{claims,exp}')::bigint from hook_case where label = 'listed'), 1900003600::bigint,
+  'listed client keeps the project token lifetime (exp matches the expires_in Supabase reports; 20260929140000)');
 select is((select out - 'claims' from hook_case where label = 'listed'), '{}'::jsonb,
   'the hook returns {claims} only, as before');
 select is((select out #>> '{claims,aud}' from hook_case where label = 'listed upper'), 'https://astrail.example/mcp',
   'client_id matching is case-insensitive (compared as lowercase text)');
 select is(
   (select out -> 'claims' from hook_case where label = 'refresh'),
-  (select claims || '{"aud":"https://astrail.example/mcp"}'::jsonb from prior_claims where label = 'refresh'),
-  'token_refresh with a listed client_id is routed identically');
+  (select claims || jsonb_build_object('aud', 'https://astrail.example/mcp', 'exp', 1900003600)
+     from prior_claims where label = 'refresh'),
+  'token_refresh with a listed client_id is routed identically (own aud, uncapped exp)');
 select is((select out -> 'claims' from hook_case where label = 'unlisted'),
   (select claims from prior_claims where label = 'unlisted'),
   'non-listed client: exactly the prior astrail-app claims');

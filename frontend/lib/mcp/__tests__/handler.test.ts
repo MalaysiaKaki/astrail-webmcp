@@ -2,7 +2,7 @@
 /**
  * The real /mcp lifecycle, driven with plain Request objects (docs/mcp-app/PLAN.md §2.4, §7.1).
  */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { handleMcpOptions, handleMcpPost, methodNotAllowed } from '../handler'
 import { MAX_BODY_BYTES } from '../http-guard'
 import {
@@ -170,5 +170,33 @@ describe('/mcp stateless JSON-RPC lifecycle', () => {
     }))
     expect(a.structuredContent.id).toBe(USER_ID)
     expect(b.structuredContent.id).toBe(OTHER_USER_ID)
+  })
+})
+
+describe('request logging (safe protocol vocabulary only)', () => {
+  it('describeRpc keeps method, tool and ui:// names and nothing else', async () => {
+    const { describeRpc } = await import('../handler')
+    expect(describeRpc({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list_trips', arguments: { secret: 'x' } } }))
+      .toEqual(['tools/call:list_trips'])
+    expect(describeRpc({ method: 'resources/read', params: { uri: 'ui://astrail/itinerary-v2.html' } }))
+      .toEqual(['resources/read:ui://astrail/itinerary-v2.html'])
+    expect(describeRpc({ method: 'resources/read', params: { uri: 'https://evil.example/x' } })).toEqual(['resources/read'])
+    expect(describeRpc([{ method: 'initialize' }, { method: 'tools/list' }])).toEqual(['initialize', 'tools/list'])
+    expect(describeRpc({ method: 'x y <script>' })).toEqual(['response_or_invalid'])
+  })
+
+  it('logs the rpc, status and a fixed failure reason for an expired token, never the token', async () => {
+    const lines: string[] = []
+    const spy = vi.spyOn(console, 'info').mockImplementation((...a: unknown[]) => { lines.push(a.map(String).join(' ')) })
+    try {
+      const token = await mintToken({ exp: Math.floor(Date.now() / 1000) - 60, iat: Math.floor(Date.now() / 1000) - 1000 })
+      const res = await handleMcpPost(rpcRequest('tools/list', {}, { token }), await deps())
+      expect(res.status).toBe(401)
+      const entry = JSON.parse(lines.find((l) => l.includes('"mcp_request"'))!)
+      expect(entry).toMatchObject({ evt: 'mcp_request', rpc: ['tools/list'], status: 401, reason: 'ERR_JWT_EXPIRED:exp' })
+      expect(lines.join('\n')).not.toContain(token)
+    } finally {
+      spy.mockRestore()
+    }
   })
 })

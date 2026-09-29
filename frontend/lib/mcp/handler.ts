@@ -33,17 +33,49 @@ function configOrNull(deps: HandlerDeps): McpConfig | null {
   return loaded.config
 }
 
+const SAFE_TOKEN = /^[A-Za-z0-9_/.:-]{1,64}$/
+
+/**
+ * What a request asked for, reduced to protocol vocabulary only: JSON-RPC method names, tool
+ * names and ui:// resource URIs — all chosen by us or the spec, never user data or tokens. Lets a
+ * deployed server's logs say "resources/read → 401 exp" instead of just "POST /mcp 401".
+ */
+export function describeRpc(body: unknown): string[] {
+  const messages = Array.isArray(body) ? body : [body]
+  return messages.slice(0, 10).map((m) => {
+    if (!m || typeof m !== 'object') return 'invalid'
+    const { method, params } = m as { method?: unknown; params?: { name?: unknown; uri?: unknown } }
+    if (typeof method !== 'string' || !SAFE_TOKEN.test(method)) return 'response_or_invalid'
+    const name = params?.name
+    if (method === 'tools/call' && typeof name === 'string' && SAFE_TOKEN.test(name)) return `${method}:${name}`
+    const uri = params?.uri
+    if (method === 'resources/read' && typeof uri === 'string' && uri.startsWith('ui://') && SAFE_TOKEN.test(uri)) return `${method}:${uri}`
+    return method
+  })
+}
+
+function logRequest(rpc: string[], status: number, startedAt: number, reason?: string): void {
+  console.info(JSON.stringify({ evt: 'mcp_request', rpc, status, ...(reason ? { reason } : {}), ms: Date.now() - startedAt }))
+}
+
 export async function handleMcpPost(req: Request, deps: HandlerDeps = {}): Promise<Response> {
+  const startedAt = Date.now()
   const config = configOrNull(deps)
   if (!config) return misconfigured()
 
   const guarded = await guardPost(req, config)
-  if (!guarded.ok) return guarded.response
+  if (!guarded.ok) {
+    logRequest([], guarded.response.status, startedAt, 'guard')
+    return guarded.response
+  }
   const cors = corsHeaders(req)
+  const rpc = describeRpc(guarded.parsedBody)
 
   const verified = await verifyMcpRequest(req, config, deps.keys)
   if (!verified.ok) {
-    const { status, challenge } = verified.failure
+    const { status, challenge, reason } = verified.failure
+    // `reason` is one of auth.ts's fixed codes (e.g. exp, audience, client_not_allowed) — never token content.
+    logRequest(rpc, status, startedAt, reason)
     if (status === 503) return jsonResponse(503, { error: 'auth_unavailable' }, cors)
     return jsonResponse(status, { error: status === 403 ? 'insufficient_scope' : 'unauthorized' }, {
       ...cors,
@@ -56,6 +88,7 @@ export async function handleMcpPost(req: Request, deps: HandlerDeps = {}): Promi
   try {
     await server.connect(transport)
     const res = await transport.handleRequest(req, { parsedBody: guarded.parsedBody })
+    logRequest(rpc, res.status, startedAt)
     return withHeaders(res, { ...cors, 'Cache-Control': 'no-store' })
   } finally {
     await transport.close().catch(() => undefined)
