@@ -15,7 +15,9 @@ export default function EatCardLinks({ restaurants, placeIndex, selectedPlaceId,
   restaurants: RestaurantSuggestion[]
   placeIndex: Map<string, Place>
   selectedPlaceId: string | null
-  onSelect: (placeId: string) => void
+  /** Show that place on the map. Omitted where there is no map (the ChatGPT widget): every card
+   *  is then plain content — no button, no chevron, no "on the map" label — and keeps Evidence. */
+  onSelect?: (placeId: string) => void
 }) {
   return (
     <ul className="flex flex-col gap-2">
@@ -28,16 +30,19 @@ export default function EatCardLinks({ restaurants, placeIndex, selectedPlaceId,
               <span className="type-body truncate text-[15px] font-semibold text-[var(--m-text)]">
                 {place?.name ?? 'Suggested spot'}
               </span>
+              {/* Keeps its width up to a bound, then truncates: an unbroken cuisine string must
+                  not push the card past the viewport. */}
               {r.cuisine ? (
-                <span className="type-body shrink-0 text-[14px] text-[var(--m-text-muted)]">{r.cuisine}</span>
+                <span className="type-body min-w-0 max-w-[45%] shrink-0 truncate text-[14px] text-[var(--m-text-muted)]">{r.cuisine}</span>
               ) : null}
             </span>
             {r.summary ? (
-              <span className="type-body mt-0.5 line-clamp-2 text-[14px] leading-snug text-[var(--m-text-muted)]">{r.summary}</span>
+              <span className="type-body mt-0.5 line-clamp-2 text-[14px] leading-snug text-[var(--m-text-muted)] [overflow-wrap:anywhere]">{r.summary}</span>
             ) : null}
           </span>
         )
-        const chosen = Boolean(place && place.id === selectedPlaceId)
+        const select = place && onSelect ? () => onSelect(place.id) : null
+        const chosen = Boolean(select && place && place.id === selectedPlaceId)
         return (
           <li key={r.id}>
             {/* One card per suggestion: the select button fills it, and the Evidence pill, when
@@ -47,18 +52,18 @@ export default function EatCardLinks({ restaurants, placeIndex, selectedPlaceId,
             <div
               data-eat-card
               className={[
-                place ? 'm-card' : 'm-subcard',
+                select ? 'm-card' : 'm-subcard',
                 'transition-transform duration-[var(--m-dur-press)] motion-reduce:transition-none',
                 'has-[>button:active]:scale-[0.985] motion-reduce:has-[>button:active]:scale-100',
                 'has-[>button:focus-visible]:outline-2 has-[>button:focus-visible]:outline-offset-2 has-[>button:focus-visible]:outline-solid has-[>button:focus-visible]:outline-[var(--m-accent)]',
                 chosen ? 'outline-2 outline-solid outline-[var(--m-ink)]' : '',
               ].join(' ')}
             >
-              {place ? (
+              {select && place ? (
                 <button
                   type="button"
                   data-eat-place-id={place.id}
-                  onClick={() => onSelect(place.id)}
+                  onClick={select}
                   aria-pressed={chosen}
                   aria-label={`Show ${place.name} on the map`}
                   className="flex min-h-14 w-full items-center gap-3 rounded-[var(--m-r-card)] px-4 py-3 text-left focus-visible:outline-none"

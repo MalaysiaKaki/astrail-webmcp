@@ -75,16 +75,18 @@ astrail/
 │   ├── components/
 │   │   ├── map/TripMap.tsx
 │   │   └── trip/
+│   │       ├── TripWorkspace.tsx       # the trip page: map + phone sheet / desktop floating panel
 │   │       ├── ReelInputPanel.tsx
 │   │       ├── GenerationTimeline.tsx
 │   │       ├── AgentDecisionRail.tsx
-│   │       ├── ItineraryCards.tsx
-│   │       ├── DaySelector.tsx
-│   │       ├── PlaceIntelPanel.tsx
-│   │       ├── RestaurantStrip.tsx     # NEW
-│   │       ├── TransportStrip.tsx      # NEW
-│   │       ├── HotelSuggestionStrip.tsx # NEW (see build step 18)
-│   │       └── OrchestratorSummary.tsx # NEW
+│   │       ├── HotelPanel.tsx          # Stay list / hotel-hub picker
+│   │       ├── OrchestratorSummary.tsx
+│   │       ├── mobile/                 # Placify phone composition (also the desktop panel body)
+│   │       │   ├── MobileTripView.tsx  # date strip, TripPanelBody ('stops' | 'stay')
+│   │       │   ├── StopTimeline.tsx    # StopCard / CompactStopRow + LegConnector + EatCardLinks
+│   │       │   └── …                   # StopParts, AboutThisTrip, MobileTripSheet, …
+│   │       ├── panel/                  # TripHero, DayHeaderCard, TripTabs, DesktopAbout
+│   │       └── card/                   # desktop place cards at the map pin
 │   └── lib/trip/
 │       ├── api.ts
 │       ├── sse.ts                  # SSE parser (port from hackathon)
@@ -192,7 +194,7 @@ ChatGPT ──POST /mcp (Bearer)──▶ Next route handler (frontend/lib/mcp)
             verify JWKS/iss/aud/role/permission/client/scope ─▶ fresh McpServer + stateless transport per request
             tool ─▶ HS256 delegation JWT (≤60 s, endpoint aud, body hash, jti) ─▶ FastAPI /internal/mcp/v1/*
                                                    (backend/auth_delegation.py: durable jti replay store)
-            render_itinerary ─▶ ui://astrail/itinerary-v1.html (frontend/mcp-app, single-file Vite build)
+            render_itinerary ─▶ ui://astrail/itinerary-v2.html (frontend/mcp-app, single-file Vite build)
 ```
 
 - Read-only v1 tools: `get_profile`, `list_trips`, `get_itinerary`, `list_saved_reels`, `render_itinerary`.

@@ -1,7 +1,11 @@
 /**
- * Read-only hotel list for the widget (PLAN §6). HotelPanel is the app's hub PICKER — it needs a
- * selection callback and a map layer mode, neither of which exists here — so the widget gets its
- * own renderer rather than a changed shared component. No selection, no "On map": there is no map.
+ * Read-only Stay list for the widget, drawn like the phone's (HotelPanel's kit rows): a hotel the
+ * app would offer as a map hub sits on an `m-card`, anything else on a plain `m-subcard`.
+ *
+ * Not HotelPanel itself: there a row is a hub-PICKER button with a chevron, and a tap only picks
+ * which hotel the map draws. The widget has no map, so the same button would promise an action
+ * it cannot take. No selection, no "On map", and an unplaced hotel says its location is
+ * unconfirmed rather than "we couldn't place it on the map" (there is no map here).
  */
 import type { HotelStatus, HotelSuggestion } from '@/lib/trip/backend-types'
 
@@ -31,10 +35,14 @@ export function priceLabel(snap: Record<string, unknown>): string | null {
 const byRank = (a: HotelSuggestion, b: HotelSuggestion) =>
   (a.rank ?? Number.POSITIVE_INFINITY) - (b.rank ?? Number.POSITIVE_INFINITY)
 
+/** HotelPanel's isSelectableHub: the rows the app draws as raised cards. */
+const isHub = (h: HotelSuggestion) =>
+  h.geo_status === 'placed' && h.rank != null && h.lat != null && h.lng != null
+
 export default function HotelSummary({ hotels }: { hotels: HotelSuggestion[] }) {
   if (hotels.length === 0) return null
   return (
-    <ul className="flex flex-col gap-2">
+    <ul className="flex flex-col gap-3">
       {[...hotels].sort(byRank).map((h) => {
         const meta = [
           priceLabel(h.price_snapshot),
@@ -43,23 +51,27 @@ export default function HotelSummary({ hotels }: { hotels: HotelSuggestion[] }) 
           h.guest_rating != null ? `${h.guest_rating}/10 guests` : null,
         ].filter(Boolean).join(' · ')
         return (
-          <li key={h.id} className="surface rounded-lg p-2.5">
-            <div className="flex items-center justify-between gap-2">
-              <span className="type-display truncate text-sm text-[var(--starlight)]">{h.name}</span>
-              <span className="type-label shrink-0 text-[10px] uppercase tracking-wide text-[var(--muted)]">
-                {STATUS_LABEL[h.status]}
+          <li key={h.id}>
+            <div data-hotel-card className={[isHub(h) ? 'm-card' : 'm-subcard', 'flex px-4 py-3.5'].join(' ')}>
+              <span className="flex min-w-0 flex-1 flex-col gap-1 text-left">
+                <span className="flex items-start justify-between gap-2">
+                  <span className="type-body min-w-0 text-[17px] font-semibold leading-snug tracking-[-0.01em] text-[var(--m-text)] [overflow-wrap:anywhere]">{h.name}</span>
+                  <span className="type-body shrink-0 pt-0.5 text-[14px] text-[var(--m-text-muted)]">{STATUS_LABEL[h.status]}</span>
+                </span>
+                {h.is_recommended ? (
+                  <span className="flex flex-wrap gap-1.5">
+                    <span className="type-body rounded-full bg-[var(--m-accent-wash)] px-2.5 text-[12px] font-semibold leading-6 text-[var(--m-accent)]">
+                      Recommended
+                    </span>
+                  </span>
+                ) : null}
+                {meta ? <span className="type-body text-[14px] text-[var(--m-text-muted)] [overflow-wrap:anywhere]">{meta}</span> : null}
+                {/* Guardrail #1: a hotel Astrail could not place is still listed, but says so. */}
+                {h.geo_status === 'unresolved' ? (
+                  <span className="type-body text-[14px] text-[var(--m-text-muted)]">Location unconfirmed.</span>
+                ) : null}
               </span>
             </div>
-            {h.is_recommended ? (
-              <span className="type-label mt-1 inline-block rounded-[var(--radius-chip)] bg-[var(--brass-soft)] px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-[var(--brass-bright)]">
-                Recommended
-              </span>
-            ) : null}
-            {meta ? <p className="type-body mt-1 text-xs text-[var(--muted)]">{meta}</p> : null}
-            {/* Guardrail #1: a hotel Astrail could not place is still listed, but says so. */}
-            {h.geo_status === 'unresolved' ? (
-              <p className="type-body mt-1 text-[11px] text-[var(--muted)]">Location unconfirmed.</p>
-            ) : null}
           </li>
         )
       })}

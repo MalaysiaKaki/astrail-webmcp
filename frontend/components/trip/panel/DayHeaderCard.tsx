@@ -11,6 +11,9 @@ import { weatherChip, type WeatherIcon } from '@/lib/trip/weather-chip'
  * weather-chip); without a code the chip is text alone, and without any weather there is none.
  * A heading block, not a control.
  */
+/** A summary longer than this gets the two-line clamp and its More/Less control. */
+const SUMMARY_MORE_CHARS = 110
+
 export default function DayHeaderCard({ day, rewriting = false }: {
   day: TripDay
   /** A summary rewrite is running for this trip: the prose below describes it BEFORE the edit. */
@@ -20,6 +23,9 @@ export default function DayHeaderCard({ day, rewriting = false }: {
   const weather = weatherChip(day)
   const [more, setMore] = useState(false)
   const summary = day.summary?.trim() || null
+  // Clamped ONLY when "More" is offered. Character count does not predict rendered lines (an 80-
+  // character CJK summary can run to four), so a clamp without its control can hide text for good.
+  const expandable = summary !== null && summary.length > SUMMARY_MORE_CHARS
   return (
     <div data-testid="day-header-card" className="m-card mb-3 flex flex-col gap-2 px-4 py-3">
       <div className="flex min-w-0 items-center gap-2">
@@ -45,7 +51,7 @@ export default function DayHeaderCard({ day, rewriting = false }: {
         ) : null}
       </div>
       {day.title ? (
-        <p className="type-body text-[length:var(--t-body)] leading-snug text-[var(--m-text-muted)]">{day.title}</p>
+        <p className="type-body text-[length:var(--t-body)] leading-snug text-[var(--m-text-muted)] [overflow-wrap:anywhere]">{day.title}</p>
       ) : null}
       {/* The day's story in two lines (A10), with "More" for the rest. While a rewrite runs the
           old prose stays, marked, and dimmed: true text about an itinerary that just changed. */}
@@ -56,8 +62,8 @@ export default function DayHeaderCard({ day, rewriting = false }: {
       ) : null}
       {summary ? (
         <div className={['flex flex-col items-start', rewriting ? 'opacity-70' : ''].join(' ')}>
-          <p data-day-summary className={['t-body leading-snug text-[var(--m-text)]', more ? '' : 'line-clamp-2'].join(' ')}>{summary}</p>
-          {summary.length > 110 ? (
+          <p data-day-summary className={['t-body leading-snug text-[var(--m-text)] [overflow-wrap:anywhere]', expandable && !more ? 'line-clamp-2' : ''].join(' ')}>{summary}</p>
+          {expandable ? (
             <button type="button" onClick={() => setMore((v) => !v)} aria-expanded={more}
               className="t-meta -ml-2 min-h-11 rounded-full px-2 font-semibold text-[var(--m-accent)] focus-visible:outline-none focus-visible:shadow-[var(--m-focus)]">
               {more ? 'Less' : 'More'}

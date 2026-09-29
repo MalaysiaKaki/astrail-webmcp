@@ -26,7 +26,7 @@ import CompactStopRow from './CompactStopRow'
 export default function StopTimeline({
   bundle, places, legs, restaurants, placeIndex, trailNumbers, selectedPlaceId, onSelectPlace,
   selectedRestaurantPlaceId, onSelectRestaurant, onShow3d, showConfidence = false,
-  variant = 'cards', detailPlaceId = null, detailFooter = null,
+  variant = 'cards', detailPlaceId = null, detailFooter = null, captionsOmitted = false,
 }: {
   bundle: TripBundle
   places: TripPlace[]
@@ -39,7 +39,9 @@ export default function StopTimeline({
   /** Called on every tap, including a re-tap of the selected row (which re-frames the map). */
   onSelectPlace: (placeId: string) => void
   selectedRestaurantPlaceId: string | null
-  onSelectRestaurant: (placeId: string) => void
+  /** Show a place to eat on the map. Omitted where there is no map (the ChatGPT widget): the eat
+   *  cards are then plain content that keeps its Evidence link (EatCardLinks). */
+  onSelectRestaurant?: (placeId: string) => void
   /** "Show in 3D" in the selected stop's detail; omitted, the button is not offered. */
   onShow3d?: (placeId: string) => void
   /** Desktop: the confidence chip in the selected stop's detail (the phone keeps it out). */
@@ -51,6 +53,9 @@ export default function StopTimeline({
   detailPlaceId?: string | null
   /** Under the sidebar detail: the way back to the map card. */
   detailFooter?: React.ReactNode
+  /** The bounded view dropped caption quotes (the widget's truncated.quotes): a quote-less Reel stop
+   *  says the caption is not included here rather than "No caption evidence". */
+  captionsOmitted?: boolean
 }) {
   const listRef = useRef<HTMLOListElement>(null)
   // The last row the user tapped HERE. A selection echoing that tap keeps 'nearest' (the row is
@@ -102,6 +107,7 @@ export default function StopTimeline({
                   thumbnail={thumbnailFor(bundle, tp)}
                   selected={tp.place_id === selectedPlaceId}
                   onTap={() => { tappedRef.current = tp.place_id; onSelectPlace(tp.place_id) }}
+                  captionOmitted={captionsOmitted}
                 />
               ) : (
               <>
@@ -123,6 +129,7 @@ export default function StopTimeline({
                 detail={rows || tp.place_id === selectedPlaceId ? buildPopupModel(bundle, tp) : null}
                 showConfidence={showConfidence}
                 onShow3d={onShow3d ? () => onShow3d(tp.place_id) : undefined}
+                captionOmitted={captionsOmitted}
               />
               {rows ? detailFooter : null}
               </>

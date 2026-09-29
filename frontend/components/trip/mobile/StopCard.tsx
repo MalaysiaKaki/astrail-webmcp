@@ -6,7 +6,7 @@ import type { StopProvenance } from '@/lib/trip/stop-provenance'
 import { safeHref } from '@/lib/safe-href'
 import type { PopupModel } from '@/components/map/popup-model'
 import EatCardLinks from './EatCardLinks'
-import { ConfidenceChip, Evidence, humanize, StopActions, WhereLine } from './StopParts'
+import { ConfidenceChip, Evidence, humanize, provenanceLabel, StopActions, WhereLine } from './StopParts'
 
 /**
  * One stop as a Placify-style card (compare placify appstore/02): an ink number badge, the name,
@@ -24,7 +24,7 @@ import { ConfidenceChip, Evidence, humanize, StopActions, WhereLine } from './St
 export default function StopCard({
   tp, pin, total, provenance: p, thumbnail, selected, eatCount, onTap,
   restaurants, placeIndex, selectedRestaurantPlaceId, onSelectRestaurant,
-  detail = null, showConfidence = false, onShow3d,
+  detail = null, showConfidence = false, onShow3d, captionOmitted = false,
 }: {
   tp: TripPlace
   /** The trail number the map pin paints, or undefined for an unnumbered (unplaced) stop. */
@@ -38,7 +38,11 @@ export default function StopCard({
   restaurants: RestaurantSuggestion[]
   placeIndex: Map<string, Place>
   selectedRestaurantPlaceId: string | null
-  onSelectRestaurant: (placeId: string) => void
+  /** Omitted where there is no map: the places to eat render as plain cards (EatCardLinks). */
+  onSelectRestaurant?: (placeId: string) => void
+  /** The caption was cut from a bounded view (the ChatGPT widget's truncated.quotes): a stop with
+   *  no quote says so instead of claiming the Reel had no caption evidence. */
+  captionOmitted?: boolean
   /** The open card's trip-relative detail (Reel link, local-script name, confidence). */
   detail?: PopupModel | null
   /** Desktop only: the confidence chip. The phone's provenance line already says the source. */
@@ -84,7 +88,7 @@ export default function StopCard({
             <span className="type-body mt-0.5 block truncate text-[14px] text-[var(--m-text-muted)]">
               <span>{humanize(tp.place.place_type)}</span>
               <span aria-hidden> · </span>
-              <span className={p.kind === 'none' ? '' : 'font-medium text-[var(--m-accent)]'}>{p.label}</span>
+              <span className={p.kind === 'none' ? '' : 'font-medium text-[var(--m-accent)]'}>{provenanceLabel(p, captionOmitted)}</span>
             </span>
           </span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25"
@@ -128,7 +132,7 @@ function StopDetail({
   restaurants: RestaurantSuggestion[]
   placeIndex: Map<string, Place>
   selectedRestaurantPlaceId: string | null
-  onSelectRestaurant: (placeId: string) => void
+  onSelectRestaurant?: (placeId: string) => void
 }) {
   const { place, evidence_json: ev } = tp
   const located = hasRealCoords(place.lng, place.lat)

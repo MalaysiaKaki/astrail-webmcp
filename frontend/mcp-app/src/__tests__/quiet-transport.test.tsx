@@ -63,11 +63,12 @@ describe('QuietPostMessageTransport', () => {
     started.push(await startItineraryWidget(container, new QuietPostMessageTransport(host.target, window)))
 
     host.deliver({ jsonrpc: '2.0', method: 'ui/notifications/tool-result', params: renderResult(MULTI_SOURCE_RESPONSE) })
-    const title = MULTI_SOURCE_RESPONSE.bundle.trip.title!
-    await waitFor(() => expect(screen.getAllByText(title).length).toBeGreaterThan(0))
+    const { trip } = MULTI_SOURCE_RESPONSE.bundle
+    // The hero heading is the trip's destination (tripTitle), as on the phone trip page.
+    await waitFor(() => expect(screen.getAllByText(trip.inferred_destination!).length).toBeGreaterThan(0))
 
     const printed = lines.join('\n')
-    const sentinels = [title, MULTI_SOURCE_RESPONSE.bundle.trip.id, ...MULTI_SOURCE_RESPONSE.bundle.places.map((p) => p.place.name)]
+    const sentinels = [trip.title!, trip.inferred_destination!, trip.id, ...MULTI_SOURCE_RESPONSE.bundle.places.map((p) => p.place.name)]
     for (const s of sentinels) expect(printed).not.toContain(s)
   })
 

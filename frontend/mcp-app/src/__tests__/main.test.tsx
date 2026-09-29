@@ -8,7 +8,7 @@ import { AppBridge } from '@modelcontextprotocol/ext-apps/app-bridge'
 import type { McpUiHostCapabilities, McpUiHostContext } from '@modelcontextprotocol/ext-apps'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { startItineraryWidget, type StartedWidget } from '../main'
-import { MULTI_SOURCE_RESPONSE, OTHER_TRIP_RESPONSE } from '../__fixtures__/multi-source-bundle'
+import { FIXTURE_IDS, MULTI_SOURCE_RESPONSE, OTHER_TRIP_RESPONSE } from '../__fixtures__/multi-source-bundle'
 import { renderResult } from './tool-results'
 
 type Host = { bridge: AppBridge; container: HTMLElement; widget: StartedWidget }
@@ -88,8 +88,8 @@ describe('itinerary widget lifecycle', () => {
         void bridge.sendToolResult(renderResult(MULTI_SOURCE_RESPONSE, 2))
       },
     })
-    await waitFor(() => expect(within(container).getByRole('heading', { name: 'Tokyo in three Reels' })).toBeInTheDocument())
-    expect(within(container).getByRole('tab', { name: /Day 2/ })).toHaveAttribute('aria-pressed', 'true')
+    await waitFor(() => expect(within(container).getByRole('heading', { name: 'Tokyo, Japan' })).toBeInTheDocument())
+    expect(within(container).getByRole('button', { name: /^Day 2\b/ })).toHaveAttribute('aria-current', 'true')
   })
 
   it('shows loading on tool input, then the error text for an isError result', async () => {
@@ -116,7 +116,14 @@ describe('itinerary widget lifecycle', () => {
       return {}
     }
     await bridge.sendToolResult(renderResult(MULTI_SOURCE_RESPONSE))
-    const link = await waitFor(() => within(container).getAllByRole('link', { name: 'evidence' })[0])
+    // The day's first place to eat is anchored to Sensō-ji: its Evidence link is in that card's detail.
+    const card = await waitFor(() => {
+      const el = container.querySelector<HTMLElement>(`[data-place-id="${FIXTURE_IDS.placeSensoji}"]`)
+      if (!el) throw new Error('Sensō-ji card not rendered yet')
+      return el
+    })
+    card.click()
+    const link = await waitFor(() => within(container).getByRole('link', { name: /^Evidence/ }))
     link.click()
     await waitFor(() => expect(opened).toEqual(['https://www.asakusaimahan.co.jp/']))
   })
@@ -128,7 +135,7 @@ describe('itinerary widget lifecycle', () => {
 
     const other = await startHost({ hostContext: { availableDisplayModes: ['inline'] } })
     await other.bridge.sendToolResult(renderResult(MULTI_SOURCE_RESPONSE))
-    await waitFor(() => expect(within(other.container).getByRole('heading', { name: 'Tokyo in three Reels' })).toBeInTheDocument())
+    await waitFor(() => expect(within(other.container).getByRole('heading', { name: 'Tokyo, Japan' })).toBeInTheDocument())
     expect(within(other.container).queryByRole('button', { name: 'Expand' })).toBeNull()
   })
 
@@ -137,10 +144,10 @@ describe('itinerary widget lifecycle', () => {
     const b = await startHost()
     await a.bridge.sendToolResult(renderResult(MULTI_SOURCE_RESPONSE))
     await b.bridge.sendToolResult(renderResult(OTHER_TRIP_RESPONSE, 3))
-    await waitFor(() => expect(within(b.container).getByRole('heading', { name: 'Another trip' })).toBeInTheDocument())
-    await waitFor(() => expect(within(a.container).getByRole('heading', { name: 'Tokyo in three Reels' })).toBeInTheDocument())
-    expect(within(a.container).getByRole('tab', { name: /Day 1/ })).toHaveAttribute('aria-pressed', 'true')
-    expect(within(b.container).getByRole('tab', { name: /Day 3/ })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getAllByRole('tablist')).toHaveLength(2)
+    await waitFor(() => expect(within(b.container).getByRole('heading', { name: 'Osaka, Japan' })).toBeInTheDocument())
+    await waitFor(() => expect(within(a.container).getByRole('heading', { name: 'Tokyo, Japan' })).toBeInTheDocument())
+    expect(within(a.container).getByRole('button', { name: /^Day 1\b/ })).toHaveAttribute('aria-current', 'true')
+    expect(within(b.container).getByRole('button', { name: /^Day 3\b/ })).toHaveAttribute('aria-current', 'true')
+    expect(screen.getAllByRole('group', { name: 'Trip days' })).toHaveLength(2)
   })
 })

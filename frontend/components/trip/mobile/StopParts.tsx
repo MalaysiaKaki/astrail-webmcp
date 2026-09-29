@@ -12,6 +12,12 @@ import { evidenceKindLabel } from '@/lib/trip/evidence-kind'
  * safe links, confidence only where asked and never for a stop the traveller requested.
  */
 
+/** The provenance line's label. A bounded view that dropped quotes (captionOmitted) cannot say a
+ *  Reel stop had no caption evidence — only that this view does not include it. */
+export function provenanceLabel(p: StopProvenance, captionOmitted = false): string {
+  return p.kind === 'none' && captionOmitted ? 'Caption not included in this view' : p.label
+}
+
 export function humanize(s: string): string {
   const t = s.replace(/_/g, ' ')
   return t.charAt(0).toUpperCase() + t.slice(1)
@@ -82,7 +88,7 @@ export function WhereLine({ tp, located }: { tp: TripPlace; located: boolean }) 
         <path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z" />
         <circle cx="12" cy="10" r="2.3" />
       </svg>
-      <span>{located ? where || 'On the map' : 'Location unavailable — this stop could not be placed on the map.'}</span>
+      <span className="min-w-0 [overflow-wrap:anywhere]">{located ? where || 'On the map' : 'Location unavailable — this stop could not be placed on the map.'}</span>
     </p>
   )
 }
