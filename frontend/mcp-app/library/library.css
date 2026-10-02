@@ -1,0 +1,13 @@
+/* The Trip Library's styles: everything the itinerary widget has (tokens, kit and scanned
+   folders, via widget.css) plus the folders only the library renders. Lives outside src/ so the
+   v3 itinerary CSS — scanned from src/ — never gains the library's utilities. */
+@import "../src/widget.css";
+@source "./";
+@source "../../components/trips/RouteGlyph.tsx";
+@source "../../components/dashboard/nav-icons.tsx";
+@source "../../lib/shell/ui.ts";
+
+/* Mobile tap targets: the reused detail components' More/Less toggles are min-h-11 (44px).
+   Raise every control to 48px inside the library only — never edit the shared components or
+   src/widget.css (that would change the frozen v3 output). */
+#astrail-library-root :is(button, a[href]) { min-height: 48px; }

@@ -1,8 +1,8 @@
 // Publishes the widget build (docs/mcp-app/PLAN.md §4.2, v3):
-//   1. checks mcp-app/dist is exactly itinerary.js + itinerary.css, both non-empty;
+//   1. for each bundle (itinerary, library) checks mcp-app/dist/<name> is exactly <name>.js + <name>.css, both non-empty;
 //   2. fails if the JS could print protocol payloads (security requirement 8);
-//   3. copies both to public/mcp-widget/v3/, which Next serves (with CORS) from our origin;
-//   4. writes the small HTML shell the gateway imports statically, with %ASSET_BASE% placeholders
+//   3. copies both to public/mcp-widget/<v3 | library/v1>/, which Next serves (with CORS) from our origin;
+//   4. (itinerary only; the library shell is source) writes the small HTML shell the gateway imports statically, with %ASSET_BASE% placeholders
 //      that lib/mcp/widget/itinerary-resource.ts fills with the configured origin at read time.
 // A missing or wrong build fails HERE, at build time, never as a "widget not built" response.
 import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -10,11 +10,12 @@ import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const WIDGET_VERSION = 'v3'
-const ASSETS = ['itinerary.css', 'itinerary.js']
+const BUNDLES = [
+  { name: 'itinerary', publicPath: WIDGET_VERSION, writesShellModule: true }, // output unchanged
+  { name: 'library', publicPath: 'library/v1', writesShellModule: false }, // shell is source (widget/library-resource.ts)
+]
 
 const frontend = fileURLToPath(new URL('../..', import.meta.url))
-const dist = fileURLToPath(new URL('../dist', import.meta.url))
-const publicDir = fileURLToPath(new URL(`../../public/mcp-widget/${WIDGET_VERSION}`, import.meta.url))
 const target = fileURLToPath(new URL(`../../lib/mcp/widget/generated/itinerary-${WIDGET_VERSION}.ts`, import.meta.url))
 
 function fail(message) {
@@ -22,60 +23,72 @@ function fail(message) {
   process.exit(1)
 }
 
-let files
-try {
-  files = readdirSync(dist).sort()
-} catch {
-  fail(`${relative(frontend, dist)} is missing — run vite build first.`)
-}
-// Exactly two files: a split chunk or an emitted image/font would be fetched by a RELATIVE URL,
-// which does not resolve inside the host's sandboxed frame.
-if (files.join(',') !== ASSETS.join(',')) {
-  fail(`${relative(frontend, dist)} must contain exactly ${ASSETS.join(' + ')}; found ${files.join(', ') || 'nothing'}.`)
-}
-const contents = Object.fromEntries(ASSETS.map((name) => [name, readFileSync(join(dist, name), 'utf8')]))
-for (const [name, text] of Object.entries(contents)) {
-  if (text.trim().length === 0) fail(`${name} is empty.`)
-}
-
 // Security requirement 8: nothing in the shipped widget may print protocol payloads. The SDK's
 // default transport does (console.debug of every parsed message); main.tsx replaces it and vite
 // strips payload-capable console calls. Fail loudly if either guard regresses.
 const LEAKS = [/console\.(debug|log|info|trace)\(/, /Parsed message/, /Sending message/]
-const leak = LEAKS.find((re) => re.test(contents['itinerary.js']))
-if (leak) fail(`itinerary.js still contains ${leak} — private tool results could reach the browser console.`)
 
-rmSync(publicDir, { recursive: true, force: true })
-mkdirSync(publicDir, { recursive: true })
-for (const name of ASSETS) copyFileSync(join(dist, name), join(publicDir, name))
+for (const { name, publicPath, writesShellModule } of BUNDLES) {
+  const ASSETS = [`${name}.css`, `${name}.js`]
+  const dist = fileURLToPath(new URL(`../dist/${name}`, import.meta.url))
+  const publicDir = fileURLToPath(new URL(`../../public/mcp-widget/${publicPath}`, import.meta.url))
 
-// crossorigin: a module script is always CORS-fetched from the sandbox's opaque origin; marking the
-// stylesheet too keeps both requests in the same (credential-less) mode.
-const shell = [
-  '<!doctype html>',
-  '<html lang="en">',
-  '<head>',
-  '<meta charset="UTF-8" />',
-  '<meta name="viewport" content="width=device-width, initial-scale=1.0" />',
-  '<title>Astrail itinerary</title>',
-  '<link rel="stylesheet" crossorigin="anonymous" href="%ASSET_BASE%/itinerary.css" />',
-  '</head>',
-  '<body>',
-  '<div id="astrail-itinerary-root"></div>',
-  '<script type="module" crossorigin="anonymous" src="%ASSET_BASE%/itinerary.js"></script>',
-  '</body>',
-  '</html>',
-  '',
-].join('\n')
+  let files
+  try {
+    files = readdirSync(dist).sort()
+  } catch {
+    fail(`${relative(frontend, dist)} is missing — run vite build first.`)
+  }
+  // Exactly two files: a split chunk or an emitted image/font would be fetched by a RELATIVE URL,
+  // which does not resolve inside the host's sandboxed frame.
+  if (files.join(',') !== ASSETS.join(',')) {
+    fail(`${relative(frontend, dist)} must contain exactly ${ASSETS.join(' + ')}; found ${files.join(', ') || 'nothing'}.`)
+  }
+  const contents = Object.fromEntries(ASSETS.map((asset) => [asset, readFileSync(join(dist, asset), 'utf8')]))
+  for (const [asset, text] of Object.entries(contents)) {
+    if (text.trim().length === 0) fail(`${asset} is empty.`)
+  }
 
-mkdirSync(dirname(target), { recursive: true })
-writeFileSync(
-  target,
-  '// GENERATED by npm run build:widgets — do not edit.\n'
-    + `/** The widget's assets are served from \`<resource origin>${'/mcp-widget/' + WIDGET_VERSION}/\` (public/). */\n`
-    + `export const ITINERARY_WIDGET_ASSET_PATH = ${JSON.stringify(`/mcp-widget/${WIDGET_VERSION}`)}\n`
-    + `/** HTML shell; %ASSET_BASE% is replaced with \`<resource origin>\${ITINERARY_WIDGET_ASSET_PATH}\`. */\n`
-    + `export const ITINERARY_WIDGET_SHELL: string = ${JSON.stringify(shell)}\n`,
-)
-const sizes = ASSETS.map((name) => `${name} ${Buffer.byteLength(contents[name])} B`).join(', ')
-console.log(`emit-module: wrote ${relative(frontend, target)} (shell ${Buffer.byteLength(shell)} B); published ${sizes} to ${relative(frontend, publicDir)}/`)
+  const leak = LEAKS.find((re) => re.test(contents[`${name}.js`]))
+  if (leak) fail(`${name}.js still contains ${leak} — private tool results could reach the browser console.`)
+
+  rmSync(publicDir, { recursive: true, force: true })
+  mkdirSync(publicDir, { recursive: true })
+  for (const asset of ASSETS) copyFileSync(join(dist, asset), join(publicDir, asset))
+
+  const sizes = ASSETS.map((asset) => `${asset} ${Buffer.byteLength(contents[asset])} B`).join(', ')
+  if (!writesShellModule) {
+    console.log(`emit-module: published ${sizes} to ${relative(frontend, publicDir)}/`)
+    continue
+  }
+
+  // crossorigin: a module script is always CORS-fetched from the sandbox's opaque origin; marking the
+  // stylesheet too keeps both requests in the same (credential-less) mode.
+  const shell = [
+    '<!doctype html>',
+    '<html lang="en">',
+    '<head>',
+    '<meta charset="UTF-8" />',
+    '<meta name="viewport" content="width=device-width, initial-scale=1.0" />',
+    '<title>Astrail itinerary</title>',
+    '<link rel="stylesheet" crossorigin="anonymous" href="%ASSET_BASE%/itinerary.css" />',
+    '</head>',
+    '<body>',
+    '<div id="astrail-itinerary-root"></div>',
+    '<script type="module" crossorigin="anonymous" src="%ASSET_BASE%/itinerary.js"></script>',
+    '</body>',
+    '</html>',
+    '',
+  ].join('\n')
+
+  mkdirSync(dirname(target), { recursive: true })
+  writeFileSync(
+    target,
+    '// GENERATED by npm run build:widgets — do not edit.\n'
+      + `/** The widget's assets are served from \`<resource origin>${'/mcp-widget/' + WIDGET_VERSION}/\` (public/). */\n`
+      + `export const ITINERARY_WIDGET_ASSET_PATH = ${JSON.stringify(`/mcp-widget/${WIDGET_VERSION}`)}\n`
+      + `/** HTML shell; %ASSET_BASE% is replaced with \`<resource origin>\${ITINERARY_WIDGET_ASSET_PATH}\`. */\n`
+      + `export const ITINERARY_WIDGET_SHELL: string = ${JSON.stringify(shell)}\n`,
+  )
+  console.log(`emit-module: wrote ${relative(frontend, target)} (shell ${Buffer.byteLength(shell)} B); published ${sizes} to ${relative(frontend, publicDir)}/`)
+}
