@@ -11,3 +11,6 @@
    Raise every control to 48px inside the library only — never edit the shared components or
    src/widget.css (that would change the frozen v3 output). */
 #astrail-library-root :is(button, a[href]) { min-height: 48px; }
+
+/* The detail's back bar already pads the top safe-area inset; the frame below must not add a second. */
+[data-library-detail] .widget-frame { padding-top: 16px; }

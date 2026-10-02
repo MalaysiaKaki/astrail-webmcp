@@ -77,14 +77,14 @@ export default function TripLibrary({ state, onOpenTrip, onBack, onDayChange }: 
   const { detail } = state
   if (!detail) return <List state={state} onOpenTrip={onOpenTrip} />
   return (
-    <>
-      <div className="sticky top-0 z-10 bg-[color:var(--m-page)]">
+    <div data-library-detail>
+      <div className="sticky top-0 z-10 bg-[color:var(--m-page)] pt-[var(--safe-top,0px)]">
         <button type="button" onClick={onBack} aria-label="Back to all trips"
-          className="flex min-h-12 min-w-12 cursor-pointer items-center px-4 font-[family-name:var(--font-ui)] text-[length:var(--t-body)] font-semibold text-[color:var(--m-ink)]">
-          ‹ All trips
+          className="flex min-h-12 min-w-12 cursor-pointer items-center px-4 focus-visible:outline-none focus-visible:shadow-[inset_0_0_0_2px_var(--m-accent)] font-[family-name:var(--font-ui)] text-[length:var(--t-body)] font-semibold text-[color:var(--m-ink)]">
+          <span aria-hidden>‹</span>&nbsp;All trips
         </button>
       </div>
       <WidgetView key={detail.seq} phase={detail.phase} restored={null} onDayChange={onDayChange} />
-    </>
+    </div>
   )
 }

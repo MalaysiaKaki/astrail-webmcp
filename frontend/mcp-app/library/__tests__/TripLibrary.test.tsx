@@ -71,6 +71,7 @@ describe('TripLibrary detail', () => {
     expect(screen.getByRole('group', { name: 'Trip days' })).toBeInTheDocument()
     const back = screen.getByRole('button', { name: 'Back to all trips' })
     expect(back).toHaveClass('min-h-12')
+    expect(back.parentElement).toHaveClass('pt-[var(--safe-top,0px)]')
     fireEvent.click(back)
     expect(props.onBack).toHaveBeenCalled()
   })
