@@ -12,7 +12,11 @@ Owner: Shaun (backend/MCP surface). Branch `feat/mcp-extensions`, local commits 
 ## Compatibility
 
 - The five existing tools and the v3 resource are pinned by snapshot tests; `/mcp-widget/v3/*` and `generated/itinerary-v3.ts` match the pre-branch SHA-256 baseline.
-- Hosts other than ChatGPT ignore the `openai/*` keys and the app-only tools.
+- Hosts other than ChatGPT ignore the `openai/*` keys. Only MCP-Apps-aware hosts honour `_meta.ui.visibility`; a plain MCP host may expose the two entrypoint tools to its model as read-only `list_trips(limit 50)` equivalents (harmless).
+- v3 release evidence (sha256, identical to the pre-branch baseline and to the final rebuild):
+  - `3562c12614687e3ad55138ce3a6558e2d95a2a251035a70d9191fdeacb0893e2` `public/mcp-widget/v3/itinerary.css`
+  - `ec61ccc19962e465b91c325a6f93d08b711b7a21311bc77345fae121f94f1b5f` `public/mcp-widget/v3/itinerary.js`
+  - `efdcfa17ee09cd5aef50ca9d61665663baa73d1477ab71c1b2d408f1ed1e18d8` `lib/mcp/widget/generated/itinerary-v3.ts`
 
 ## Live test for Shaun (mobile first)
 
@@ -21,13 +25,19 @@ Owner: Shaun (backend/MCP surface). Branch `feat/mcp-extensions`, local commits 
 3. On iOS and Android: "Astrail" appears in the sidebar; open it, tap a trip; in a chat, open the "Trips" panel.
 4. Then desktop. Record the ChatGPT app version and plan.
 
+Merge gate (live, iOS and Android): both entrypoints open; tap a trip and the detail renders (proves `_meta` forwarding); the context chip appears; remove the chip, then change day: it does not re-attach; reopen the trip: it re-attaches; an old model-invoked v3 card still works.
+
 **First live check (untested assumption):** tapping a trip relies on ChatGPT's `callServerTool` returning the result `_meta` (`astrail/bundle`) to the app. Failure signature: every tapped trip shows "Couldn't display this itinerary" while the model-invoked card still works. Fix then: an app-only tool that returns the bundle in `structuredContent`.
 
 Availability caveats as stated by OpenAI docs on 2026-10-02: Free/Go on web is "coming soon"; composer mentions are desktop-only.
 
 ## Rollback
 
-Remove the two `register*` calls in `server.ts` and redeploy. Keep the library build and `/mcp-widget/library/v1`; a full revert would delete regenerated assets that cached shells still load. Hosts that cached the tool list show "unknown tool" until the connector is refreshed.
+1. Remove the two `register*` calls in `server.ts`, AND revert `frontend/scripts/mcp-smoke.mjs` to the five tool names and the entrypoint cases in `handler.test.ts` / `tools.test.ts`; otherwise the live smoke and the tests fail.
+2. Keep `mcp-app/library/` and the vite / `emit-module` changes (a harmless dark bundle). The assets under `public/` are gitignored and regenerated on each Vercel build, so there is nothing under `public/` to keep.
+3. Redeploy.
+
+Limits of a rollback: hosts with a cached tool list keep showing the entrypoints ("unknown tool" until the connector is refreshed); already-open library iframes may keep working until closed; context already attached to a composer is not retracted.
 
 ## Dev preview
 
