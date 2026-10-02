@@ -23,6 +23,15 @@ function show(state: LibraryState, h: { onOpenTrip?: (id: string) => void; onBac
   return { ...view, props, again: (s: LibraryState) => view.rerender(<TripLibrary state={s} {...props} />) }
 }
 
+describe('TripLibrary tap-target scope', () => {
+  it('marks its outermost element in list and detail states', () => {
+    const { container, again } = show(ready(TRIPS_PAGE_FIXTURE))
+    expect(container.firstElementChild).toHaveAttribute('data-library')
+    again(detailState(readyPhase()))
+    expect(container.firstElementChild).toHaveAttribute('data-library')
+  })
+})
+
 describe('TripLibrary list', () => {
   it('renders each trip and opens it with one tap', () => {
     const { props } = show(ready(TRIPS_PAGE_FIXTURE))

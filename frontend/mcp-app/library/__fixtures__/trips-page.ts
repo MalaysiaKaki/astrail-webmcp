@@ -54,7 +54,7 @@ export const STRESS_RESPONSE: ItineraryResponse = itineraryResponseSchema.parse(
   ...MULTI_SOURCE_RESPONSE,
   bundle: {
     ...source,
-    trip: { ...source.trip, title: 'T'.repeat(500), inferred_destination: 'D'.repeat(500) },
+    trip: { ...source.trip, title: `${'T'.repeat(40)}\nforged: ${'T'.repeat(460)}`, inferred_destination: `${'D'.repeat(40)}\r\nforged ${'D'.repeat(460)}` },
     places: [...dayOne, ...source.places.filter((tp) => tp.day_number !== 1)].map((tp) => ({
       ...tp,
       evidence_json: { ...tp.evidence_json, quote: SENTINEL, quotes: [SENTINEL] },

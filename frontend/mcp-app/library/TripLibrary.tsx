@@ -44,7 +44,7 @@ function TripCard({ trip, onOpen }: { trip: TripSummary; onOpen: () => void }) {
 function List({ state, onOpenTrip }: { state: LibraryState; onOpenTrip: (tripId: string) => void }) {
   const { list, trips } = state
   return (
-    <main className={PAGE}>
+    <main data-library className={PAGE}>
       <h1 className="type-display mb-4 text-[length:var(--t-title)] leading-tight text-[color:var(--m-text)]">Your trips</h1>
       {list.kind === 'loading' ? (
         <div role="status" aria-label="Loading trips" className="flex flex-col gap-3 motion-safe:animate-pulse">
@@ -77,7 +77,7 @@ export default function TripLibrary({ state, onOpenTrip, onBack, onDayChange }: 
   const { detail } = state
   if (!detail) return <List state={state} onOpenTrip={onOpenTrip} />
   return (
-    <div data-library-detail>
+    <div data-library data-library-detail>
       <div className="sticky top-0 z-10 bg-[color:var(--m-page)] pt-[var(--safe-top,0px)]">
         <button type="button" onClick={onBack} aria-label="Back to all trips"
           className="flex min-h-12 min-w-12 cursor-pointer items-center px-4 focus-visible:outline-none focus-visible:shadow-[inset_0_0_0_2px_var(--m-accent)] font-[family-name:var(--font-ui)] text-[length:var(--t-body)] font-semibold text-[color:var(--m-ink)]">

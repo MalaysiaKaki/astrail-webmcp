@@ -10,7 +10,24 @@
 /* Mobile tap targets: the reused detail components' More/Less toggles are min-h-11 (44px).
    Raise every control to 48px inside the library only — never edit the shared components or
    src/widget.css (that would change the frozen v3 output). */
-#astrail-library-root :is(button, a[href]) { min-height: 48px; }
+[data-library] :is(button, a[href]) { min-height: 48px; }
 
 /* The detail's back bar already pads the top safe-area inset; the frame below must not add a second. */
 [data-library-detail] .widget-frame { padding-top: 16px; }
+
+/* Status dot (rules copied from app/globals.css, which the widget does not import). Only live
+   states animate. Tokens come from the imported palette.css. */
+[data-library] .pulse-dot {
+  background: var(--brass-bright);
+  border-radius: 999px;
+  box-shadow: 0 0 6px var(--brass-glow), 0 0 12px var(--brass-glow);
+  flex-shrink: 0;
+  height: 5px;
+  width: 5px;
+}
+[data-library] .pulse-dot--ok { background: var(--ok); box-shadow: 0 0 6px color-mix(in srgb, var(--ok) 55%, transparent); }
+[data-library] .pulse-dot--warn { background: var(--warn); box-shadow: 0 0 6px color-mix(in srgb, var(--warn) 55%, transparent); }
+[data-library] .pulse-dot--fail { background: var(--fail); box-shadow: 0 0 6px color-mix(in srgb, var(--fail) 55%, transparent); }
+[data-library] .pulse-dot--live { animation: pulse-dot-breathe 1.6s ease-in-out infinite alternate; }
+@keyframes pulse-dot-breathe { from { opacity: 0.5; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { [data-library] .pulse-dot--live { animation: none; } }

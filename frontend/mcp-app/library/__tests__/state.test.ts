@@ -68,6 +68,14 @@ describe('trip model context', () => {
     for (const n of names) expect(n.length).toBeLessThanOrEqual(80)
     const tripLine = text.split('\n').find((l) => l.startsWith('Trip: '))!
     expect(tripLine.length).toBeLessThanOrEqual(80 + 80 + 120)
+    expect(tripLine).not.toMatch(/[\r\n]/)
+    expect(_meta['openai/title']).not.toMatch(/[\r\n]/)
+    expect(text.split('\n').filter((l) => l.startsWith('Trip: '))).toHaveLength(1)
+  })
+
+  it('never yields an empty chip title', () => {
+    const blank = { ...MULTI_SOURCE_RESPONSE, bundle: { ...MULTI_SOURCE_RESPONSE.bundle, trip: { ...MULTI_SOURCE_RESPONSE.bundle.trip, title: '  ' } } }
+    expect(tripModelContext(widgetData(blank), null).content[0]._meta['openai/title']).toBe('Untitled trip')
   })
 
   it('detects removal only from an update that carries the key as null', () => {
