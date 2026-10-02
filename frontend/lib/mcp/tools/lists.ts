@@ -12,7 +12,7 @@ import { READ_ONLY_ANNOTATIONS, runTool, toolMeta, type ToolContext } from './sh
 
 type ListArgs = { limit?: number; cursor?: string }
 
-function listBody(args: ListArgs): Record<string, unknown> {
+export function listBody(args: ListArgs): Record<string, unknown> {
   return { limit: args.limit ?? MCP_LIMITS.listDefault, ...(args.cursor ? { cursor: args.cursor } : {}) }
 }
 

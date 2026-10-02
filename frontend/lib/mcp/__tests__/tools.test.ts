@@ -9,15 +9,16 @@ import {
   DAY_TWO_START_RESPONSE, MULTI_SOURCE_RESPONSE, TRUNCATED_RESPONSE,
 } from '@/mcp-app/src/__fixtures__/multi-source-bundle'
 import {
-  BUNDLE_META_KEY, ITINERARY_RESOURCE_URI, LINKS_META_KEY, widgetLinksSchema, itinerarySummarySchema, renderSummarySchema, savedReelsPageSchema, tripsPageSchema,
+  BUNDLE_META_KEY, ITINERARY_RESOURCE_URI, LIBRARY_RESOURCE_URI, LINKS_META_KEY, widgetLinksSchema, itinerarySummarySchema, renderSummarySchema, savedReelsPageSchema, tripsPageSchema,
 } from '../contract'
 import { handleMcpPost } from '../handler'
 import { loadMcpConfig } from '../config'
 import { widgetCsp, widgetHtml } from '../widget/itinerary-resource'
+import { libraryHtml } from '../widget/library-resource'
 import { verifyStaticMap } from '../static-map'
 import { WIDGET_ASSET_PATH, widgetAssetProblems, widgetShellProblems } from '../widget/shell-contract.mjs'
 import { ITINERARY_WIDGET_ASSET_PATH, ITINERARY_WIDGET_SHELL } from '../widget/generated/itinerary-v3'
-import { CLIENT_ID, ENV, USER_ID, fakeBackend, mintToken, rpcJson, rpcRequest, testKeys } from './helpers'
+import { CLIENT_ID, ENV, OTHER_USER_ID, USER_ID, fakeBackend, mintToken, rpcJson, rpcRequest, testKeys } from './helpers'
 
 type Tool = {
   name: string
@@ -57,11 +58,14 @@ describe('tools/list descriptors', () => {
     }
   })
 
-  it('only render_itinerary links the UI resource; only get_profile is the profile tool', async () => {
+  it('only render_itinerary and the two entrypoints link a UI resource; only get_profile is the profile tool', async () => {
     const tools = (await call('tools/list', {})).result?.tools as Tool[]
-    const withUi = tools.filter((t) => (t._meta?.ui as { resourceUri?: string } | undefined)?.resourceUri)
-    expect(withUi.map((t) => t.name)).toEqual(['render_itinerary'])
-    expect((withUi[0]._meta?.ui as { resourceUri: string }).resourceUri).toBe(ITINERARY_RESOURCE_URI)
+    const uri = (t: Tool) => (t._meta?.ui as { resourceUri?: string } | undefined)?.resourceUri
+    expect(Object.fromEntries(tools.filter(uri).map((t) => [t.name, uri(t)]))).toEqual({
+      open_trip_library: LIBRARY_RESOURCE_URI,
+      open_trip_panel: LIBRARY_RESOURCE_URI,
+      render_itinerary: ITINERARY_RESOURCE_URI,
+    })
     expect(tools.filter((t) => t._meta?.['openai/profile'] === true).map((t) => t.name)).toEqual(['get_profile'])
   })
 
@@ -327,5 +331,75 @@ describe('render_itinerary links (_meta["astrail/links"])', () => {
     const result = await callTool('render_itinerary', { trip_id: tripId }, fakeBackend(), {}, env)
     expect(JSON.stringify(result.structuredContent)).not.toContain('static-map')
     expect(result.content.map((c) => c.text).join()).not.toContain('static-map')
+  })
+})
+
+describe('OpenAI MCP Extensions entrypoints', () => {
+  const ENTRY = { open_trip_library: 'global', open_trip_panel: 'thread' } as const
+  type ListedTool = Tool & { title?: string; icons?: { src: string; mimeType?: string }[] }
+
+  it('advertises one global and one thread entrypoint, app-only, on the library resource', async () => {
+    const tools = (await call('tools/list', {})).result?.tools as ListedTool[]
+    expect(tools.map((t) => t.name).sort()).toEqual(['get_itinerary', 'get_profile', 'list_saved_reels', 'list_trips', 'open_trip_library', 'open_trip_panel', 'render_itinerary'])
+    for (const [name, type] of Object.entries(ENTRY)) {
+      const tool = tools.find((t) => t.name === name)!
+      expect(tool._meta?.['openai/ui']).toEqual({ entrypoints: [{ type }] })
+      expect(tool._meta?.ui).toEqual({ resourceUri: LIBRARY_RESOURCE_URI, visibility: ['app'] })
+      expect(tool._meta?.['openai/iconStyle']).toBe('monochrome')
+      expect(tool.inputSchema?.properties ?? {}).toEqual({})
+      expect(tool.icons?.[0].mimeType).toBe('image/svg+xml')
+      const svg = decodeURIComponent(tool.icons![0].src.replace('data:image/svg+xml,', ''))
+      expect(svg).toContain('viewBox="0 0 20 20"')
+      expect(svg).toContain('currentColor')
+      expect(svg).toContain('stroke-width="1.33"')
+    }
+    expect(tools.filter((t) => t.name in ENTRY).map((t) => t.title).sort()).toEqual(['Astrail', 'Trips'])
+  })
+
+  it.each(Object.keys(ENTRY))('%s accepts {} and returns the first trips page (limit 50)', async (name) => {
+    const backend = fakeBackend()
+    const result = await callTool(name, {}, backend)
+    expect(result.isError).toBeFalsy()
+    expect(tripsPageSchema.parse(result.structuredContent).trips.length).toBeGreaterThan(0)
+    expect(backend.calls).toHaveLength(1)
+    expect(backend.calls[0].path).toMatch(/\/trips\/list$/)
+    expect(backend.calls[0].body).toEqual({ limit: 50 })
+  })
+
+  it.each(Object.keys(ENTRY))('%s works when the host omits arguments', async (name) => {
+    const result = (await call('tools/call', { name }, fakeBackend())).result as unknown as CallResult
+    expect(result.isError).toBeFalsy()
+  })
+
+  it('required-argument tools still reject missing arguments', async () => {
+    const result = (await call('tools/call', { name: 'render_itinerary' }, fakeBackend())).result as unknown as CallResult
+    expect(result.isError).toBe(true)
+  })
+
+  it('a backend failure is an honest, sanitized tool error', async () => {
+    const result = await callTool('open_trip_panel', {}, fakeBackend({ respond: () => new Response('{}', { status: 500 }) }))
+    expect(result.isError).toBe(true)
+    expect(JSON.stringify(result)).not.toMatch(/stack|at \w+ \(/)
+  })
+
+  it.each(Object.keys(ENTRY))('%s delegates the caller as the backend subject', async (name) => {
+    const backend = fakeBackend()
+    await callTool(name, {}, backend, { sub: OTHER_USER_ID })
+    expect(backend.calls[0].claims?.sub).toBe(OTHER_USER_ID)
+  })
+
+  it('serves the library resource: fullscreen-preferred, same CSP as the itinerary, shell on our origin', async () => {
+    const loaded = loadMcpConfig(ENV)
+    if (!loaded.ok) throw new Error(loaded.problems.join())
+    const config = loaded.config
+    const res = (await call('resources/read', { uri: LIBRARY_RESOURCE_URI })).result as { contents: { mimeType: string; text: string; _meta: Record<string, unknown> }[] }
+    const [content] = res.contents
+    expect(content.mimeType).toBe(RESOURCE_MIME_TYPE)
+    expect(content.text).toBe(libraryHtml(config))
+    expect(content.text).toContain('<div id="astrail-library-root"></div>')
+    expect(content.text).toContain(`${config.resourceOrigin}/mcp-widget/library/v1/library.js`)
+    expect(content.text).not.toContain('%ASSET_BASE%')
+    expect(content._meta['openai/ui']).toEqual({ preferredDisplayMode: 'fullscreen', availableDisplayModes: ['inline', 'fullscreen'] })
+    expect((content._meta.ui as { csp: unknown }).csp).toEqual(widgetCsp(config))
   })
 })
