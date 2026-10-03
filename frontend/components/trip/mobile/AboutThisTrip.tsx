@@ -21,11 +21,12 @@ import type { FeedbackComposer } from '../use-feedback-composer'
 export default function AboutThisTrip({ bundle, readOnly, feedback }: {
   bundle: TripBundle
   readOnly: boolean
-  feedback?: FeedbackComposer
+  /** null: no feedback row (the widget viewer). Omitted: the panel keeps its own draft. */
+  feedback?: FeedbackComposer | null
 }) {
   // Same explicit status allowlist as the desktop rail (plan T3), not reachability.
   const withGaps = bundle.trip.status === 'saved_with_gaps'
-  const showFeedback = !readOnly && (bundle.trip.status === 'complete' || bundle.trip.status === 'saved_with_gaps')
+  const showFeedback = feedback !== null && !readOnly && (bundle.trip.status === 'complete' || bundle.trip.status === 'saved_with_gaps')
   // Rows appear only when there is something behind them: a card link that opens onto nothing is
   // a dead control. The agent rail always has an honest answer ("No agent activity recorded").
   const hasPreferences = typeof bundle.trip.preference_summary === 'string' && bundle.trip.preference_summary.trim() !== ''
@@ -74,7 +75,7 @@ export default function AboutThisTrip({ bundle, readOnly, feedback }: {
         ) : null}
         {showFeedback ? (
           <Row title="How was this trail?">
-            <TripFeedbackPanel key={bundle.trip.id} tripId={bundle.trip.id} composer={feedback} />
+            <TripFeedbackPanel key={bundle.trip.id} tripId={bundle.trip.id} composer={feedback ?? undefined} />
           </Row>
         ) : null}
       </div>

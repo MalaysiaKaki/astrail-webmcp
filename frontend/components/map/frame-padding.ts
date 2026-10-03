@@ -89,6 +89,22 @@ export function phoneStackFits({ buttons, safeTop, viewportHeight, obstruction }
 }
 
 const DESKTOP_BREAKPOINT = 768
+
+// The trip layout an embed pinned (the ChatGPT widget forces 'mobile' in a wide iframe), or null.
+// Held here rather than in lib/trip/use-trip-layout so this module stays import-free: tests that
+// mock use-trip-layout still get real padding. Set only through forceTripLayout, which notifies.
+let forcedLayout: 'mobile' | 'desktop' | null = null
+
+/** Internal to forceTripLayout (lib/trip/use-trip-layout); call that instead. */
+export function setForcedLayout(layout: 'mobile' | 'desktop' | null): void {
+  forcedLayout = layout
+}
+
+/** The override only, never the viewport result. Re-exported by lib/trip/use-trip-layout. */
+export function getForcedTripLayout(): 'mobile' | 'desktop' | null {
+  return forcedLayout
+}
+
 /** Desktop: room between the panel's right edge and a framed pin (its radius and name pill). */
 export const DESKTOP_PANEL_GAP = 40
 /** Desktop pad on a side nothing covers. */
@@ -113,7 +129,8 @@ export function computeFramePadding({
   /** Desktop: pixels the floating panel covers at the left (its right edge); 0 when collapsed. */
   leftObstruction?: number
 }): FramePadding {
-  const wide = width >= DESKTOP_BREAKPOINT
+  const forced = getForcedTripLayout()
+  const wide = forced ? forced === 'desktop' : width >= DESKTOP_BREAKPOINT
   const wanted = wide
     ? {
         top: DESKTOP_EDGE, right: DESKTOP_EDGE, bottom: DESKTOP_EDGE,

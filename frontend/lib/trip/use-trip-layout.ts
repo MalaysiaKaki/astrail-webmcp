@@ -1,6 +1,9 @@
 'use client'
 
 import { useSyncExternalStore } from 'react'
+import { getForcedTripLayout, setForcedLayout } from '@/components/map/frame-padding'
+
+export { getForcedTripLayout }
 
 /**
  * Which trip layout this viewport gets: the phone view (map + stop sheet) or the desktop rail.
@@ -18,14 +21,29 @@ export type TripLayout = 'mobile' | 'desktop'
 
 export const MOBILE_QUERY = '(max-width: 767.98px)'
 
+// An embed (the ChatGPT widget) can pin the layout whatever its iframe's width. Null: the viewport
+// decides. The value lives in frame-padding so the camera padding honours it too.
+const listeners = new Set<() => void>()
+
+export function forceTripLayout(layout: TripLayout | null): void {
+  setForcedLayout(layout)
+  for (const l of listeners) l()
+}
+
 function subscribe(onChange: () => void): () => void {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return () => {}
+  listeners.add(onChange)
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return () => { listeners.delete(onChange) }
   const mql = window.matchMedia(MOBILE_QUERY)
   mql.addEventListener?.('change', onChange)
-  return () => mql.removeEventListener?.('change', onChange)
+  return () => {
+    listeners.delete(onChange)
+    mql.removeEventListener?.('change', onChange)
+  }
 }
 
 function getSnapshot(): TripLayout {
+  const forced = getForcedTripLayout()
+  if (forced) return forced
   // No matchMedia (old test envs, exotic embeds) falls back to desktop: the layout that has
   // always existed, rather than one nothing has ever rendered in that environment.
   if (typeof window.matchMedia !== 'function') return 'desktop'
