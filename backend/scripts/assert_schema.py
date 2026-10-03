@@ -493,5 +493,16 @@ def main() -> int:
     return asyncio.run(run())
 
 
+def _exit(code: int) -> None:
+    """Flush the verdict, then hard-exit. Render waits for this PROCESS to end, not for the
+    verdict line: on 2026-10-03 the gate printed `schema gate OK` in ~40 s and then never
+    exited (something the SDK left behind kept the interpreter alive), so every deploy timed
+    out after ~33 min. `sys.exit` waits on lingering threads; `os._exit` does not, and the gate
+    has nothing left to clean up once it has decided."""
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(code)
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    _exit(main())
