@@ -448,6 +448,8 @@ describe('OpenAI MCP Extensions entrypoints', () => {
     if (!loaded.ok) throw new Error(loaded.problems.join())
     const config = loaded.config
     expect(LIBRARY_V1_RESOURCE_URI).toBe('ui://astrail/library-v1.html')
+    const listed = (await call('resources/list', {})).result as { resources: { uri: string; name: string }[] }
+    expect(listed.resources.find((r) => r.uri === LIBRARY_V1_RESOURCE_URI)?.name).toBe('Astrail trips')
     const res = (await call('resources/read', { uri: LIBRARY_V1_RESOURCE_URI })).result as { contents: { text: string; _meta: Record<string, unknown> }[] }
     const [content] = res.contents
     expect(content.text).toContain(`${config.resourceOrigin}/mcp-widget/library/v1/library.js`)

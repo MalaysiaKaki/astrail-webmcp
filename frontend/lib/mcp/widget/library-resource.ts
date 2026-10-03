@@ -41,8 +41,8 @@ function libraryV2Csp(config: McpConfig) {
 }
 
 const VARIANTS = [
-  { uri: LIBRARY_RESOURCE_URI, name: 'Astrail trips', assetPath: LIBRARY_WIDGET_ASSET_PATH, csp: libraryV2Csp },
-  { uri: LIBRARY_V1_RESOURCE_URI, name: 'Astrail trips (v1)', assetPath: LIBRARY_V1_ASSET_PATH, csp: widgetCsp },
+  { uri: LIBRARY_RESOURCE_URI, name: 'Astrail trips (v2)', assetPath: LIBRARY_WIDGET_ASSET_PATH, csp: libraryV2Csp },
+  { uri: LIBRARY_V1_RESOURCE_URI, name: 'Astrail trips', assetPath: LIBRARY_V1_ASSET_PATH, csp: widgetCsp },
 ]
 
 export function registerLibraryResource(server: McpServer, config: McpConfig): void {

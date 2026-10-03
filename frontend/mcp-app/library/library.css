@@ -6,6 +6,8 @@
 @source "../../components/trips/RouteGlyph.tsx";
 @source "../../components/dashboard/nav-icons.tsx";
 @source "../../lib/shell/ui.ts";
+@source "../../components/map";
+@source "../../components/trip/*.tsx";
 
 /* Light only. The kit is paper-only (no dark tokens), but the host's applyDocumentTheme writes an
    INLINE `color-scheme: dark` on <html> in a dark ChatGPT — that flips the canvas and system
@@ -44,3 +46,24 @@ body { min-height: 100vh; }
 [data-library] .pulse-dot--live { animation: pulse-dot-breathe 1.6s ease-in-out infinite alternate; }
 @keyframes pulse-dot-breathe { from { opacity: 0.5; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { [data-library] .pulse-dot--live { animation: none; } }
+
+/* Trip map view. MapProvider renders .shared-map as a sibling OUTSIDE every [data-library] element,
+   so these rules (copied from app/globals.css) are deliberately unscoped. */
+.shared-map {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 400ms ease-out;
+}
+.shared-map--visible { opacity: 1; visibility: visible; }
+.shared-map--interactive { pointer-events: auto; }
+.trip-map-container { opacity: 0; transition: opacity 400ms ease-out; }
+.trip-map-container--loaded { opacity: 1; }
+
+/* The sheet's env(safe-area-inset-bottom) reads 0 inside the host iframe; use the host inset instead
+   (MobileTripSheet.tsx body padding and its Show-sheet button). */
+[data-library] #mobile-trip-sheet-body { padding-bottom: calc(24px + var(--safe-bottom, 0px)); }
+[data-library] button[aria-label="Show trip sheet"] { bottom: calc(16px + var(--safe-bottom, 0px)); }

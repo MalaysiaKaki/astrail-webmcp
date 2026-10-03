@@ -15,5 +15,5 @@
       "@/*": ["../*"]
     }
   },
-  "include": ["src", "library", "probe", "vite.config.ts", "../vitest.setup.ts"]
+  "include": ["src", "library", "vite.config.ts", "../vitest.setup.ts"]
 }
