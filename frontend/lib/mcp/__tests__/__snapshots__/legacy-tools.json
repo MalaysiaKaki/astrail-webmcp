@@ -1,0 +1,1430 @@
+[
+  {
+    "name": "get_itinerary",
+    "title": "Get trip itinerary",
+    "description": "Read one trip's itinerary: days, stops with their evidence, transport notes, restaurants and hotels. Pass the full trip_id from list_trips; pass `day` to read a single day.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "trip_id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "description": "The full trip_id from list_trips."
+        },
+        "day": {
+          "description": "Only this day number.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        }
+      },
+      "required": [
+        "trip_id"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    },
+    "_meta": {
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "openid"
+          ]
+        }
+      ],
+      "openai/toolInvocation/invoking": "Reading your itinerary…",
+      "openai/toolInvocation/invoked": "Read your itinerary"
+    },
+    "outputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "trip": {
+          "type": "object",
+          "properties": {
+            "trip_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "title": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "destination": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "generating",
+                "places_ready",
+                "complete",
+                "saved_with_gaps",
+                "failed"
+              ]
+            },
+            "start_date": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "end_date": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "summary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "trip_id",
+            "title",
+            "destination",
+            "status",
+            "start_date",
+            "end_date",
+            "summary"
+          ],
+          "additionalProperties": false
+        },
+        "days": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "day_number": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "date": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "title": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "summary": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "weather_summary": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "stops": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "trip_place_id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "place_type": {
+                      "type": "string",
+                      "enum": [
+                        "attraction",
+                        "restaurant",
+                        "hotel",
+                        "area",
+                        "city",
+                        "country",
+                        "station",
+                        "shop",
+                        "other"
+                      ]
+                    },
+                    "city": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "source_type": {
+                      "type": "string",
+                      "enum": [
+                        "reel_extracted",
+                        "user_requested",
+                        "agent_suggested"
+                      ]
+                    },
+                    "evidence": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "reel_quote",
+                            "requested_by_you",
+                            "research",
+                            "mapbox_route",
+                            "open_meteo",
+                            "travala_hotel_search",
+                            "memory_preference",
+                            "inferred_default",
+                            "suggested_by_astrail"
+                          ]
+                        },
+                        "quote": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "source_url": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "quote",
+                        "source_url"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "trip_place_id",
+                    "name",
+                    "place_type",
+                    "city",
+                    "source_type",
+                    "evidence"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "legs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "walk",
+                        "drive",
+                        "cycle",
+                        "transit_hint",
+                        "unknown"
+                      ]
+                    },
+                    "duration_s": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "warning": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "duration_s",
+                    "warning"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "day_number",
+              "date",
+              "title",
+              "summary",
+              "weather_summary",
+              "stops",
+              "legs"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "unscheduled_stops": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "trip_place_id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "trip_place_id",
+              "name"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "restaurants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "day_number": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "cuisine": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "summary": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "day_number",
+              "cuisine",
+              "summary"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "hotels": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "area": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "suggested",
+                  "unavailable",
+                  "skipped",
+                  "failed"
+                ]
+              },
+              "is_recommended": {
+                "type": "boolean"
+              },
+              "star_rating": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "guest_rating": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "price_label": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "refundable": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "free_cancellation_until": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "area",
+              "status",
+              "is_recommended",
+              "star_rating",
+              "guest_rating",
+              "price_label",
+              "refundable",
+              "free_cancellation_until"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "truncated": {
+          "type": "object",
+          "properties": {
+            "days": {
+              "type": "boolean"
+            },
+            "stops": {
+              "type": "boolean"
+            },
+            "legs": {
+              "type": "boolean"
+            },
+            "restaurants": {
+              "type": "boolean"
+            },
+            "restaurant_text": {
+              "type": "boolean"
+            },
+            "hotels": {
+              "type": "boolean"
+            },
+            "inspiration": {
+              "type": "boolean"
+            },
+            "suggestion_places": {
+              "type": "boolean"
+            },
+            "quotes": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "days",
+            "stops",
+            "legs",
+            "restaurants",
+            "restaurant_text",
+            "hotels",
+            "inspiration",
+            "suggestion_places",
+            "quotes"
+          ],
+          "additionalProperties": false
+        },
+        "days_shown": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "saved_day_numbers": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        }
+      },
+      "required": [
+        "trip",
+        "days",
+        "unscheduled_stops",
+        "restaurants",
+        "hotels",
+        "truncated",
+        "days_shown",
+        "saved_day_numbers"
+      ],
+      "additionalProperties": false
+    },
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "openid"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "get_profile",
+    "title": "Get Astrail profile",
+    "description": "Return the Astrail account this connection is signed in as. The opaque id is the user's stable Astrail id and does not change across token refresh, reconnection, or name/email changes.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    },
+    "_meta": {
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "openid"
+          ]
+        }
+      ],
+      "openai/toolInvocation/invoking": "Checking your Astrail account…",
+      "openai/toolInvocation/invoked": "Checked your Astrail account",
+      "openai/profile": true
+    },
+    "outputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "openid"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "list_saved_reels",
+    "title": "List saved Reels",
+    "description": "List the Instagram Reels and posts the user saved in Astrail, newest first, with their analysis status and the places Astrail verified in each. Read-only: it does not save or analyse anything.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "limit": {
+          "description": "How many to return (1-50, default 20).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "cursor": {
+          "description": "next_cursor from the previous page, to continue listing.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        }
+      }
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    },
+    "_meta": {
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "openid"
+          ]
+        }
+      ],
+      "openai/toolInvocation/invoking": "Loading your saved Reels…",
+      "openai/toolInvocation/invoked": "Loaded your saved Reels"
+    },
+    "outputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "reels": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "reel_id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "platform": {
+                "type": "string",
+                "enum": [
+                  "instagram",
+                  "tiktok",
+                  "manual"
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "reel",
+                  "post",
+                  "other"
+                ]
+              },
+              "shortcode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "not_analyzed",
+                  "queued",
+                  "processing",
+                  "organized",
+                  "location_not_found",
+                  "failed"
+                ]
+              },
+              "saved_at": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "place_count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "places": {
+                "maxItems": 10,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "country_name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "country_name"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "reel_id",
+              "platform",
+              "kind",
+              "shortcode",
+              "status",
+              "saved_at",
+              "place_count",
+              "places"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_-]+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "reels",
+        "next_cursor"
+      ],
+      "additionalProperties": false
+    },
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "openid"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "list_trips",
+    "title": "List trips",
+    "description": "List the signed-in user's Astrail trips, newest first, with their full trip_id, dates, destination and status. Use this first whenever the user refers to a trip, then pass the trip_id to get_itinerary.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "limit": {
+          "description": "How many to return (1-50, default 20).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "cursor": {
+          "description": "next_cursor from the previous page, to continue listing.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        }
+      }
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    },
+    "_meta": {
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "openid"
+          ]
+        }
+      ],
+      "openai/toolInvocation/invoking": "Loading your trips…",
+      "openai/toolInvocation/invoked": "Loaded your trips"
+    },
+    "outputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "trips": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "trip_id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "title": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "destination": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "draft",
+                  "generating",
+                  "places_ready",
+                  "complete",
+                  "saved_with_gaps",
+                  "failed"
+                ]
+              },
+              "start_date": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "end_date": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "day_count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "created_at": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              }
+            },
+            "required": [
+              "trip_id",
+              "title",
+              "destination",
+              "status",
+              "start_date",
+              "end_date",
+              "day_count",
+              "created_at"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_-]+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "trips",
+        "next_cursor"
+      ],
+      "additionalProperties": false
+    },
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "openid"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "render_itinerary",
+    "title": "Show itinerary card",
+    "description": "Show a trip itinerary as an interactive card with a day picker. Call get_itinerary first to confirm the trip_id; this re-reads the trip from Astrail and renders it.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "trip_id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "description": "The full trip_id from list_trips."
+        },
+        "focus_day": {
+          "description": "Open the card on this day number.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        }
+      },
+      "required": [
+        "trip_id"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    },
+    "_meta": {
+      "securitySchemes": [
+        {
+          "type": "oauth2",
+          "scopes": [
+            "openid"
+          ]
+        }
+      ],
+      "openai/toolInvocation/invoking": "Opening your itinerary…",
+      "openai/toolInvocation/invoked": "Opened your itinerary",
+      "ui": {
+        "resourceUri": "ui://astrail/itinerary-v3.html"
+      },
+      "ui/resourceUri": "ui://astrail/itinerary-v3.html"
+    },
+    "outputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "trip": {
+          "type": "object",
+          "properties": {
+            "trip_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "title": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "destination": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "generating",
+                "places_ready",
+                "complete",
+                "saved_with_gaps",
+                "failed"
+              ]
+            },
+            "start_date": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "end_date": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "summary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "trip_id",
+            "title",
+            "destination",
+            "status",
+            "start_date",
+            "end_date",
+            "summary"
+          ],
+          "additionalProperties": false
+        },
+        "days": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "day_number": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "date": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "title": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "summary": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "weather_summary": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "stops": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "trip_place_id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "place_type": {
+                      "type": "string",
+                      "enum": [
+                        "attraction",
+                        "restaurant",
+                        "hotel",
+                        "area",
+                        "city",
+                        "country",
+                        "station",
+                        "shop",
+                        "other"
+                      ]
+                    },
+                    "city": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "source_type": {
+                      "type": "string",
+                      "enum": [
+                        "reel_extracted",
+                        "user_requested",
+                        "agent_suggested"
+                      ]
+                    },
+                    "evidence": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "reel_quote",
+                            "requested_by_you",
+                            "research",
+                            "mapbox_route",
+                            "open_meteo",
+                            "travala_hotel_search",
+                            "memory_preference",
+                            "inferred_default",
+                            "suggested_by_astrail"
+                          ]
+                        },
+                        "quote": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "source_url": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "quote",
+                        "source_url"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "trip_place_id",
+                    "name",
+                    "place_type",
+                    "city",
+                    "source_type",
+                    "evidence"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "legs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "walk",
+                        "drive",
+                        "cycle",
+                        "transit_hint",
+                        "unknown"
+                      ]
+                    },
+                    "duration_s": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "warning": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "duration_s",
+                    "warning"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "day_number",
+              "date",
+              "title",
+              "summary",
+              "weather_summary",
+              "stops",
+              "legs"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "unscheduled_stops": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "trip_place_id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "trip_place_id",
+              "name"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "restaurants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "day_number": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "cuisine": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "summary": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "day_number",
+              "cuisine",
+              "summary"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "hotels": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "area": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "suggested",
+                  "unavailable",
+                  "skipped",
+                  "failed"
+                ]
+              },
+              "is_recommended": {
+                "type": "boolean"
+              },
+              "star_rating": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "guest_rating": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "price_label": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "refundable": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "free_cancellation_until": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "area",
+              "status",
+              "is_recommended",
+              "star_rating",
+              "guest_rating",
+              "price_label",
+              "refundable",
+              "free_cancellation_until"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "truncated": {
+          "type": "object",
+          "properties": {
+            "days": {
+              "type": "boolean"
+            },
+            "stops": {
+              "type": "boolean"
+            },
+            "legs": {
+              "type": "boolean"
+            },
+            "restaurants": {
+              "type": "boolean"
+            },
+            "restaurant_text": {
+              "type": "boolean"
+            },
+            "hotels": {
+              "type": "boolean"
+            },
+            "inspiration": {
+              "type": "boolean"
+            },
+            "suggestion_places": {
+              "type": "boolean"
+            },
+            "quotes": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "days",
+            "stops",
+            "legs",
+            "restaurants",
+            "restaurant_text",
+            "hotels",
+            "inspiration",
+            "suggestion_places",
+            "quotes"
+          ],
+          "additionalProperties": false
+        },
+        "days_shown": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "saved_day_numbers": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "focus_day": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "trip",
+        "days",
+        "unscheduled_stops",
+        "restaurants",
+        "hotels",
+        "truncated",
+        "days_shown",
+        "saved_day_numbers",
+        "focus_day"
+      ],
+      "additionalProperties": false
+    },
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "openid"
+        ]
+      }
+    ]
+  }
+]

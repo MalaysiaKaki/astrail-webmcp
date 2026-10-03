@@ -7,7 +7,7 @@ import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const frontend = fileURLToPath(new URL('../..', import.meta.url))
-const srcDir = fileURLToPath(new URL('../src', import.meta.url))
+const srcDirs = ['../src', '../library'].map((dir) => fileURLToPath(new URL(dir, import.meta.url)))
 
 const DOMAIN_TYPES = [
   'TripBundle', 'Trip', 'TripPlace', 'TripDay', 'Place', 'TransportLeg',
@@ -29,7 +29,7 @@ function sourceFiles(dir) {
 }
 
 const violations = []
-for (const file of sourceFiles(srcDir)) {
+for (const file of srcDirs.flatMap(sourceFiles)) {
   readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
     for (const { label, pattern } of FORBIDDEN) {
       if (pattern.test(line)) violations.push(`${relative(frontend, file)}:${i + 1}: ${label}: ${line.trim()}`)
@@ -38,7 +38,7 @@ for (const file of sourceFiles(srcDir)) {
 }
 
 if (violations.length > 0) {
-  console.error(`check-casts: ${violations.length} forbidden cast(s) in mcp-app/src:\n${violations.join('\n')}`)
+  console.error(`check-casts: ${violations.length} forbidden cast(s) in mcp-app/src or mcp-app/library:\n${violations.join('\n')}`)
   process.exit(1)
 }
-console.log('check-casts: no domain-type or any casts in mcp-app/src')
+console.log('check-casts: no domain-type or any casts in mcp-app/src or mcp-app/library')

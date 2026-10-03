@@ -96,7 +96,7 @@ const nextConfig: NextConfig = {
         source: "/:path*",
         headers: securityHeaders,
       },
-      // The ChatGPT itinerary widget's JS and CSS (public/mcp-widget/, written by build:widgets).
+      // Both ChatGPT widget bundles (itinerary v3 and Trip Library): JS and CSS in public/mcp-widget/, written by build:widgets.
       // The host renders its HTML shell in a sandboxed frame with an OPAQUE origin, and a module
       // script is always fetched in CORS mode, so these static files must allow any origin. They
       // hold no user data (the trip arrives over postMessage) and are fetched credential-less.

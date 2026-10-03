@@ -1,0 +1,33 @@
+{
+  "contents": [
+    {
+      "uri": "ui://astrail/itinerary-v3.html",
+      "mimeType": "text/html;profile=mcp-app",
+      "text": "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<title>Astrail itinerary</title>\n<link rel=\"stylesheet\" crossorigin=\"anonymous\" href=\"https://astrail.test/mcp-widget/v3/itinerary.css\" />\n</head>\n<body>\n<div id=\"astrail-itinerary-root\"></div>\n<script type=\"module\" crossorigin=\"anonymous\" src=\"https://astrail.test/mcp-widget/v3/itinerary.js\"></script>\n</body>\n</html>\n",
+      "_meta": {
+        "ui": {
+          "csp": {
+            "connectDomains": [],
+            "resourceDomains": [
+              "https://astrail.test",
+              "https://project.supabase.test",
+              "https://*.cdninstagram.com",
+              "https://*.fbcdn.net"
+            ]
+          },
+          "prefersBorder": true
+        },
+        "openai/widgetCSP": {
+          "connect_domains": [],
+          "resource_domains": [
+            "https://astrail.test",
+            "https://project.supabase.test",
+            "https://*.cdninstagram.com",
+            "https://*.fbcdn.net"
+          ]
+        },
+        "openai/widgetDescription": "Shows the user's Astrail trip day by day: stops with their source evidence, transport notes, restaurants and hotels."
+      }
+    }
+  ]
+}

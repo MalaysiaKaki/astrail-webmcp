@@ -11,7 +11,7 @@ function shortDate(iso: string): string {
   return new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-export function tripDateRange(trip: Trip): string {
+export function tripDateRange(trip: Pick<Trip, 'start_date' | 'end_date'>): string {
   if (trip.start_date && trip.end_date) return `${shortDate(trip.start_date)} – ${shortDate(trip.end_date)}`
   if (trip.start_date) return shortDate(trip.start_date)
   return 'Dates flexible'

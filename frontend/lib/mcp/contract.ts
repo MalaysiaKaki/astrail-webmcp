@@ -395,6 +395,8 @@ export const widgetLinksSchema = z.object({
 })
 export type WidgetLinks = z.infer<typeof widgetLinksSchema>
 export const ITINERARY_RESOURCE_URI = 'ui://astrail/itinerary-v3.html'
+/** The Trip Library (sidebar + conversation panel) UI. Versioned like the itinerary: hosts cache by URI. */
+export const LIBRARY_RESOURCE_URI = 'ui://astrail/library-v1.html'
 
 // ---- Compile-time proof that the bundle is a real TripBundle (N2) ----
 

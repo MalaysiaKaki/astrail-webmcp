@@ -61,7 +61,7 @@ step('notifications/initialized', '202')
 
 const tools = (await rpc('tools/list')).tools
 assert.deepEqual(tools.map((t) => t.name).sort(), [
-  'get_itinerary', 'get_profile', 'list_saved_reels', 'list_trips', 'render_itinerary',
+  'get_itinerary', 'get_profile', 'list_saved_reels', 'list_trips', 'open_trip_library', 'open_trip_panel', 'render_itinerary',
 ])
 for (const t of tools) assert.equal(t.annotations?.readOnlyHint, true, `${t.name} must be read-only`)
 step('tools/list', tools.map((t) => t.name).join(', '))
