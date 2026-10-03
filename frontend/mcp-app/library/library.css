@@ -16,6 +16,9 @@
   background: var(--m-page);
 }
 body { min-height: 100vh; }
+/* ChatGPT Desktop's fullscreen sandbox overrides the page background (verified live: even
+   <html>/<body> painted paper showed black), so the library paints its OWN root instead. */
+[data-library] { background: var(--m-page); color-scheme: light; min-height: 100vh; }
 
 /* Mobile tap targets: the reused detail components' More/Less toggles are min-h-11 (44px).
    Raise every control to 48px inside the library only — never edit the shared components or
