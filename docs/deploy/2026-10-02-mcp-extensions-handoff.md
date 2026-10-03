@@ -9,6 +9,19 @@ Owner: Shaun (backend/MCP surface). Branch `feat/mcp-extensions`, local commits 
 - Trip Library UI (mobile first, notch-safe back bar) that lists trips and opens one through `render_itinerary`, reusing the itinerary widget components. It publishes a bounded model context (trip id, day, short summary) that the user can remove.
 - No backend, DB, Pydantic, `backend-types.ts` or env change.
 
+## Update 2026-10-03: live map in the Trip Library (branch `feat/trip-map-view`)
+
+Owner: Shaun (MCP surface). Shared website seams (five, default-preserving) touch Zhi Hao's surface: `MapProvider` (`accessToken`, `onError`), `use-trip-layout` (`forceTripLayout`), `frame-padding` (forced layout), `safe-area` (`--safe-top`), and the nullable `feedback` prop. Website behaviour is unchanged with no override set.
+
+- **v2 resource.** Both entrypoints now point at `ui://astrail/library-v2.html`, which loads `/mcp-widget/library/v2/`. Its CSP adds `connect-src https://api.mapbox.com https://events.mapbox.com` and `https://api.mapbox.com` to the resource domains, mirrored in `openai/widgetCSP`. A trip opens on the website's phone trip page: live Mapbox map, pins, day strip, Stay, Fit and 3D, with the compact/expanded sheet.
+- **v1 kept.** `ui://astrail/library-v1.html` and `/mcp-widget/library/v1/` stay published with the old CSP and the same new bundle. A host that cached the v1 shell gets Mapbox requests blocked by CSP; the map latch fires and every trip shows the static `WidgetView` (verified in the browser). Remove v1 only after a host-cache policy is decided.
+- **Refresh the connector** (ChatGPT, Plugins, Refresh) so hosts pick up the v2 resource URI. Until then a cached host keeps v1 (static view).
+- **Token.** The entrypoint results carry `NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN` (already set on Vercel production; the earlier probe used it) in model-hidden `_meta['astrail/mapbox_token']`. Only `pk.` values pass; an `sk.` value gives no token. The token is never logged, rendered or put in model text.
+- **Fallback and latch.** No token, no WebGL, a Mapbox load error (CSP, style, tiles), a render throw in the map view, or a map not ready 15 s after a trip opens all latch `mapFailed` for the life of that library iframe: the map provider unmounts and every trip renders the static `WidgetView`, on the day the user last chose. A zero-day trip always uses `WidgetView`.
+- **Probe removed.** The throwaway `open_map_probe` tool, its resource and `/mcp-widget/probe/v1/` are gone. A host with a cached tool list may show "unknown tool" for it until the connector is refreshed.
+- **Bundle size.** `library.js` 2,604,039 B (about 712 KB gzip), `library.css` 96,593 B (about 17 KB gzip); Mapbox GL JS is most of it. It loads only when a library entrypoint opens; the v3 inline card is unchanged (sha256 below still matches).
+- **Kill switch `MCP_LIBRARY_MAP`.** Server env on Vercel. Only the exact value `off` disables the map: the entrypoints then omit the token, so every newly opened library falls back to `WidgetView`. It affects newly opened libraries only; an iframe already open keeps its token until it is closed. Any other value, or unset, leaves the map on.
+
 ## Compatibility
 
 - The five existing tools and the v3 resource are pinned by snapshot tests; `/mcp-widget/v3/*` and `generated/itinerary-v3.ts` match the pre-branch SHA-256 baseline.
@@ -29,9 +42,27 @@ Merge gate (live, iOS and Android): both entrypoints open; tap a trip and the de
 
 **First live check (untested assumption):** tapping a trip relies on ChatGPT's `callServerTool` returning the result `_meta` (`astrail/bundle`) to the app. Failure signature: every tapped trip shows "Couldn't display this itinerary" while the model-invoked card still works. Fix then: an app-only tool that returns the bundle in `structuredContent`.
 
+### Live test for the map (Desktop and iPhone, after Refresh)
+
+On ChatGPT Desktop and on an iPhone, open "Astrail" from the sidebar and tap a trip. Check:
+
+1. The map renders with street and place **labels/glyphs** (not blank tiles), the pins, and the route; the sheet sits over the lower half and the map shows above it.
+2. "All trips" and the Fit/3D controls sit below the notch / host chrome; the sheet's last row clears the home indicator.
+3. **3D** toggles to a pitched view with terrain and back, with no blank map.
+4. On Day 2, tap a Day 1 pin: the day strip **switches to Day 1** and the sheet scrolls to that stop.
+5. Stay shows the hotels and the hotel card. Known website behaviour: on a phone the hotel card can run up under the "All trips" button (phone framing leaves no popup room); note whether it is usable.
+6. Open trip A, Back, trip B, Back, trip A: each shows only its own pins.
+7. The **context chip** appears; remove it, change day: it does not re-attach.
+8. An **old model-invoked v3 card** in a chat still renders and works.
+9. If the map does not appear, read the browser console / network for blocked requests before widening the CSP, then use the kill switch if needed.
+
 Availability caveats as stated by OpenAI docs on 2026-10-02: Free/Go on web is "coming soon"; composer mentions are desktop-only.
 
 ## Rollback
+
+**Live map (2026-10-03): use the kill switch, not a revert.** Set the Vercel env `MCP_LIBRARY_MAP=off` and redeploy. The entrypoints then omit the token and every newly opened library uses `WidgetView`. Keep both resource URIs (`library-v1`, `library-v2`) and both asset paths published: a revert would delete the v2 assets that cached v2 shells still load, which would blank those libraries. To re-enable, unset the variable and redeploy.
+
+Whole Trip Library (original rollback):
 
 1. Remove the two `register*` calls in `server.ts`, AND revert `frontend/scripts/mcp-smoke.mjs` to the five tool names and the entrypoint cases in `handler.test.ts` / `tools.test.ts`; otherwise the live smoke and the tests fail.
 2. Keep `mcp-app/library/` and the vite / `emit-module` changes (a harmless dark bundle). The assets under `public/` are gitignored and regenerated on each Vercel build, so there is nothing under `public/` to keep.
@@ -41,7 +72,9 @@ Limits of a rollback: hosts with a cached tool list keep showing the entrypoints
 
 ## Dev preview
 
-`frontend/mcp-app/library-preview.html` + `library/preview.tsx`: fake ChatGPT host for local visual QA (`?empty=1`, `?long=1`). Dev-only; not in the production bundle.
+`frontend/mcp-app/library-preview.html` + `library/preview.tsx`: fake ChatGPT host for local visual QA (`?empty=1`, `?long=1`, `?theme=dark`, `?inline=1`; host insets top 47 / bottom 34). Dev-only; not in the production bundle. For the live map, export `VITE_MAPBOX_PREVIEW_TOKEN` (a `pk.` token, never committed) in the shell that starts Vite with `--config mcp-app/vite.config.ts`; the preview puts it in the entrypoint result `_meta` like the real tools. The preview spreads the fixture's places over real Tokyo / Osaka coordinates so pins do not stack.
+
+QA evidence (2026-10-03, headless Chrome + SwiftShader, real Mapbox tiles): screenshots in `.gstack/qa/mcp-trip-map/` of the main checkout; report in `.superpowers/sdd/2026-10-03-mcp-trip-map-view/task-6-report.md`.
 
 ## Deferrals
 
@@ -50,7 +83,11 @@ Limits of a rollback: hosts with a cached tool list keep showing the entrypoints
 | Live ChatGPT test (mobile first); first check `callServerTool` forwards `_meta` | Shaun's next tunnel session; required before merge to `dev` |
 | Pagination beyond 50 trips | An account exceeds 50 trips |
 | Restore attached trip on remount | Live test shows the panel losing its place |
-| Interactive Mapbox GL map | Static route maps prove insufficient (CSP, token, size plan) |
+| Live map in the inline v3 card | Demand for maps inside chat answers (v4 card; bundle size) |
+| Remove `library-v1` resource and `/mcp-widget/library/v1/` | An explicit host-cache/refresh policy is accepted |
+| Desktop floating-panel layout for the library map | Users find the full-width phone sheet awkward on wide Desktop |
+| Post-load fatal map error fallback | Seen live (today only pre-load errors fall back) |
+| Phone hotel card room under the top controls (shared `frame-padding`) | Live test shows the Stay card hidden under "All trips" |
 | Composer @-mentions | Desktop users ask for them |
 | Native plugin settings | A remote preferences write contract exists |
 | Rich forms (MRTR) | MRTR-capable SDK adopted and a write flow needs it |
