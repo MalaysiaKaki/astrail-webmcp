@@ -137,6 +137,65 @@ describe('MapProvider seams', () => {
     expect(handlerFor('error')).toBeUndefined()
   })
 
+  // Without onError the website must still see these as unhandled rejections (Sentry captures them).
+  // Vitest's own listener would fail the run, so it is swapped out for a capture while each runs.
+  async function unhandledDuring(run: () => Promise<void>): Promise<unknown[]> {
+    const seen: unknown[] = []
+    const vitestListeners = process.listeners('unhandledRejection')
+    process.removeAllListeners('unhandledRejection')
+    const capture = (reason: unknown) => { seen.push(reason) }
+    process.on('unhandledRejection', capture)
+    try {
+      await run()
+      await new Promise((r) => setTimeout(r, 10))
+    } finally {
+      process.off('unhandledRejection', capture)
+      for (const l of vitestListeners) process.on('unhandledRejection', l)
+    }
+    return seen
+  }
+
+  it('without onError, a rejected import still surfaces as an unhandled rejection, and retry works', async () => {
+    importGate.fail = 1
+    const seen = await unhandledDuring(async () => {
+      render(<MapProvider accessToken="pk.widget"><Grabber /><Consumer /></MapProvider>)
+      await flush()
+    })
+    expect(seen).toHaveLength(1)
+    // Vitest wraps a throwing mock factory; the original import error is its cause.
+    expect(String((seen[0] as Error).cause)).toMatch(/chunk load failed/)
+    act(() => { ctx!.acquire({ interactive: true, lightPreset: 'dawn' }) })
+    await flush()
+    expect(MapCtor).toHaveBeenCalledTimes(1)
+  })
+
+  it('without onError, a throwing constructor still surfaces as an unhandled rejection, and retry works', async () => {
+    MapCtor.mockImplementationOnce(() => { throw new Error('WebGL unavailable') })
+    const seen = await unhandledDuring(async () => {
+      render(<MapProvider accessToken="pk.widget"><Grabber /><Consumer /></MapProvider>)
+      await flush()
+    })
+    expect(seen).toHaveLength(1)
+    expect(String(seen[0])).toMatch(/WebGL unavailable/)
+    act(() => { ctx!.acquire({ interactive: true, lightPreset: 'dawn' }) })
+    await flush()
+    expect(ctx!.getMap()).toBe(mapInstance)
+  })
+
+  it('with onError, neither failure leaves an unhandled rejection', async () => {
+    importGate.fail = 1
+    MapCtor.mockImplementationOnce(() => { throw new Error('WebGL unavailable') })
+    const onError = vi.fn()
+    const seen = await unhandledDuring(async () => {
+      render(<MapProvider accessToken="pk.widget" onError={onError}><Grabber /><Consumer /></MapProvider>)
+      await flush()
+      act(() => { ctx!.acquire({ interactive: true, lightPreset: 'dawn' }) })
+      await flush()
+    })
+    expect(onError.mock.calls).toEqual([['import'], ['construct']])
+    expect(seen).toEqual([])
+  })
+
   it('unmounting while the import is pending gives no onError and no map', async () => {
     let release!: () => void
     importGate.hold = new Promise<void>((r) => { release = r })

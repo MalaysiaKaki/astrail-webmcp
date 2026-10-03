@@ -193,23 +193,25 @@ export default function MapProvider({ children, accessToken, onError }: {
           pitch: 0,
           interactive: false,
         })
-      } catch {
-        // No WebGL, typically. loadingRef is already clear, so a later acquire retries.
-        onErrorRef.current?.('construct')
+      } catch (err) {
+        // No WebGL, typically. loadingRef is already clear, so a later acquire retries. Without an
+        // onError, rethrow: the website keeps seeing it as an unhandled rejection (Sentry).
+        if (!onErrorRef.current) throw err
+        onErrorRef.current('construct')
         return
       }
-      let loaded = false
-      let reported = false
+      // Loaded, or the pre-load error already reported: later errors are not the map failing.
+      let settled = false
       map.on('load', () => {
-        loaded = true
+        settled = true
         setReady(true)
         applyPreset()
       })
       if (onErrorRef.current) {
         // Registering any 'error' listener replaces Mapbox's console.error. Never forward the event.
         map.on('error', () => {
-          if (loaded || reported) return
-          reported = true
+          if (settled) return
+          settled = true
           onErrorRef.current?.('style')
         })
       }
@@ -221,9 +223,10 @@ export default function MapProvider({ children, accessToken, onError }: {
       }
       applyPreset()
       applyInteractive(map, wanted.interactive)
-    }, () => {
+    }, (err) => {
       loadingRef.current = false
-      if (aliveRef.current) onErrorRef.current?.('import')
+      if (!onErrorRef.current) throw err
+      if (aliveRef.current) onErrorRef.current('import')
     })
   }, [applyPreset, accessToken])
 
