@@ -206,7 +206,7 @@ export default function TripMapView({ data, onBack, onDayChange }: {
   )
 }
 
-/** "‹ All trips" top-left and the Fit / 3D stack top-right, both measured for the camera padding. */
+/** The icon-only Back circle top-left and the Fit / 3D stack top-right, both measured for the camera padding. */
 function ControlStrip({ onBack, sheetExpanded, fit, mode3d, onToggle3d }: {
   onBack: () => void
   sheetExpanded: boolean
@@ -219,8 +219,12 @@ function ControlStrip({ onBack, sheetExpanded, fit, mode3d, onToggle3d }: {
   return (
     <>
       <button ref={backRef} type="button" onClick={onBack} aria-label="Back to all trips" data-map-control
-        className={`${EDGE} left-3 pointer-events-auto flex h-12 min-w-12 cursor-pointer items-center rounded-full bg-[color:var(--m-card)] px-4 shadow-[var(--m-shadow-2)] focus-visible:outline-none focus-visible:shadow-[var(--m-focus)] font-[family-name:var(--font-ui)] text-[length:var(--t-body)] font-semibold text-[color:var(--m-ink)]`}>
-        <span aria-hidden>‹</span>&nbsp;All trips
+        style={{ width: 48, height: 48 }}
+        className={`${EDGE} left-3 m-btn-icon pointer-events-auto focus-visible:outline-none focus-visible:shadow-[var(--m-focus)]`}>
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.1"
+          strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M15 5l-7 7 7 7" />
+        </svg>
       </button>
       <MapControlStack
         variant="phone"
