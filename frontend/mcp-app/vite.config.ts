@@ -24,13 +24,14 @@ const frontend = fileURLToPath(new URL('..', import.meta.url))
 const BUNDLES = {
   itinerary: './src/main.tsx',
   library: './library/main.tsx',
+  probe: './probe/main.tsx', // SPIKE (throwaway)
 } as const
 
 // frontend/package.json has no "type": "module", so Vite bundles this config as CommonJS, and
 // @tailwindcss/vite is ESM-only — a static import fails to `require` it. A dynamic import stays
 // a real `import()` in that output.
 export default defineConfig(async ({ mode }): Promise<UserConfig> => {
-  const name: keyof typeof BUNDLES = mode === 'library' ? 'library' : 'itinerary'
+  const name: keyof typeof BUNDLES = mode === 'library' || mode === 'probe' ? mode : 'itinerary'
   return {
     root,
     plugins: [react(), (await import('@tailwindcss/vite')).default()],

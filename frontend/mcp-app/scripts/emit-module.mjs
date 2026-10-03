@@ -13,6 +13,7 @@ export const WIDGET_VERSION = 'v3'
 const BUNDLES = [
   { name: 'itinerary', publicPath: WIDGET_VERSION, writesShellModule: true }, // output unchanged
   { name: 'library', publicPath: 'library/v1', writesShellModule: false }, // shell is source (widget/library-resource.ts)
+  { name: 'probe', publicPath: 'probe/v1', writesShellModule: false }, // SPIKE (throwaway): tools/map-probe.ts
 ]
 
 const frontend = fileURLToPath(new URL('../..', import.meta.url))
