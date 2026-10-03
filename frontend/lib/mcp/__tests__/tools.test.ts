@@ -9,12 +9,12 @@ import {
   DAY_TWO_START_RESPONSE, MULTI_SOURCE_RESPONSE, TRUNCATED_RESPONSE,
 } from '@/mcp-app/src/__fixtures__/multi-source-bundle'
 import {
-  BUNDLE_META_KEY, ITINERARY_RESOURCE_URI, LIBRARY_RESOURCE_URI, MAP_PROBE_RESOURCE_URI, LINKS_META_KEY, widgetLinksSchema, itinerarySummarySchema, renderSummarySchema, savedReelsPageSchema, tripsPageSchema,
+  BUNDLE_META_KEY, ITINERARY_RESOURCE_URI, LIBRARY_RESOURCE_URI, LIBRARY_V1_RESOURCE_URI, MAPBOX_TOKEN_META_KEY, LINKS_META_KEY, widgetLinksSchema, itinerarySummarySchema, renderSummarySchema, savedReelsPageSchema, tripsPageSchema,
 } from '../contract'
 import { handleMcpPost } from '../handler'
 import { loadMcpConfig } from '../config'
 import { widgetCsp, widgetHtml } from '../widget/itinerary-resource'
-import { libraryHtml } from '../widget/library-resource'
+import { LIBRARY_WIDGET_ASSET_PATH, libraryHtml } from '../widget/library-resource'
 import { verifyStaticMap } from '../static-map'
 import { WIDGET_ASSET_PATH, widgetAssetProblems, widgetShellProblems } from '../widget/shell-contract.mjs'
 import { ITINERARY_WIDGET_ASSET_PATH, ITINERARY_WIDGET_SHELL } from '../widget/generated/itinerary-v3'
@@ -62,7 +62,6 @@ describe('tools/list descriptors', () => {
     const tools = (await call('tools/list', {})).result?.tools as Tool[]
     const uri = (t: Tool) => (t._meta?.ui as { resourceUri?: string } | undefined)?.resourceUri
     expect(Object.fromEntries(tools.filter(uri).map((t) => [t.name, uri(t)]))).toEqual({
-      open_map_probe: MAP_PROBE_RESOURCE_URI,
       open_trip_library: LIBRARY_RESOURCE_URI,
       open_trip_panel: LIBRARY_RESOURCE_URI,
       render_itinerary: ITINERARY_RESOURCE_URI,
@@ -335,29 +334,37 @@ describe('render_itinerary links (_meta["astrail/links"])', () => {
   })
 })
 
-describe('map probe spike', () => {
-  const TOKEN_KEY = 'astrail/mapbox_token'
-  const withEnv = async (value: string, run: () => Promise<void>) => {
-    const prev = process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN
-    process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN = value
-    try { await run() } finally {
-      if (prev === undefined) delete process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN
-      else process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN = prev
+describe('library entrypoints Mapbox token', () => {
+  const withEnv = async (env: Record<string, string | undefined>, run: () => Promise<void>) => {
+    const prev = { ...process.env }
+    for (const [k, v] of Object.entries(env)) {
+      if (v === undefined) delete process.env[k]
+      else process.env[k] = v
     }
+    try { await run() } finally { process.env = prev }
   }
+  const NAMES = ['open_trip_library', 'open_trip_panel']
 
-  it('forwards a pk. token in hidden _meta', async () => {
-    await withEnv('pk.test-public', async () => {
-      const result = await callTool('open_map_probe', {})
-      expect(result.structuredContent).toEqual({ ok: true })
-      expect(result._meta?.[TOKEN_KEY]).toBe('pk.test-public')
+  it.each(NAMES)('%s forwards a pk. token in hidden _meta only', async (name) => {
+    await withEnv({ NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN: 'pk.test-public', MCP_LIBRARY_MAP: undefined }, async () => {
+      const result = await callTool(name, {}, fakeBackend())
+      expect(result._meta?.[MAPBOX_TOKEN_META_KEY]).toBe('pk.test-public')
+      expect(JSON.stringify(result.structuredContent)).not.toContain('pk.test-public')
+      expect(result.content.map((c) => c.text).join()).not.toContain('pk.test-public')
     })
   })
 
-  it('never forwards an sk. token', async () => {
-    await withEnv('sk.test-secret', async () => {
-      const result = await callTool('open_map_probe', {})
-      expect(result._meta?.[TOKEN_KEY]).toBeNull()
+  it.each(NAMES)('%s never forwards an sk. token', async (name) => {
+    await withEnv({ NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN: 'sk.test-secret', MCP_LIBRARY_MAP: undefined }, async () => {
+      const result = await callTool(name, {}, fakeBackend())
+      expect(result._meta?.[MAPBOX_TOKEN_META_KEY]).toBeNull()
+    })
+  })
+
+  it.each(NAMES)('%s gives a null token when MCP_LIBRARY_MAP=off (kill switch)', async (name) => {
+    await withEnv({ NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN: 'pk.test-public', MCP_LIBRARY_MAP: 'off' }, async () => {
+      const result = await callTool(name, {}, fakeBackend())
+      expect(result._meta?.[MAPBOX_TOKEN_META_KEY]).toBeNull()
     })
   })
 })
@@ -368,7 +375,7 @@ describe('OpenAI MCP Extensions entrypoints', () => {
 
   it('advertises one global and one thread entrypoint, app-only, on the library resource', async () => {
     const tools = (await call('tools/list', {})).result?.tools as ListedTool[]
-    expect(tools.map((t) => t.name).sort()).toEqual(['get_itinerary', 'get_profile', 'list_saved_reels', 'list_trips', 'open_map_probe', 'open_trip_library', 'open_trip_panel', 'render_itinerary'])
+    expect(tools.map((t) => t.name).sort()).toEqual(['get_itinerary', 'get_profile', 'list_saved_reels', 'list_trips', 'open_trip_library', 'open_trip_panel', 'render_itinerary'])
     for (const [name, type] of Object.entries(ENTRY)) {
       const tool = tools.find((t) => t.name === name)!
       expect(tool._meta?.['openai/ui']).toEqual({ entrypoints: [{ type }] })
@@ -423,11 +430,29 @@ describe('OpenAI MCP Extensions entrypoints', () => {
     const res = (await call('resources/read', { uri: LIBRARY_RESOURCE_URI })).result as { contents: { mimeType: string; text: string; _meta: Record<string, unknown> }[] }
     const [content] = res.contents
     expect(content.mimeType).toBe(RESOURCE_MIME_TYPE)
-    expect(content.text).toBe(libraryHtml(config))
+    expect(content.text).toBe(libraryHtml(config, LIBRARY_WIDGET_ASSET_PATH))
     expect(content.text).toContain('<div id="astrail-library-root"></div>')
-    expect(content.text).toContain(`${config.resourceOrigin}/mcp-widget/library/v1/library.js`)
+    expect(content.text).toContain(`${config.resourceOrigin}/mcp-widget/library/v2/library.js`)
     expect(content.text).not.toContain('%ASSET_BASE%')
     expect(content._meta['openai/ui']).toEqual({ preferredDisplayMode: 'fullscreen', availableDisplayModes: ['inline', 'fullscreen'] })
+    const csp = {
+      connectDomains: ['https://api.mapbox.com', 'https://events.mapbox.com'],
+      resourceDomains: [...widgetCsp(config).resourceDomains, 'https://api.mapbox.com'],
+    }
+    expect((content._meta.ui as { csp: unknown }).csp).toEqual(csp)
+    expect(content._meta['openai/widgetCSP']).toEqual({ connect_domains: csp.connectDomains, resource_domains: csp.resourceDomains })
+  })
+
+  it('still serves library v1 unchanged: v1 assets and the old (map-blocking) CSP', async () => {
+    const loaded = loadMcpConfig(ENV)
+    if (!loaded.ok) throw new Error(loaded.problems.join())
+    const config = loaded.config
+    expect(LIBRARY_V1_RESOURCE_URI).toBe('ui://astrail/library-v1.html')
+    const res = (await call('resources/read', { uri: LIBRARY_V1_RESOURCE_URI })).result as { contents: { text: string; _meta: Record<string, unknown> }[] }
+    const [content] = res.contents
+    expect(content.text).toContain(`${config.resourceOrigin}/mcp-widget/library/v1/library.js`)
+    expect(content.text).toBe(libraryHtml(config, '/mcp-widget/library/v1'))
     expect((content._meta.ui as { csp: unknown }).csp).toEqual(widgetCsp(config))
+    expect(content._meta['openai/widgetCSP']).toEqual({ connect_domains: [], resource_domains: widgetCsp(config).resourceDomains })
   })
 })

@@ -156,7 +156,7 @@ describe('/mcp stateless JSON-RPC lifecycle', () => {
     const list = await handleMcpPost(rpcRequest('tools/list', {}, { token }), d)
     expect(list.headers.get('mcp-session-id')).toBeNull()
     const names = ((await rpcJson(list)).result?.tools as { name: string }[]).map((t) => t.name).sort()
-    expect(names).toEqual(['get_itinerary', 'get_profile', 'list_saved_reels', 'list_trips', 'open_map_probe', 'open_trip_library', 'open_trip_panel', 'render_itinerary'])
+    expect(names).toEqual(['get_itinerary', 'get_profile', 'list_saved_reels', 'list_trips', 'open_trip_library', 'open_trip_panel', 'render_itinerary'])
   })
 
   it('two concurrent users with the same JSON-RPC id each get only their own identity', async () => {

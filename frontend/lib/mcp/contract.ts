@@ -396,9 +396,11 @@ export const widgetLinksSchema = z.object({
 export type WidgetLinks = z.infer<typeof widgetLinksSchema>
 export const ITINERARY_RESOURCE_URI = 'ui://astrail/itinerary-v3.html'
 /** The Trip Library (sidebar + conversation panel) UI. Versioned like the itinerary: hosts cache by URI. */
-export const LIBRARY_RESOURCE_URI = 'ui://astrail/library-v1.html'
-/** SPIKE (throwaway): Mapbox-in-ChatGPT probe widget. */
-export const MAP_PROBE_RESOURCE_URI = 'ui://astrail/map-probe-v1.html'
+export const LIBRARY_RESOURCE_URI = 'ui://astrail/library-v2.html'
+/** Still registered so hosts that cached v1 keep working (old CSP: the map is blocked, the UI falls back). */
+export const LIBRARY_V1_RESOURCE_URI = 'ui://astrail/library-v1.html'
+/** Hidden `_meta` key carrying the public Mapbox token on the library entrypoint results. */
+export const MAPBOX_TOKEN_META_KEY = 'astrail/mapbox_token'
 
 // ---- Compile-time proof that the bundle is a real TripBundle (N2) ----
 
