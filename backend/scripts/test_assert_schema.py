@@ -714,3 +714,26 @@ async def test_absent_credential_fails_closed_without_naming_its_value(monkeypat
     combined = "".join(capsys.readouterr())
     assert missing in combined
     assert SENTINEL_KEY not in combined
+
+
+@pytest.mark.parametrize("code", [0, 1])
+def test_exit_terminates_with_the_verdict_even_if_threads_linger(monkeypatch, capsys, code):
+    """Render waits for the pre-deploy PROCESS to exit, not for the verdict line. On 2026-10-03
+    the gate printed `schema gate OK` in ~40 s and then never exited (something the SDK left
+    behind kept the interpreter alive), so Render timed the deploy out after ~33 min. `_exit`
+    flushes the verdict and hard-exits so a lingering thread cannot hold the deploy hostage."""
+    exits: list[int] = []
+    monkeypatch.setattr(assert_schema.os, "_exit", exits.append)
+    print("verdict line")
+
+    assert_schema._exit(code)
+
+    assert exits == [code]
+    assert "verdict line" in capsys.readouterr().out
+
+
+def test_module_entrypoint_uses_hard_exit():
+    """The `__main__` guard must route through `_exit`, not `sys.exit` (which waits on threads)."""
+    source = Path(assert_schema.__file__).read_text()
+    assert "_exit(main())" in source
+    assert "sys.exit(main())" not in source
