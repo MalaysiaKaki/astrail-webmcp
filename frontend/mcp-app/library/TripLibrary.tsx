@@ -17,7 +17,6 @@ import TripMapView from './TripMapView'
 
 /** A map that has not loaded this long after a trip opened is treated as failed. */
 export const MAP_BACKSTOP_MS = 15_000
-const NOOP = () => {}
 
 /** Never a blank page: a render-time throw in the map view latches and shows the static view. */
 class MapViewBoundary extends Component<{ onError: () => void; fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
@@ -98,17 +97,17 @@ function List({ state, onOpenTrip }: { state: LibraryState; onOpenTrip: (tripId:
   )
 }
 
-export default function TripLibrary({ state, onOpenTrip, onBack, onDayChange, hasMap = false, onMapFailed = NOOP, restored = null }: {
+export default function TripLibrary({ state, onOpenTrip, onBack, onDayChange, hasMap, onMapFailed, restored }: {
   state: LibraryState
   onOpenTrip: (tripId: string) => void
   onBack: () => void
   onDayChange: (state: WidgetDayState) => void
   /** A MapProvider wraps this tree and the map has not failed. */
-  hasMap?: boolean
+  hasMap: boolean
   /** Sets the library-wide latch (stable identity). */
-  onMapFailed?: () => void
+  onMapFailed: () => void
   /** The open trip's last chosen day: a fallback after a latch reopens on it. */
-  restored?: WidgetDayState | null
+  restored: WidgetDayState | null
 }) {
   const { detail } = state
   const mapData = hasMap && detail?.phase.kind === 'ready' && detail.phase.data.bundle.days.length > 0

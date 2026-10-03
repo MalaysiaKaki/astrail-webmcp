@@ -3,5 +3,5 @@
 import type { AnchorHTMLAttributes } from 'react'
 
 export default function Link({ href, ...rest }: Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> & { href: string | { pathname?: string } }) {
-  return <a href={typeof href === 'string' ? href : href.pathname ?? ''} {...rest} />
+  return <a href={typeof href === 'string' ? href : '#'} {...rest} />
 }

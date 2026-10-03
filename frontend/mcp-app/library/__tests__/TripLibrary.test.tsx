@@ -32,7 +32,7 @@ const detailState = (phase: NonNullable<LibraryState['detail']>['phase'], seq = 
 const readyPhase = () => ({ kind: 'ready' as const, data: widgetData(MULTI_SOURCE_RESPONSE) })
 
 function show(state: LibraryState, h: { onOpenTrip?: (id: string) => void; onBack?: () => void } = {}) {
-  const props = { onOpenTrip: h.onOpenTrip ?? vi.fn(), onBack: h.onBack ?? vi.fn(), onDayChange: vi.fn() }
+  const props = { onOpenTrip: h.onOpenTrip ?? vi.fn(), onBack: h.onBack ?? vi.fn(), onDayChange: vi.fn(), hasMap: false, onMapFailed: vi.fn(), restored: null }
   const view = render(<TripLibrary state={state} {...props} />)
   return { ...view, props, again: (s: LibraryState) => view.rerender(<TripLibrary state={s} {...props} />) }
 }
@@ -117,7 +117,7 @@ describe('TripLibrary detail', () => {
 describe('TripLibrary map backstop', () => {
   function showMap(state: LibraryState) {
     const onMapFailed = vi.fn()
-    const props = { onOpenTrip: vi.fn(), onBack: vi.fn(), onDayChange: vi.fn(), onMapFailed }
+    const props = { onOpenTrip: vi.fn(), onBack: vi.fn(), onDayChange: vi.fn(), onMapFailed, restored: null }
     const tree = (s: LibraryState) => (
       <MapProvider accessToken="pk.test-public-token"><TripLibrary state={s} hasMap {...props} /></MapProvider>
     )
@@ -185,7 +185,7 @@ describe('TripLibrary map view boundary', () => {
     const { container } = render(
       <MapProvider accessToken="pk.test-public-token">
         <TripLibrary state={detailState(readyPhase())} hasMap onMapFailed={onMapFailed}
-          onOpenTrip={vi.fn()} onBack={vi.fn()} onDayChange={vi.fn()} />
+          onOpenTrip={vi.fn()} onBack={vi.fn()} onDayChange={vi.fn()} restored={null} />
       </MapProvider>,
     )
     expect(onMapFailed).toHaveBeenCalledTimes(1)
