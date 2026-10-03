@@ -75,8 +75,8 @@ export type MobileTripViewProps = {
   onHideSheet: () => void
   onReopenSheet: () => void
   summaryRewriting: boolean
-  /** Owned by TripWorkspace so a draft survives the phone/desktop switch. */
-  feedback: FeedbackComposer
+  /** Owned by TripWorkspace so a draft survives the phone/desktop switch. Null hides the row. */
+  feedback: FeedbackComposer | null
   /** Desktop (A10): the stop whose detail is in the sidebar instead of on the map card (the map
    *  cannot show it, or the user chose "Details in the sidebar"); null when it is on the map. */
   detailPlaceId?: string | null
@@ -356,7 +356,7 @@ export function TripPanelBody(p: MobileTripViewProps & {
       {/* Desktop (A10): About is redistributed across the tabs; only the trip summary and the
           feedback stay here. The phone keeps its one About disclosure unchanged. */}
       {desktop
-        ? <DesktopAbout bundle={p.bundle} readOnly={p.readOnly} feedback={p.feedback} />
+        ? <DesktopAbout bundle={p.bundle} readOnly={p.readOnly} feedback={p.feedback ?? undefined} />
         : <AboutThisTrip bundle={p.bundle} readOnly={p.readOnly} feedback={p.feedback} />}
     </>
   )

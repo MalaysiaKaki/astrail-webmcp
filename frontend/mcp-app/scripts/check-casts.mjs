@@ -7,7 +7,7 @@ import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const frontend = fileURLToPath(new URL('../..', import.meta.url))
-const srcDirs = ['../src', '../library', '../probe'].map((dir) => fileURLToPath(new URL(dir, import.meta.url)))
+const srcDirs = ['../src', '../library'].map((dir) => fileURLToPath(new URL(dir, import.meta.url)))
 
 const DOMAIN_TYPES = [
   'TripBundle', 'Trip', 'TripPlace', 'TripDay', 'Place', 'TransportLeg',

@@ -15,26 +15,48 @@
  * React install the app uses.
  */
 import { fileURLToPath } from 'node:url'
-import { defineConfig, type UserConfig } from 'vite'
+import { defineConfig, type Plugin, type UserConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 const root = fileURLToPath(new URL('.', import.meta.url))
 const frontend = fileURLToPath(new URL('..', import.meta.url))
 
+const stubs = (file: string) => fileURLToPath(new URL(`./library/stubs/${file}`, import.meta.url))
+
+// The website map stack pulls two modules the widget must not load: next/link (reads process.env at
+// module scope) and TripFeedbackPanel (session/API; imported relatively, so match the RESOLVED path).
+function widgetStubs(): Plugin {
+  return {
+    name: 'astrail-widget-stubs',
+    enforce: 'pre',
+    async resolveId(source, importer, options) {
+      if (source === 'next/link') return stubs('next-link.tsx')
+      if (!importer) return null
+      const resolved = await this.resolve(source, importer, { ...options, skipSelf: true })
+      return resolved?.id.replaceAll('\\', '/').endsWith('components/trip/TripFeedbackPanel.tsx')
+        ? stubs('TripFeedbackPanel.tsx')
+        : null
+    },
+  }
+}
+
 const BUNDLES = {
   itinerary: './src/main.tsx',
   library: './library/main.tsx',
-  probe: './probe/main.tsx', // SPIKE (throwaway)
 } as const
 
 // frontend/package.json has no "type": "module", so Vite bundles this config as CommonJS, and
 // @tailwindcss/vite is ESM-only — a static import fails to `require` it. A dynamic import stays
 // a real `import()` in that output.
-export default defineConfig(async ({ mode }): Promise<UserConfig> => {
-  const name: keyof typeof BUNDLES = mode === 'library' || mode === 'probe' ? mode : 'itinerary'
+export default defineConfig(async ({ mode, command }): Promise<UserConfig> => {
+  const name: keyof typeof BUNDLES = mode === 'library' ? mode : 'itinerary'
   return {
     root,
-    plugins: [react(), (await import('@tailwindcss/vite')).default()],
+    plugins: [
+      ...(name === 'library' || command === 'serve' ? [widgetStubs()] : []),
+      react(),
+      (await import('@tailwindcss/vite')).default(),
+    ],
     resolve: {
       alias: { '@': frontend },
     },

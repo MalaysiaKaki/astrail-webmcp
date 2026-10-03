@@ -1,8 +1,11 @@
 /**
  * The Trip Library: a one-column list of trips (the website's TripRow card, one tap to open) and,
  * once a trip is opened, the shared itinerary view under a back bar. Mobile first; the entrypoints
- * are already fullscreen.
+ * are already fullscreen. With a live map (`hasMap`), a loaded trip with days opens in TripMapView;
+ * anything else keeps the static WidgetView.
  */
+import { Component, useEffect, type ReactNode } from 'react'
+import { useOptionalSharedMap } from '@/components/map/MapProvider'
 import { WidgetView } from '../src/ItineraryWidget'
 import type { WidgetDayState } from '../src/day-view'
 import { ChevronRightIcon } from '@/components/dashboard/nav-icons'
@@ -10,6 +13,32 @@ import RouteGlyph from '@/components/trips/RouteGlyph'
 import { META, TAG } from '@/lib/shell/ui'
 import { statusDotClass, tripDateRange, tripStatusLabel } from '@/lib/trip/trip-presenters'
 import type { LibraryState, TripSummary } from './state'
+import TripMapView from './TripMapView'
+
+/** A map that has not loaded this long after a trip opened is treated as failed. */
+export const MAP_BACKSTOP_MS = 15_000
+
+/** Never a blank page: a render-time throw in the map view latches and shows the static view. */
+class MapViewBoundary extends Component<{ onError: () => void; fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  componentDidCatch() {
+    console.warn('[astrail-library] map view failed, showing the static view')
+    this.props.onError()
+  }
+  render() { return this.state.failed ? this.props.fallback : this.props.children }
+}
+
+/* Null-safe on purpose: once the latch removes the provider, useSharedMap() would throw. Restarted
+   by each map detail mount; cancelled on ready, Back (inactive) and unmount. */
+function useMapBackstop(active: boolean, onMapFailed: () => void) {
+  const ready = useOptionalSharedMap()?.ready ?? false
+  useEffect(() => {
+    if (!active || ready) return
+    const timer = setTimeout(onMapFailed, MAP_BACKSTOP_MS)
+    return () => clearTimeout(timer)
+  }, [active, ready, onMapFailed])
+}
 
 const PAGE = 'mx-auto max-w-[640px] px-4 pt-[calc(var(--safe-top,0px)+16px)] pb-[calc(var(--safe-bottom,0px)+16px)]'
 // Card classes copied from components/trips/TripRow.tsx (that file imports next/link).
@@ -68,15 +97,24 @@ function List({ state, onOpenTrip }: { state: LibraryState; onOpenTrip: (tripId:
   )
 }
 
-export default function TripLibrary({ state, onOpenTrip, onBack, onDayChange }: {
+export default function TripLibrary({ state, onOpenTrip, onBack, onDayChange, hasMap, onMapFailed, restored }: {
   state: LibraryState
   onOpenTrip: (tripId: string) => void
   onBack: () => void
   onDayChange: (state: WidgetDayState) => void
+  /** A MapProvider wraps this tree and the map has not failed. */
+  hasMap: boolean
+  /** Sets the library-wide latch (stable identity). */
+  onMapFailed: () => void
+  /** The open trip's last chosen day: a fallback after a latch reopens on it. */
+  restored: WidgetDayState | null
 }) {
   const { detail } = state
+  const mapData = hasMap && detail?.phase.kind === 'ready' && detail.phase.data.bundle.days.length > 0
+    ? detail.phase.data : null
+  useMapBackstop(mapData !== null, onMapFailed)
   if (!detail) return <List state={state} onOpenTrip={onOpenTrip} />
-  return (
+  const staticDetail = (
     <div data-library data-library-detail>
       <div className="sticky top-0 z-10 bg-[color:var(--m-page)] pt-[var(--safe-top,0px)]">
         <button type="button" onClick={onBack} aria-label="Back to all trips"
@@ -84,7 +122,13 @@ export default function TripLibrary({ state, onOpenTrip, onBack, onDayChange }: 
           <span aria-hidden>‹</span>&nbsp;All trips
         </button>
       </div>
-      <WidgetView key={detail.seq} phase={detail.phase} restored={null} onDayChange={onDayChange} />
+      <WidgetView key={detail.seq} phase={detail.phase} restored={restored} onDayChange={onDayChange} />
     </div>
+  )
+  if (!mapData) return staticDetail
+  return (
+    <MapViewBoundary key={detail.seq} onError={onMapFailed} fallback={staticDetail}>
+      <TripMapView key={detail.seq} data={mapData} onBack={onBack} onDayChange={onDayChange} />
+    </MapViewBoundary>
   )
 }

@@ -6,7 +6,7 @@
 import { registerAppTool } from '@modelcontextprotocol/ext-apps/server'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
-import { LIBRARY_RESOURCE_URI, MCP_LIMITS, tripsPageSchema } from '../contract'
+import { LIBRARY_RESOURCE_URI, MAPBOX_TOKEN_META_KEY, MCP_LIMITS, tripsPageSchema } from '../contract'
 import { BACKEND_PATHS, callBackend } from '../upstream'
 import { listBody, tripsText } from './lists'
 import { READ_ONLY_ANNOTATIONS, runTool, toolMeta, type ToolContext } from './shared'
@@ -17,6 +17,14 @@ export const LIBRARY_TOOLS = { global: 'open_trip_library', thread: 'open_trip_p
 // SDK 1.x registerTool drops `icons`, so server.ts adds them in its tools/list wrapper.
 const ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.33" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17.5s-5.5-4.7-5.5-9.2a5.5 5.5 0 0 1 11 0c0 4.5-5.5 9.2-5.5 9.2z"/><circle cx="10" cy="8.3" r="2"/></svg>'
 export const LIBRARY_TOOL_ICONS = [{ src: `data:image/svg+xml,${encodeURIComponent(ICON_SVG)}`, mimeType: 'image/svg+xml', sizes: ['any'] }]
+
+/** Public tokens only: an `sk.` secret must never reach a widget. `MCP_LIBRARY_MAP=off` is the
+ * rollback lever: newly opened libraries get no token and fall back to the list view. */
+function publicMapboxToken(env: Record<string, string | undefined>): string | null {
+  if (env.MCP_LIBRARY_MAP === 'off') return null
+  const token = env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN?.trim()
+  return token?.startsWith('pk.') ? token : null
+}
 
 const ENTRYPOINTS = [
   { name: LIBRARY_TOOLS.global, title: 'Astrail', description: 'Open your Astrail trips and read any of them day by day.', entrypoint: { type: 'global' } },
@@ -47,7 +55,11 @@ export function registerLibraryTools(server: McpServer, ctx: ToolContext): void 
       async () =>
         runTool(name, ctx, async () => {
           const page = await callBackend(ctx, BACKEND_PATHS.tripsList, listBody({ limit: MCP_LIMITS.listMax }), tripsPageSchema)
-          return { structuredContent: page, content: [{ type: 'text', text: tripsText(page) }] }
+          return {
+            structuredContent: page,
+            content: [{ type: 'text', text: tripsText(page) }],
+            _meta: { [MAPBOX_TOKEN_META_KEY]: publicMapboxToken(process.env) },
+          }
         }),
     )
   }

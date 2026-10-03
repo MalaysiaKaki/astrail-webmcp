@@ -31,6 +31,9 @@ const DEFAULT_TRANSITION_MS = 300
 
 export type LightPreset = 'night' | 'dawn'
 
+/** Why the map could not come up. Fixed strings only: an error payload can carry URLs (and token). */
+export type MapErrorReason = 'import' | 'construct' | 'style'
+
 export type AcquireOptions = {
   interactive: boolean
   lightPreset: LightPreset
@@ -91,7 +94,14 @@ function applyInteractive(map: mapboxgl.Map, on: boolean) {
   map.touchPitch.disable()
 }
 
-export default function MapProvider({ children }: { children: React.ReactNode }) {
+export default function MapProvider({ children, accessToken, onError }: {
+  children: React.ReactNode
+  /** Wins over NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN when given (the ChatGPT widget's token). */
+  accessToken?: string
+  /** Once per map attempt: the bundle import, the constructor, or the first error before 'load'
+   *  failed. Given, it also silences Mapbox's default console.error. Omitted: today's behaviour. */
+  onError?: (reason: MapErrorReason) => void
+}) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const markersRef = useRef<mapboxgl.Marker[]>([])
@@ -102,6 +112,9 @@ export default function MapProvider({ children }: { children: React.ReactNode })
   /** What the currently-mounted consumer asked for, or null once it has released. */
   const activeRef = useRef<AcquireOptions | null>(null)
   const loadingRef = useRef(false)
+  const aliveRef = useRef(true)
+  const onErrorRef = useRef(onError)
+  onErrorRef.current = onError
 
   const [ready, setReady] = useState(false)
   const [visible, setVisible] = useState(false)
@@ -142,7 +155,7 @@ export default function MapProvider({ children }: { children: React.ReactNode })
       clearTimeout(hideTimerRef.current)
       hideTimerRef.current = null
     }
-    const token = mapboxToken()
+    const token = accessToken ?? mapboxToken()
     if (!token) return
 
     activeRef.current = options
@@ -169,19 +182,39 @@ export default function MapProvider({ children }: { children: React.ReactNode })
       // Released while the bundle was in flight — do not build a map nobody is showing.
       if (!container || !wanted || mapRef.current) return
       mapboxgl.accessToken = token
-      const map = new mapboxgl.Map({
-        container,
-        style: 'mapbox://styles/mapbox/standard',
-        projection: 'globe',
-        center: wanted.center ?? [100, 15],
-        zoom: wanted.zoom ?? 1.2,
-        pitch: 0,
-        interactive: false,
-      })
+      let map: mapboxgl.Map
+      try {
+        map = new mapboxgl.Map({
+          container,
+          style: 'mapbox://styles/mapbox/standard',
+          projection: 'globe',
+          center: wanted.center ?? [100, 15],
+          zoom: wanted.zoom ?? 1.2,
+          pitch: 0,
+          interactive: false,
+        })
+      } catch (err) {
+        // No WebGL, typically. loadingRef is already clear, so a later acquire retries. Without an
+        // onError, rethrow: the website keeps seeing it as an unhandled rejection (Sentry).
+        if (!onErrorRef.current) throw err
+        onErrorRef.current('construct')
+        return
+      }
+      // Loaded, or the pre-load error already reported: later errors are not the map failing.
+      let settled = false
       map.on('load', () => {
+        settled = true
         setReady(true)
         applyPreset()
       })
+      if (onErrorRef.current) {
+        // Registering any 'error' listener replaces Mapbox's console.error. Never forward the event.
+        map.on('error', () => {
+          if (settled) return
+          settled = true
+          onErrorRef.current?.('style')
+        })
+      }
       mapRef.current = map
       if (process.env.NODE_ENV !== 'production') {
         // Dev-only handle so capture/QA sessions can tune Standard config properties.
@@ -190,8 +223,12 @@ export default function MapProvider({ children }: { children: React.ReactNode })
       }
       applyPreset()
       applyInteractive(map, wanted.interactive)
+    }, (err) => {
+      loadingRef.current = false
+      if (!onErrorRef.current) throw err
+      if (aliveRef.current) onErrorRef.current('import')
     })
-  }, [applyPreset])
+  }, [applyPreset, accessToken])
 
   // Deliberately does NOT reset the light preset: the relight is fired on the outgoing
   // route and has to survive this teardown to still be running when the next one mounts.
@@ -220,22 +257,26 @@ export default function MapProvider({ children }: { children: React.ReactNode })
   }, [])
 
   // Only on leaving the /app shell entirely — never across an in-shell navigation.
-  useEffect(() => () => {
-    if (hideTimerRef.current) clearTimeout(hideTimerRef.current)
-    mapRef.current?.remove()
-    mapRef.current = null
-    markersRef.current = []
+  useEffect(() => {
+    aliveRef.current = true
+    return () => {
+      aliveRef.current = false
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current)
+      mapRef.current?.remove()
+      mapRef.current = null
+      markersRef.current = []
+    }
   }, [])
 
   const value = useMemo<SharedMapContextValue>(() => ({
-    hasToken: Boolean(mapboxToken()),
+    hasToken: Boolean(accessToken ?? mapboxToken()),
     ready,
     getMap: () => mapRef.current,
     acquire,
     release,
     setMarkers,
     setLightPreset,
-  }), [ready, acquire, release, setMarkers, setLightPreset])
+  }), [ready, acquire, release, setMarkers, setLightPreset, accessToken])
 
   return (
     <>

@@ -28,7 +28,10 @@ function ensureProbe(): HTMLElement {
   probe.setAttribute(
     'style',
     'position:fixed;top:0;left:0;width:0;height:0;visibility:hidden;pointer-events:none;'
-      + 'padding-top:env(safe-area-inset-top, 0px)',
+      // A host inset carried as --safe-top (the ChatGPT widget) wins; the first declaration is the
+      // fallback for an engine that rejects the second. The website never sets --safe-top.
+      + 'padding-top:env(safe-area-inset-top, 0px);'
+      + 'padding-top:var(--safe-top, env(safe-area-inset-top, 0px))',
   )
   document.body.appendChild(probe)
   return probe
