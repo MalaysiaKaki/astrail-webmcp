@@ -331,6 +331,6 @@ shasum -a 256 public/mcp-widget/v3/* lib/mcp/widget/generated/itinerary-v3.ts > 
 
 ## Review folds (rev 3 → rev 3.1)
 - Codex r3 and Claude r3 both flagged `TripPanelBody` → `DesktopAbout` nullable forwarding. Fixed with `p.feedback ?? undefined` inside the authorized MobileTripView seam.
-- Claude r3: backstop reads `ready` null-safely after the latch; kill switch documented in ENV.md.
+- Claude r3: backstop reads `ready` null-safely after the latch; kill switch documented in the handoff doc.
 - Codex r3: kill-switch wording corrected to "newly opened".
 - Scores: Claude 7.5 PASS; Codex 6, with that single type gap as its only P2.

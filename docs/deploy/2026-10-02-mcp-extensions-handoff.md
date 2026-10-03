@@ -17,10 +17,13 @@ Owner: Shaun (MCP surface). Shared website seams (five, default-preserving) touc
 - **v1 kept.** `ui://astrail/library-v1.html` and `/mcp-widget/library/v1/` stay published with the old CSP and the same new bundle. A host that cached the v1 shell gets Mapbox requests blocked by CSP; the map latch fires and every trip shows the static `WidgetView` (verified in the browser). Remove v1 only after a host-cache policy is decided.
 - **Refresh the connector** (ChatGPT, Plugins, Refresh) so hosts pick up the v2 resource URI. Until then a cached host keeps v1 (static view).
 - **Token.** The entrypoint results carry `NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN` (already set on Vercel production; the earlier probe used it) in model-hidden `_meta['astrail/mapbox_token']`. Only `pk.` values pass; an `sk.` value gives no token. The token is never logged, rendered or put in model text.
-- **Fallback and latch.** No token, no WebGL, a Mapbox load error (CSP, style, tiles), a render throw in the map view, or a map not ready 15 s after a trip opens all latch `mapFailed` for the life of that library iframe: the map provider unmounts and every trip renders the static `WidgetView`, on the day the user last chose. A zero-day trip always uses `WidgetView`.
+- **Fallback behaviour (three cases).**
+  1. **Static selection, no latch:** no token, no WebGL, or a zero-day trip shows the static `WidgetView` directly.
+  2. **Latch:** a Mapbox error **before the style loads** (import, construct, style), a render-time throw in the map view, or a map not ready 15 s after a trip opens latches `mapFailed` for the rest of that library session: the map provider unmounts and every trip renders the static `WidgetView`, on the day the user last chose.
+  3. **Not handled (deferred):** errors **after** load (tiles, style, worker) leave a degraded map. Mapbox's default console errors are suppressed, so check the network panel.
 - **Probe removed.** The throwaway `open_map_probe` tool, its resource and `/mcp-widget/probe/v1/` are gone. A host with a cached tool list may show "unknown tool" for it until the connector is refreshed.
 - **Bundle size.** `library.js` 2,604,039 B (about 712 KB gzip), `library.css` 96,593 B (about 17 KB gzip); Mapbox GL JS is most of it. It loads only when a library entrypoint opens; the v3 inline card is unchanged (sha256 below still matches).
-- **Kill switch `MCP_LIBRARY_MAP`.** Server env on Vercel. Only the exact value `off` disables the map: the entrypoints then omit the token, so every newly opened library falls back to `WidgetView`. It affects newly opened libraries only; an iframe already open keeps its token until it is closed. Any other value, or unset, leaves the map on.
+- **Kill switch `MCP_LIBRARY_MAP`.** Server env on Vercel; this handoff doc is the env reference (`docs/ENV.md` does not exist). Only the exact value `off` disables the map: the entrypoint results then carry a **null** token value (the `astrail/mapbox_token` key stays present). It affects **newly returned entrypoint results**: newly opened libraries go static; an already-open library keeps its map until it is closed and reopened; it does not retract context already attached. Any other value, or unset, leaves the map on.
 
 ## Compatibility
 
@@ -42,15 +45,17 @@ Merge gate (live, iOS and Android): both entrypoints open; tap a trip and the de
 
 **First live check (untested assumption):** tapping a trip relies on ChatGPT's `callServerTool` returning the result `_meta` (`astrail/bundle`) to the app. Failure signature: every tapped trip shows "Couldn't display this itinerary" while the model-invoked card still works. Fix then: an app-only tool that returns the bundle in `structuredContent`.
 
-### Live test for the map (Desktop and iPhone, after Refresh)
+### Release gate: live map (run right after deploy)
+
+Merge is deploy and the connector runs in dev mode, so run this on the **real library in ChatGPT Desktop and iPhone** immediately after the deploy, with the kill switch ready. Record the host versions. Android is outstanding unless tested. Cover: both entrypoints; list to trip (`_meta` forwarding); labels; 3D; safe areas; chip removal then day change; A, Back, B; an old v3 card; a cached v1 shell (static fallback); a refreshed v2 shell.
 
 On ChatGPT Desktop and on an iPhone, open "Astrail" from the sidebar and tap a trip. Check:
 
 1. The map renders with street and place **labels/glyphs** (not blank tiles), the pins, and the route; the sheet sits over the lower half and the map shows above it.
-2. "All trips" and the Fit/3D controls sit below the notch / host chrome; the sheet's last row clears the home indicator.
+2. The Back circle (chevron, label "Back to all trips") and the Fit/3D controls sit below the notch / host chrome; the sheet's last row clears the home indicator.
 3. **3D** toggles to a pitched view with terrain and back, with no blank map.
 4. On Day 2, tap a Day 1 pin: the day strip **switches to Day 1** and the sheet scrolls to that stop.
-5. Stay shows the hotels and the hotel card. Known website behaviour: on a phone the hotel card can run up under the "All trips" button (phone framing leaves no popup room); note whether it is usable.
+5. Stay shows the hotels and the hotel card. Known website behaviour: on a phone the hotel card runs up under the Back control (phone framing leaves no popup room; same root cause as the website phone page, `components/map/frame-padding.ts` around line 150). Confirmed known issue, deferred to Zhi Hao; trigger: before broader publication. Note whether it is usable.
 6. Open trip A, Back, trip B, Back, trip A: each shows only its own pins.
 7. The **context chip** appears; remove it, change day: it does not re-attach.
 8. An **old model-invoked v3 card** in a chat still renders and works.
@@ -60,7 +65,7 @@ Availability caveats as stated by OpenAI docs on 2026-10-02: Free/Go on web is "
 
 ## Rollback
 
-**Live map (2026-10-03): use the kill switch, not a revert.** Set the Vercel env `MCP_LIBRARY_MAP=off` and redeploy. The entrypoints then omit the token and every newly opened library uses `WidgetView`. Keep both resource URIs (`library-v1`, `library-v2`) and both asset paths published: a revert would delete the v2 assets that cached v2 shells still load, which would blank those libraries. To re-enable, unset the variable and redeploy.
+**Live map (2026-10-03): use the kill switch, not a revert.** Set the Vercel env `MCP_LIBRARY_MAP=off` and redeploy. The entrypoints then return a null token and every newly opened library uses `WidgetView` (open libraries keep their map until reopened). Keep both resource URIs (`library-v1`, `library-v2`) and both asset paths published: a revert would delete the v2 assets that cached v2 shells still load, which would blank those libraries. To re-enable, unset the variable and redeploy.
 
 Whole Trip Library (original rollback):
 
@@ -87,7 +92,7 @@ QA evidence (2026-10-03, headless Chrome + SwiftShader, real Mapbox tiles): scre
 | Remove `library-v1` resource and `/mcp-widget/library/v1/` | An explicit host-cache/refresh policy is accepted |
 | Desktop floating-panel layout for the library map | Users find the full-width phone sheet awkward on wide Desktop |
 | Post-load fatal map error fallback | Seen live (today only pre-load errors fall back) |
-| Phone hotel card room under the top controls (shared `frame-padding`) | Live test shows the Stay card hidden under "All trips" |
+| Phone hotel card room under the top controls (shared `frame-padding`) | Before broader publication (owner: Zhi Hao); confirmed known issue |
 | Composer @-mentions | Desktop users ask for them |
 | Native plugin settings | A remote preferences write contract exists |
 | Rich forms (MRTR) | MRTR-capable SDK adopted and a write flow needs it |
