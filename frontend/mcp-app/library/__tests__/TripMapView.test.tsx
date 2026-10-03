@@ -3,6 +3,7 @@ import { act, cleanup, render, screen, within } from '@testing-library/react'
 import MapProvider from '@/components/map/MapProvider'
 import { forceTripLayout } from '@/lib/trip/use-trip-layout'
 import { setSheetObstruction } from '@/lib/trip/sheet-obstruction'
+import { getControlRects } from '@/lib/trip/control-obstruction'
 import type { ItineraryResponse } from '@/lib/mcp/contract'
 import {
   CAPPED_QUOTES_RESPONSE, FIXTURE_IDS, MULTI_SOURCE_RESPONSE, OTHER_TRIP_RESPONSE,
@@ -15,9 +16,29 @@ import TripMapView from '../TripMapView'
 const gl = vi.hoisted(() => {
   const layers = new Set<string>()
   const sources = new Set<string>()
+  // Live listener registry: on/once add, off removes, so a listener left behind is visible.
+  const listeners = new Map<string, Set<unknown>>()
+  const add = (event: string, fn: unknown) => {
+    if (!listeners.has(event)) listeners.set(event, new Set())
+    listeners.get(event)!.add(fn)
+  }
+  // Terrain and fog as state, so camera-mode's real controller runs and its result is readable.
+  const atmosphere: { terrain: { source: string } | null; fog: unknown; fogThrows: number } = {
+    terrain: null, fog: null, fogThrows: 0,
+  }
   const handler = () => ({ enable: vi.fn(), disable: vi.fn() })
   const mapInstance = {
-    on: vi.fn(), off: vi.fn(), getZoom: vi.fn(() => 13),
+    on: vi.fn(add), once: vi.fn(add),
+    off: vi.fn((event: string, fn: unknown) => { listeners.get(event)?.delete(fn) }),
+    getTerrain: vi.fn(() => atmosphere.terrain),
+    setTerrain: vi.fn((t: { source: string } | null) => { atmosphere.terrain = t }),
+    getFog: vi.fn(() => atmosphere.fog),
+    setFog: vi.fn((f: unknown) => {
+      // "Style is not done loading": the controller defers the rest of its step to 'idle'.
+      if (atmosphere.fogThrows > 0) { atmosphere.fogThrows--; throw new Error('style not done loading') }
+      atmosphere.fog = f
+    }),
+    getZoom: vi.fn(() => 13),
     getCanvas: vi.fn(() => ({ clientWidth: 390, clientHeight: 844 })),
     addSource: vi.fn((id: string) => { sources.add(id) }),
     addLayer: vi.fn((layer: { id: string }) => { layers.add(layer.id) }),
@@ -27,7 +48,7 @@ const gl = vi.hoisted(() => {
     removeSource: vi.fn((id: string) => { sources.delete(id) }),
     setFilter: vi.fn(), setPaintProperty: vi.fn(), setLayoutProperty: vi.fn(),
     flyTo: vi.fn(), fitBounds: vi.fn(), jumpTo: vi.fn(), setConfigProperty: vi.fn(),
-    easeTo: vi.fn(), isMoving: vi.fn(() => false), once: vi.fn(), setPadding: vi.fn(),
+    easeTo: vi.fn(), isMoving: vi.fn(() => false), setPadding: vi.fn(),
     getContainer: vi.fn(() => ({ clientWidth: 390, clientHeight: 844 })),
     remove: vi.fn(), resize: vi.fn(), stop: vi.fn(),
     style: { setTransition: vi.fn() },
@@ -49,7 +70,7 @@ const gl = vi.hoisted(() => {
     return popup
   })
   const BoundsCtor = vi.fn(() => ({ extend: vi.fn() }))
-  return { layers, sources, mapInstance, MapCtor, MarkerCtor, PopupCtor, BoundsCtor, markers }
+  return { layers, sources, listeners, atmosphere, mapInstance, MapCtor, MarkerCtor, PopupCtor, BoundsCtor, markers }
 })
 
 vi.mock('mapbox-gl', () => ({
@@ -70,6 +91,8 @@ function fireLoad() {
 
 const pin = (name: string) => gl.markers.find((m) => m.el.getAttribute('aria-label') === name)?.el
 const liveMarkers = () => gl.markers.filter((m) => m.remove.mock.calls.length === 0)
+/** Every registered listener, per event, as counts (what the provider owns stays; a route's must go). */
+const listenerCounts = () => Object.fromEntries([...gl.listeners].map(([e, fns]) => [e, fns.size]).filter(([, n]) => n))
 const stops = () => within(screen.getByRole('list', { name: 'Stops' }))
 
 /** Opens one trip on a loaded map: the import resolves, the map loads, the pins are drawn. */
@@ -91,6 +114,10 @@ beforeEach(() => {
   gl.layers.clear()
   gl.sources.clear()
   gl.markers.length = 0
+  gl.listeners.clear()
+  gl.atmosphere.terrain = null
+  gl.atmosphere.fog = null
+  gl.atmosphere.fogThrows = 0
   forceTripLayout('mobile')
   // TripMap frames in a requestAnimationFrame; run it synchronously (as TripMap.test does).
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1 })
@@ -101,6 +128,7 @@ afterEach(() => {
   cleanup()
   forceTripLayout(null)
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
   setSheetObstruction(0)
 })
 
@@ -224,5 +252,60 @@ describe('TripMapView', () => {
     }
     expect(gl.MapCtor).toHaveBeenCalledTimes(1)
     expect(gl.mapInstance.remove).not.toHaveBeenCalled()
+  })
+
+  it('A in 3D with a deferred ease and a deferred terrain step -> Back -> B: no listener, terrain, layer or source survives', async () => {
+    const props = { onBack: vi.fn(), onDayChange: vi.fn() }
+    const view = render(<MapProvider accessToken="pk.test">{null}</MapProvider>)
+    const show = (response: ItineraryResponse) => view.rerender(
+      <MapProvider accessToken="pk.test"><TripMapView data={widgetData(response)} {...props} /></MapProvider>,
+    )
+    const back = () => view.rerender(<MapProvider accessToken="pk.test">{null}</MapProvider>)
+
+    show(MULTI_SOURCE_RESPONSE)
+    await flush()
+    fireLoad()
+    // The provider's own 'load' listener outlives every trip; everything else is the route's.
+    const providerOnly = { load: 1 }
+    await flush()
+    const mounted = listenerCounts()
+    expect(Object.keys(mounted).length).toBeGreaterThan(1)
+
+    // 3D on, its fog step deferred to 'idle' (the style "not done loading" once).
+    gl.atmosphere.fogThrows = 1
+    act(() => { screen.getByRole('button', { name: '3D view' }).click() })
+    expect(gl.atmosphere.terrain?.source).toBeTruthy()
+    // The sheet's first measurement re-fits; the next, mid-flight, defers its padding ease to 'moveend'.
+    act(() => { setSheetObstruction(300) })
+    gl.mapInstance.isMoving.mockReturnValue(true)
+    act(() => { setSheetObstruction(320) })
+    gl.mapInstance.isMoving.mockReturnValue(false)
+    expect(listenerCounts()).toEqual({ ...mounted, idle: 1, moveend: (mounted.moveend ?? 0) + 1 })
+
+    back()
+    await flush()
+    expect(listenerCounts()).toEqual(providerOnly)
+    expect(gl.atmosphere.terrain).toBeNull()
+    expect(gl.mapInstance.setTerrain).toHaveBeenLastCalledWith(null)
+    expect([...gl.layers]).toEqual([])
+    expect([...gl.sources]).toEqual([])
+
+    show(OTHER_TRIP_RESPONSE)
+    await flush()
+    expect(screen.getByRole('heading', { name: 'Another trip' })).toBeInTheDocument()
+    expect(gl.atmosphere.terrain).toBeNull()
+    expect(gl.MapCtor).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports the back button\'s rect for the camera padding, and clears it on unmount', async () => {
+    const rect = { left: 12, top: 12, width: 120, height: 48, right: 132, bottom: 60, x: 12, y: 12 }
+    const zero = { left: 0, top: 0, width: 0, height: 0, right: 0, bottom: 0, x: 0, y: 0 }
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return { ...(this.getAttribute('aria-label') === 'Back to all trips' ? rect : zero), toJSON: () => ({}) }
+    })
+    const view = await open()
+    expect(getControlRects()).toContainEqual({ x: 12, y: 12, w: 120, h: 48 })
+    view.unmount()
+    expect(getControlRects()).toEqual([])
   })
 })
