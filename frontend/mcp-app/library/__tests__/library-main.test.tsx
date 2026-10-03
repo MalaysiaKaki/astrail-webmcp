@@ -3,7 +3,7 @@
  * SDK's in-memory transport pair. Nothing in main.tsx is mocked; trip loads are deferred promises
  * so the tests decide the order in which results arrive.
  */
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { waitFor, within } from '@testing-library/react'
 import { AppBridge } from '@modelcontextprotocol/ext-apps/app-bridge'
 import type { McpUiHostCapabilities, McpUiHostContext } from '@modelcontextprotocol/ext-apps'
@@ -16,6 +16,10 @@ import { MULTI_SOURCE_RESPONSE, OTHER_TRIP_RESPONSE } from '../../src/__fixtures
 import { renderResult } from '../../src/__tests__/tool-results'
 import { availableDayNumbers } from '../../src/day-view'
 import { GENERIC_ERROR } from '../../src/tool-result'
+import { MAPBOX_TOKEN_META_KEY } from '@/lib/mcp/contract'
+import { fire, mapInstance, MapCtor, resetMapbox } from './mapbox-gl-mock'
+
+vi.mock('mapbox-gl', async () => (await import('./mapbox-gl-mock')).mapboxModule)
 
 type ContextUpdate = Parameters<NonNullable<AppBridge['onupdatemodelcontext']>>[0]
 type Deferred = { resolve: (r: CallToolResult) => void; reject: (e: Error) => void }
@@ -36,9 +40,10 @@ const CHATGPT: McpUiHostCapabilities = {
   updateModelContext: { text: {}, structuredContent: {} },
   experimental: { 'openai/modelContext': {} },
 }
-const page = (structuredContent: typeof TRIPS_PAGE_FIXTURE): CallToolResult => ({
+const page = (structuredContent: typeof TRIPS_PAGE_FIXTURE, token?: string): CallToolResult => ({
   content: [{ type: 'text', text: 'Trips shown.' }],
   structuredContent,
+  ...(token === undefined ? {} : { _meta: { [MAPBOX_TOKEN_META_KEY]: token } }),
 })
 
 const started: Host[] = []
@@ -68,7 +73,8 @@ async function startHost({
   hostContext = {},
   capabilities = CHATGPT,
   closeFirst = false,
-}: { hostContext?: McpUiHostContext; capabilities?: McpUiHostCapabilities; closeFirst?: boolean } = {}): Promise<Host> {
+  token,
+}: { hostContext?: McpUiHostContext; capabilities?: McpUiHostCapabilities; closeFirst?: boolean; token?: string } = {}): Promise<Host> {
   const [appTransport, hostTransport] = InMemoryTransport.createLinkedPair()
   const bridge = new AppBridge(null, { name: 'test-host', version: '1' }, capabilities, { hostContext })
   const calls: Host['calls'] = []
@@ -84,7 +90,7 @@ async function startHost({
     contexts.push(params)
     return {}
   }
-  bridge.oninitialized = () => void bridge.sendToolResult(page(TRIPS_PAGE_FIXTURE))
+  bridge.oninitialized = () => void bridge.sendToolResult(page(TRIPS_PAGE_FIXTURE, token))
   await bridge.connect(hostTransport)
   if (closeFirst) await hostTransport.close()
   const container = document.createElement('div')
@@ -283,5 +289,118 @@ describe('trip library lifecycle', () => {
     expect(ui(host).queryByRole('status', { name: 'Loading trips' })).toBeNull()
     expect(linkDelegated(host.container)).toBe(false)
     error.mockRestore()
+  })
+})
+
+const mapView = (host: Host) => host.container.querySelector('[data-library-map]')
+const staticView = (host: Host) => host.container.querySelector('[data-library-detail]')
+const sharedMap = (host: Host) => host.container.querySelector('[data-testid="shared-map"]')
+
+async function openTrip(host: Host, title: string, tripId: string, response: typeof MULTI_SOURCE_RESPONSE) {
+  await tap(host, title)
+  await resolveTrip(host, tripId, response)
+}
+
+describe('trip library live map', () => {
+  const loseContext = vi.fn()
+  let webgl = true
+
+  beforeEach(() => {
+    resetMapbox()
+    webgl = true
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
+      (() => (webgl ? { getExtension: () => ({ loseContext }) } : null)) as unknown as HTMLCanvasElement['getContext'],
+    )
+  })
+  afterEach(() => { vi.restoreAllMocks() })
+
+  it('declares the inline and fullscreen display modes at init', async () => {
+    const host = await startHost()
+    expect(host.bridge.getAppCapabilities()?.availableDisplayModes).toEqual(['inline', 'fullscreen'])
+  })
+
+  it('opens a trip on the live map with a pk. token and WebGL, after releasing the probe context', async () => {
+    const host = await startHost({ token: 'pk.test' })
+    await openTrip(host, 'Tokyo in three Reels', A, MULTI_SOURCE_RESPONSE)
+    await waitFor(() => expect(mapView(host)).not.toBeNull())
+    expect(staticView(host)).toBeNull()
+    expect(ui(host).getByRole('heading', { name: 'Tokyo in three Reels' })).toBeInTheDocument()
+    expect(loseContext).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(MapCtor).toHaveBeenCalledTimes(1))
+    // pushContext is unchanged: the opening day is published once.
+    await waitFor(() => expect(host.contexts).toHaveLength(1))
+    expect(host.contexts[0].structuredContent).toEqual({ trip_id: A, day: firstDay(MULTI_SOURCE_RESPONSE) })
+  })
+
+  it('A -> Back -> B: back returns to the list, and one map serves both trips', async () => {
+    const host = await startHost({ token: 'pk.test' })
+    await openTrip(host, 'Tokyo in three Reels', A, MULTI_SOURCE_RESPONSE)
+    await waitFor(() => expect(MapCtor).toHaveBeenCalledTimes(1))
+    fire('load')
+    await back(host)
+    await waitFor(() => expect(ui(host).getByRole('heading', { name: 'Your trips' })).toBeInTheDocument())
+    await openTrip(host, 'Kyoto long weekend', B, OTHER_TRIP_RESPONSE)
+    await waitFor(() => expect(ui(host).getByRole('heading', { name: 'Another trip' })).toBeInTheDocument())
+    expect(mapView(host)).not.toBeNull()
+    expect(MapCtor).toHaveBeenCalledTimes(1)
+    expect(mapInstance.remove).not.toHaveBeenCalled()
+  })
+
+  it('keeps the static view without a pk. token, without WebGL, or for a zero-day trip', async () => {
+    const zeroDay = { ...MULTI_SOURCE_RESPONSE, bundle: { ...MULTI_SOURCE_RESPONSE.bundle, days: [] } }
+    const cases = [
+      { name: 'no token', token: undefined, gl: true, response: MULTI_SOURCE_RESPONSE, provider: false },
+      { name: 'secret token', token: 'sk.secret', gl: true, response: MULTI_SOURCE_RESPONSE, provider: false },
+      { name: 'no WebGL', token: 'pk.test', gl: false, response: MULTI_SOURCE_RESPONSE, provider: false },
+      { name: 'zero days', token: 'pk.test', gl: true, response: zeroDay, provider: true },
+    ]
+    for (const c of cases) {
+      webgl = c.gl
+      const host = await startHost({ token: c.token })
+      await openTrip(host, 'Tokyo in three Reels', A, c.response)
+      await waitFor(() => expect(staticView(host), c.name).not.toBeNull())
+      expect(mapView(host), c.name).toBeNull()
+      expect(sharedMap(host) !== null, c.name).toBe(c.provider)
+      host.dispose()
+    }
+    await settle()
+    expect(MapCtor).not.toHaveBeenCalled()
+  })
+
+  it('a map error latches: the provider unmounts (one remove) and every later trip is static', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const host = await startHost({ token: 'pk.test' })
+    await openTrip(host, 'Tokyo in three Reels', A, MULTI_SOURCE_RESPONSE)
+    await waitFor(() => expect(MapCtor).toHaveBeenCalledTimes(1))
+    fire('error', { error: new Error('style blocked') })
+    await waitFor(() => expect(staticView(host)).not.toBeNull())
+    expect(mapView(host)).toBeNull()
+    expect(sharedMap(host)).toBeNull()
+    expect(mapInstance.remove).toHaveBeenCalledTimes(1)
+    expect(warn).toHaveBeenCalledWith('[astrail-library] map unavailable, showing the static view')
+
+    await back(host)
+    await openTrip(host, 'Kyoto long weekend', B, OTHER_TRIP_RESPONSE)
+    await heading(host, 'Osaka, Japan')
+    expect(staticView(host)).not.toBeNull()
+    expect(mapView(host)).toBeNull()
+    expect(MapCtor).toHaveBeenCalledTimes(1)
+    expect(mapInstance.remove).toHaveBeenCalledTimes(1)
+  })
+
+  it('re-measures (window resize) after new host safe-area insets are applied, and only then', async () => {
+    const host = await startHost()
+    const seen: string[] = []
+    const onResize = () => seen.push(document.documentElement.style.getPropertyValue('--safe-top'))
+    window.addEventListener('resize', onResize)
+    try {
+      host.bridge.setHostContext({ theme: 'dark' })
+      await waitFor(() => expect(document.documentElement.getAttribute('data-theme')).toBe('dark'))
+      expect(seen).toEqual([])
+      host.bridge.setHostContext({ theme: 'dark', safeAreaInsets: { top: 47, right: 0, bottom: 34, left: 0 } })
+      await waitFor(() => expect(seen).toEqual(['47px']))
+    } finally {
+      window.removeEventListener('resize', onResize)
+    }
   })
 })

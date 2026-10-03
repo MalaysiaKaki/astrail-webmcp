@@ -1,11 +1,15 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { MULTI_SOURCE_RESPONSE } from '../../src/__fixtures__/multi-source-bundle'
 import { widgetData } from '../../src/__tests__/tool-results'
 import { tripDateRange, tripStatusLabel } from '@/lib/trip/trip-presenters'
 import { EMPTY_TRIPS_PAGE, MORE_TRIPS_PAGE, TRIPS_PAGE_FIXTURE } from '../__fixtures__/trips-page'
 import type { LibraryState } from '../state'
-import TripLibrary from '../TripLibrary'
+import MapProvider from '@/components/map/MapProvider'
+import TripLibrary, { MAP_BACKSTOP_MS } from '../TripLibrary'
+import { fire, MapCtor, resetMapbox } from './mapbox-gl-mock'
+
+vi.mock('mapbox-gl', async () => (await import('./mapbox-gl-mock')).mapboxModule)
 
 afterEach(cleanup)
 
@@ -97,5 +101,65 @@ describe('TripLibrary detail', () => {
     expect(within(days()).getByRole('button', { name: /^Day 2\b/ })).toHaveAttribute('aria-current', 'true')
     again(detailState(readyPhase(), 2))
     expect(within(days()).getByRole('button', { name: /^Day 1\b/ })).toHaveAttribute('aria-current', 'true')
+  })
+})
+
+describe('TripLibrary map backstop', () => {
+  function showMap(state: LibraryState) {
+    const onMapFailed = vi.fn()
+    const props = { onOpenTrip: vi.fn(), onBack: vi.fn(), onDayChange: vi.fn(), onMapFailed }
+    const tree = (s: LibraryState) => (
+      <MapProvider accessToken="pk.test"><TripLibrary state={s} hasMap {...props} /></MapProvider>
+    )
+    const view = render(tree(state))
+    return { ...view, onMapFailed, again: (s: LibraryState) => view.rerender(tree(s)) }
+  }
+  const flush = () => act(async () => { await vi.advanceTimersByTimeAsync(0) })
+
+  beforeEach(() => {
+    resetMapbox()
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+  })
+
+  it('latches when the map is not ready 15 s after a map detail mounts', async () => {
+    const { onMapFailed, container } = showMap(detailState(readyPhase()))
+    expect(container.querySelector('[data-library-map]')).not.toBeNull()
+    await act(async () => { await vi.advanceTimersByTimeAsync(MAP_BACKSTOP_MS - 1) })
+    expect(onMapFailed).not.toHaveBeenCalled()
+    await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+    expect(onMapFailed).toHaveBeenCalledTimes(1)
+  })
+
+  it('never starts on the list', async () => {
+    const { onMapFailed } = showMap(ready(TRIPS_PAGE_FIXTURE))
+    await act(async () => { await vi.advanceTimersByTimeAsync(MAP_BACKSTOP_MS * 2) })
+    expect(onMapFailed).not.toHaveBeenCalled()
+  })
+
+  it('is cancelled when the map becomes ready', async () => {
+    const { onMapFailed } = showMap(detailState(readyPhase()))
+    await flush()
+    expect(MapCtor).toHaveBeenCalledTimes(1)
+    act(() => { fire('load') })
+    await act(async () => { await vi.advanceTimersByTimeAsync(MAP_BACKSTOP_MS * 2) })
+    expect(onMapFailed).not.toHaveBeenCalled()
+  })
+
+  it('is cancelled on Back and on unmount', async () => {
+    const backed = showMap(detailState(readyPhase()))
+    await act(async () => { await vi.advanceTimersByTimeAsync(MAP_BACKSTOP_MS - 1) })
+    backed.again(ready(TRIPS_PAGE_FIXTURE))
+    await act(async () => { await vi.advanceTimersByTimeAsync(MAP_BACKSTOP_MS * 2) })
+    expect(backed.onMapFailed).not.toHaveBeenCalled()
+    cleanup()
+
+    const unmounted = showMap(detailState(readyPhase()))
+    unmounted.unmount()
+    await act(async () => { await vi.advanceTimersByTimeAsync(MAP_BACKSTOP_MS * 2) })
+    expect(unmounted.onMapFailed).not.toHaveBeenCalled()
   })
 })

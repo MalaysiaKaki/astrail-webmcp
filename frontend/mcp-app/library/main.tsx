@@ -5,10 +5,17 @@
  * A trip opens in place through `render_itinerary`; a result for a superseded open changes
  * nothing, and the model context (trip id, day, bounded summary) is published only while the
  * user has not removed it. All state lives in this closure.
+ *
+ * The live map: with a `pk.` token from the entrypoint result and WebGL, ONE MapProvider is mounted
+ * around the library for its whole life. Any map failure (Mapbox error, 15 s backstop) latches
+ * `mapFailed` for good: the provider unmounts and every trip renders the static WidgetView.
  */
 import './library.css'
 import { createRoot } from 'react-dom/client'
 import { App, type McpUiHostCapabilities } from '@modelcontextprotocol/ext-apps'
+import MapProvider from '@/components/map/MapProvider'
+import { MAPBOX_TOKEN_META_KEY } from '@/lib/mcp/contract'
+import { forceTripLayout } from '@/lib/trip/use-trip-layout'
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import TripLibrary from './TripLibrary'
 import {
@@ -19,13 +26,34 @@ import { availableDayNumbers, initialDayNumber, type WidgetDayState } from '../s
 import { applyHostContext } from '../src/host-context'
 import { installLinkDelegation } from '../src/links'
 import { QuietPostMessageTransport } from '../src/quiet-transport'
-import { GENERIC_ERROR, type WidgetData } from '../src/tool-result'
+import { GENERIC_ERROR, type ToolResult, type WidgetData } from '../src/tool-result'
+
+// The bundle is only ever the library, and the library is always the phone trip page (any width).
+forceTripLayout('mobile')
+
+/** The hidden public token on an entrypoint result, or null. Never logged or rendered. */
+export function mapboxTokenFrom(result: ToolResult): string | null {
+  const token = result._meta?.[MAPBOX_TOKEN_META_KEY]
+  return typeof token === 'string' && token.startsWith('pk.') ? token : null
+}
+
+/** A throwaway WebGL probe, released at once so it never holds one of the browser's few contexts. */
+export function webglSupported(): boolean {
+  try {
+    const canvas = document.createElement('canvas')
+    const gl = canvas.getContext('webgl2') ?? canvas.getContext('webgl')
+    gl?.getExtension('WEBGL_lose_context')?.loseContext()
+    return gl !== null
+  } catch {
+    return false
+  }
+}
 
 export async function startTripLibrary(
   container: HTMLElement,
   transport?: Transport,
 ): Promise<{ app: App; dispose: () => void }> {
-  const app = new App({ name: 'astrail-library', version: '1' })
+  const app = new App({ name: 'astrail-library', version: '1' }, { availableDisplayModes: ['inline', 'fullscreen'] })
   const root = createRoot(container)
   let state = initialLibraryState()
   let disposed = false
@@ -34,11 +62,28 @@ export async function startTripLibrary(
   let canCall = false
   let ctxCaps: McpUiHostCapabilities['updateModelContext']
   let removeLinks: () => void = () => {}
+  let mapToken: string | null = null // set once, from the first entrypoint result that carries it
+  let mapFailed = false // the library-wide latch: never cleared
+
+  // Stable identity: MapProvider and the backstop effect must not see a new callback per render.
+  const latchMapFailed = () => {
+    if (mapFailed) return
+    mapFailed = true
+    console.warn('[astrail-library] map unavailable, showing the static view')
+    set(state)
+  }
 
   const set = (next: LibraryState) => {
     if (disposed) return
     state = next
-    root.render(<TripLibrary state={state} onOpenTrip={onOpenTrip} onBack={() => set(backToList(state))} onDayChange={onDayChange} />)
+    const token = mapFailed ? null : mapToken
+    const hasMap = token !== null
+    const library = (
+      <TripLibrary state={state} hasMap={hasMap} onMapFailed={latchMapFailed}
+        onOpenTrip={onOpenTrip} onBack={() => set(backToList(state))} onDayChange={onDayChange} />
+    )
+    // Same element type and props on every render, so the provider (and its one map) is never re-created.
+    root.render(token !== null ? <MapProvider accessToken={token} onError={latchMapFailed}>{library}</MapProvider> : library)
   }
   const dispose = () => {
     if (disposed) return
@@ -89,11 +134,19 @@ export async function startTripLibrary(
     if (contextOn && detail?.tripId === trip_id && detail.phase.kind === 'ready') pushContext(detail.phase.data, day)
   }
 
-  app.addEventListener('toolresult', (result) => set(withTripsResult(state, result)))
+  app.addEventListener('toolresult', (result) => {
+    if (mapToken === null && !mapFailed) {
+      const token = mapboxTokenFrom(result)
+      if (token && webglSupported()) mapToken = token
+    }
+    set(withTripsResult(state, result))
+  })
   app.addEventListener('toolcancelled', () => set(withListError(state, 'Cancelled.')))
   app.addEventListener('hostcontextchanged', (params) => {
     if (disposed) return
     applyHostContext(app.getHostContext(), document.documentElement)
+    // After the --safe-* vars are written: the safe-area probe and Mapbox re-measure on resize.
+    if (params.safeAreaInsets) window.dispatchEvent(new Event('resize'))
     // Only the event's own partial update: the merged context keeps a removal's null forever.
     if (contextRemoved(params)) {
       contextOn = false
