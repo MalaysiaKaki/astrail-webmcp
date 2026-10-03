@@ -41,7 +41,7 @@ Owner: Shaun (MCP surface). Shared website seams (five, default-preserving) touc
 3. On iOS and Android: "Astrail" appears in the sidebar; open it, tap a trip; in a chat, open the "Trips" panel.
 4. Then desktop. Record the ChatGPT app version and plan.
 
-Merge gate (live, iOS and Android): both entrypoints open; tap a trip and the detail renders (proves `_meta` forwarding); the context chip appears; remove the chip, then change day: it does not re-attach; reopen the trip: it re-attaches; an old model-invoked v3 card still works.
+Live check (original Trip Library, PR #6 — passed on Desktop and iPhone 2026-10-03): both entrypoints open; tap a trip and the detail renders (proves `_meta` forwarding); the context chip appears; remove the chip, then change day: it does not re-attach; reopen the trip: it re-attaches; an old model-invoked v3 card still works. Android was not tested. For the live map, use the post-deploy gate below.
 
 **First live check (untested assumption):** tapping a trip relies on ChatGPT's `callServerTool` returning the result `_meta` (`astrail/bundle`) to the app. Failure signature: every tapped trip shows "Couldn't display this itinerary" while the model-invoked card still works. Fix then: an app-only tool that returns the bundle in `structuredContent`.
 
