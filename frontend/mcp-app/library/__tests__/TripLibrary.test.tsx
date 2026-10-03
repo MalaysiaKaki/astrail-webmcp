@@ -10,6 +10,16 @@ import TripLibrary, { MAP_BACKSTOP_MS } from '../TripLibrary'
 import { fire, MapCtor, resetMapbox } from './mapbox-gl-mock'
 
 vi.mock('mapbox-gl', async () => (await import('./mapbox-gl-mock')).mapboxModule)
+const mapViewThrows = vi.hoisted(() => ({ on: false }))
+vi.mock('../TripMapView', async (load) => {
+  const real = (await load<typeof import('../TripMapView')>()).default
+  return {
+    default: (props: Parameters<typeof real>[0]) => {
+      if (mapViewThrows.on) throw new Error('render failed')
+      return real(props)
+    },
+  }
+})
 
 afterEach(cleanup)
 
@@ -109,7 +119,7 @@ describe('TripLibrary map backstop', () => {
     const onMapFailed = vi.fn()
     const props = { onOpenTrip: vi.fn(), onBack: vi.fn(), onDayChange: vi.fn(), onMapFailed }
     const tree = (s: LibraryState) => (
-      <MapProvider accessToken="pk.test"><TripLibrary state={s} hasMap {...props} /></MapProvider>
+      <MapProvider accessToken="pk.test-public-token"><TripLibrary state={s} hasMap {...props} /></MapProvider>
     )
     const view = render(tree(state))
     return { ...view, onMapFailed, again: (s: LibraryState) => view.rerender(tree(s)) }
@@ -161,5 +171,27 @@ describe('TripLibrary map backstop', () => {
     unmounted.unmount()
     await act(async () => { await vi.advanceTimersByTimeAsync(MAP_BACKSTOP_MS * 2) })
     expect(unmounted.onMapFailed).not.toHaveBeenCalled()
+  })
+})
+
+describe('TripLibrary map view boundary', () => {
+  afterEach(() => { mapViewThrows.on = false })
+
+  it('a map view that throws while rendering latches and shows the static view, never a blank page', () => {
+    mapViewThrows.on = true
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {}) // React's own report of the caught error
+    const onMapFailed = vi.fn()
+    const { container } = render(
+      <MapProvider accessToken="pk.test-public-token">
+        <TripLibrary state={detailState(readyPhase())} hasMap onMapFailed={onMapFailed}
+          onOpenTrip={vi.fn()} onBack={vi.fn()} onDayChange={vi.fn()} />
+      </MapProvider>,
+    )
+    expect(onMapFailed).toHaveBeenCalledTimes(1)
+    expect(warn).toHaveBeenCalledWith('[astrail-library] map view failed, showing the static view')
+    expect(container.querySelector('[data-library-detail]')).not.toBeNull()
+    expect(screen.getByRole('heading', { name: 'Tokyo, Japan' })).toBeInTheDocument()
+    vi.restoreAllMocks()
   })
 })

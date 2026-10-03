@@ -4,7 +4,7 @@
  * are already fullscreen. With a live map (`hasMap`), a loaded trip with days opens in TripMapView;
  * anything else keeps the static WidgetView.
  */
-import { useEffect } from 'react'
+import { Component, useEffect, type ReactNode } from 'react'
 import { useOptionalSharedMap } from '@/components/map/MapProvider'
 import { WidgetView } from '../src/ItineraryWidget'
 import type { WidgetDayState } from '../src/day-view'
@@ -18,6 +18,17 @@ import TripMapView from './TripMapView'
 /** A map that has not loaded this long after a trip opened is treated as failed. */
 export const MAP_BACKSTOP_MS = 15_000
 const NOOP = () => {}
+
+/** Never a blank page: a render-time throw in the map view latches and shows the static view. */
+class MapViewBoundary extends Component<{ onError: () => void; fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  componentDidCatch() {
+    console.warn('[astrail-library] map view failed, showing the static view')
+    this.props.onError()
+  }
+  render() { return this.state.failed ? this.props.fallback : this.props.children }
+}
 
 /* Null-safe on purpose: once the latch removes the provider, useSharedMap() would throw. Restarted
    by each map detail mount; cancelled on ready, Back (inactive) and unmount. */
@@ -87,7 +98,7 @@ function List({ state, onOpenTrip }: { state: LibraryState; onOpenTrip: (tripId:
   )
 }
 
-export default function TripLibrary({ state, onOpenTrip, onBack, onDayChange, hasMap = false, onMapFailed = NOOP }: {
+export default function TripLibrary({ state, onOpenTrip, onBack, onDayChange, hasMap = false, onMapFailed = NOOP, restored = null }: {
   state: LibraryState
   onOpenTrip: (tripId: string) => void
   onBack: () => void
@@ -96,14 +107,15 @@ export default function TripLibrary({ state, onOpenTrip, onBack, onDayChange, ha
   hasMap?: boolean
   /** Sets the library-wide latch (stable identity). */
   onMapFailed?: () => void
+  /** The open trip's last chosen day: a fallback after a latch reopens on it. */
+  restored?: WidgetDayState | null
 }) {
   const { detail } = state
   const mapData = hasMap && detail?.phase.kind === 'ready' && detail.phase.data.bundle.days.length > 0
     ? detail.phase.data : null
   useMapBackstop(mapData !== null, onMapFailed)
   if (!detail) return <List state={state} onOpenTrip={onOpenTrip} />
-  if (mapData) return <TripMapView key={detail.seq} data={mapData} onBack={onBack} onDayChange={onDayChange} />
-  return (
+  const staticDetail = (
     <div data-library data-library-detail>
       <div className="sticky top-0 z-10 bg-[color:var(--m-page)] pt-[var(--safe-top,0px)]">
         <button type="button" onClick={onBack} aria-label="Back to all trips"
@@ -111,7 +123,13 @@ export default function TripLibrary({ state, onOpenTrip, onBack, onDayChange, ha
           <span aria-hidden>‹</span>&nbsp;All trips
         </button>
       </div>
-      <WidgetView key={detail.seq} phase={detail.phase} restored={null} onDayChange={onDayChange} />
+      <WidgetView key={detail.seq} phase={detail.phase} restored={restored} onDayChange={onDayChange} />
     </div>
+  )
+  if (!mapData) return staticDetail
+  return (
+    <MapViewBoundary key={detail.seq} onError={onMapFailed} fallback={staticDetail}>
+      <TripMapView key={detail.seq} data={mapData} onBack={onBack} onDayChange={onDayChange} />
+    </MapViewBoundary>
   )
 }

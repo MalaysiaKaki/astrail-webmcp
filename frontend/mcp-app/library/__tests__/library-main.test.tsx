@@ -9,7 +9,7 @@ import { AppBridge } from '@modelcontextprotocol/ext-apps/app-bridge'
 import type { McpUiHostCapabilities, McpUiHostContext } from '@modelcontextprotocol/ext-apps'
 import type { CallToolRequest, CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
-import { startTripLibrary } from '../main'
+import { mapboxTokenFrom, startTripLibrary } from '../main'
 import { LIBRARY_ERRORS } from '../state'
 import { TRIPS_PAGE_FIXTURE } from '../__fixtures__/trips-page'
 import { MULTI_SOURCE_RESPONSE, OTHER_TRIP_RESPONSE } from '../../src/__fixtures__/multi-source-bundle'
@@ -301,6 +301,8 @@ async function openTrip(host: Host, title: string, tripId: string, response: typ
   await resolveTrip(host, tripId, response)
 }
 
+const TOKEN = 'pk.test-public-token'
+
 describe('trip library live map', () => {
   const loseContext = vi.fn()
   let webgl = true
@@ -320,7 +322,7 @@ describe('trip library live map', () => {
   })
 
   it('opens a trip on the live map with a pk. token and WebGL, after releasing the probe context', async () => {
-    const host = await startHost({ token: 'pk.test' })
+    const host = await startHost({ token: TOKEN })
     await openTrip(host, 'Tokyo in three Reels', A, MULTI_SOURCE_RESPONSE)
     await waitFor(() => expect(mapView(host)).not.toBeNull())
     expect(staticView(host)).toBeNull()
@@ -333,7 +335,7 @@ describe('trip library live map', () => {
   })
 
   it('A -> Back -> B: back returns to the list, and one map serves both trips', async () => {
-    const host = await startHost({ token: 'pk.test' })
+    const host = await startHost({ token: TOKEN })
     await openTrip(host, 'Tokyo in three Reels', A, MULTI_SOURCE_RESPONSE)
     await waitFor(() => expect(MapCtor).toHaveBeenCalledTimes(1))
     fire('load')
@@ -351,8 +353,8 @@ describe('trip library live map', () => {
     const cases = [
       { name: 'no token', token: undefined, gl: true, response: MULTI_SOURCE_RESPONSE, provider: false },
       { name: 'secret token', token: 'sk.secret', gl: true, response: MULTI_SOURCE_RESPONSE, provider: false },
-      { name: 'no WebGL', token: 'pk.test', gl: false, response: MULTI_SOURCE_RESPONSE, provider: false },
-      { name: 'zero days', token: 'pk.test', gl: true, response: zeroDay, provider: true },
+      { name: 'no WebGL', token: TOKEN, gl: false, response: MULTI_SOURCE_RESPONSE, provider: false },
+      { name: 'zero days', token: TOKEN, gl: true, response: zeroDay, provider: true },
     ]
     for (const c of cases) {
       webgl = c.gl
@@ -369,7 +371,7 @@ describe('trip library live map', () => {
 
   it('a map error latches: the provider unmounts (one remove) and every later trip is static', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const host = await startHost({ token: 'pk.test' })
+    const host = await startHost({ token: TOKEN })
     await openTrip(host, 'Tokyo in three Reels', A, MULTI_SOURCE_RESPONSE)
     await waitFor(() => expect(MapCtor).toHaveBeenCalledTimes(1))
     fire('error', { error: new Error('style blocked') })
@@ -387,6 +389,46 @@ describe('trip library live map', () => {
     expect(MapCtor).toHaveBeenCalledTimes(1)
     expect(mapInstance.remove).toHaveBeenCalledTimes(1)
   })
+
+  it('accepts only a well-formed pk. token', () => {
+    const meta = (token: unknown) => ({ content: [], _meta: { [MAPBOX_TOKEN_META_KEY]: token } })
+    for (const bad of ['pk.', 'pk.short', 'sk.eyJ1IjoiYXN0cmFpbCJ9.abc', 'pk.has space in it', 42, null]) {
+      expect(mapboxTokenFrom(meta(bad)), String(bad)).toBeNull()
+    }
+    expect(mapboxTokenFrom(meta('pk.eyJ1IjoiYXN0cmFpbCJ9.abc_-1'))).toBe('pk.eyJ1IjoiYXN0cmFpbCJ9.abc_-1')
+  })
+
+  it('probes WebGL once: a browser without it is not re-probed on later results', async () => {
+    webgl = false
+    const host = await startHost({ token: TOKEN })
+    await waitFor(() => expect(ui(host).getByRole('button', { name: 'Open Tokyo in three Reels' })).toBeInTheDocument())
+    await host.bridge.sendToolResult(page(TRIPS_PAGE_FIXTURE, TOKEN))
+    await settle()
+    expect(HTMLCanvasElement.prototype.getContext).toHaveBeenCalledTimes(2) // webgl2, then webgl, once
+  })
+
+  for (const removed of [false, true]) {
+    it(`a latch after a day change keeps that day in the static view, and pushes no context${removed ? ' (chip removed)' : ''}`, async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const host = await startHost({ token: TOKEN })
+      await openTrip(host, 'Tokyo in three Reels', A, MULTI_SOURCE_RESPONSE)
+      await waitFor(() => expect(host.contexts).toHaveLength(1))
+      if (removed) {
+        host.bridge.setHostContext({ 'openai/modelContext': null })
+        await settle()
+      }
+      await waitFor(() => expect(mapView(host)).not.toBeNull())
+      await selectDay(host, 2)
+      const pushed = removed ? 1 : 2
+      await waitFor(() => expect(host.contexts).toHaveLength(pushed))
+      await waitFor(() => expect(MapCtor).toHaveBeenCalledTimes(1))
+      fire('error', {})
+      await waitFor(() => expect(staticView(host)).not.toBeNull())
+      expect(ui(host).getByRole('button', { name: /^Day 2\b/ })).toHaveAttribute('aria-current', 'true')
+      await settle()
+      expect(host.contexts).toHaveLength(pushed)
+    })
+  }
 
   it('re-measures (window resize) after new host safe-area insets are applied, and only then', async () => {
     const host = await startHost()

@@ -34,7 +34,7 @@ forceTripLayout('mobile')
 /** The hidden public token on an entrypoint result, or null. Never logged or rendered. */
 export function mapboxTokenFrom(result: ToolResult): string | null {
   const token = result._meta?.[MAPBOX_TOKEN_META_KEY]
-  return typeof token === 'string' && token.startsWith('pk.') ? token : null
+  return typeof token === 'string' && /^pk\.[A-Za-z0-9._-]{10,}$/.test(token) ? token : null
 }
 
 /** A throwaway WebGL probe, released at once so it never holds one of the browser's few contexts. */
@@ -63,7 +63,10 @@ export async function startTripLibrary(
   let ctxCaps: McpUiHostCapabilities['updateModelContext']
   let removeLinks: () => void = () => {}
   let mapToken: string | null = null // set once, from the first entrypoint result that carries it
+  let mapProbed = false // the WebGL probe runs at most once
   let mapFailed = false // the library-wide latch: never cleared
+  // The open trip's last reported day, so a latched fallback reopens on it (the model's day too).
+  let lastDay: { seq: number; day: WidgetDayState } | null = null
 
   // Stable identity: MapProvider and the backstop effect must not see a new callback per render.
   const latchMapFailed = () => {
@@ -78,8 +81,9 @@ export async function startTripLibrary(
     state = next
     const token = mapFailed ? null : mapToken
     const hasMap = token !== null
+    const restored = lastDay && lastDay.seq === state.detail?.seq ? lastDay.day : null
     const library = (
-      <TripLibrary state={state} hasMap={hasMap} onMapFailed={latchMapFailed}
+      <TripLibrary state={state} hasMap={hasMap} onMapFailed={latchMapFailed} restored={restored}
         onOpenTrip={onOpenTrip} onBack={() => set(backToList(state))} onDayChange={onDayChange} />
     )
     // Same element type and props on every render, so the provider (and its one map) is never re-created.
@@ -131,13 +135,15 @@ export async function startTripLibrary(
 
   function onDayChange({ trip_id, day }: WidgetDayState) {
     const detail = state.detail
+    if (detail?.tripId === trip_id) lastDay = { seq: detail.seq, day: { trip_id, day } }
     if (contextOn && detail?.tripId === trip_id && detail.phase.kind === 'ready') pushContext(detail.phase.data, day)
   }
 
   app.addEventListener('toolresult', (result) => {
-    if (mapToken === null && !mapFailed) {
-      const token = mapboxTokenFrom(result)
-      if (token && webglSupported()) mapToken = token
+    const token = mapProbed ? null : mapboxTokenFrom(result)
+    if (token) {
+      mapProbed = true
+      if (webglSupported()) mapToken = token
     }
     set(withTripsResult(state, result))
   })
