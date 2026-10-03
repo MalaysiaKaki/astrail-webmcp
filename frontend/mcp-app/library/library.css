@@ -26,6 +26,8 @@ body { min-height: 100vh; }
    Raise every control to 48px inside the library only — never edit the shared components or
    src/widget.css (that would change the frozen v3 output). */
 [data-library] :is(button, a[href]) { min-height: 48px; }
+/* The kit's 44px circles (map Fit/3D, the sheet's hide control) stay circles at 48px. */
+[data-library] .m-btn-icon { width: 48px; height: 48px; }
 
 /* The detail's back bar already pads the top safe-area inset; the frame below must not add a second. */
 [data-library-detail] .widget-frame { padding-top: 16px; }
@@ -60,8 +62,6 @@ body { min-height: 100vh; }
 }
 .shared-map--visible { opacity: 1; visibility: visible; }
 .shared-map--interactive { pointer-events: auto; }
-.trip-map-container { opacity: 0; transition: opacity 400ms ease-out; }
-.trip-map-container--loaded { opacity: 1; }
 
 /* The sheet's env(safe-area-inset-bottom) reads 0 inside the host iframe; use the host inset instead
    (MobileTripSheet.tsx body padding and its Show-sheet button). */

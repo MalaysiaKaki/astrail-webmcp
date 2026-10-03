@@ -1,7 +1,7 @@
 // Publishes the widget build (docs/mcp-app/PLAN.md §4.2, v3):
 //   1. for each bundle (itinerary, library) checks mcp-app/dist/<name> is exactly <name>.js + <name>.css, both non-empty;
 //   2. fails if the JS could print protocol payloads (security requirement 8);
-//   3. copies both to public/mcp-widget/<v3 | library/v1>/, which Next serves (with CORS) from our origin;
+//   3. copies both to public/mcp-widget/<v3 | library/v1 | library/v2>/ (the library to both), which Next serves (with CORS) from our origin;
 //   4. (itinerary only; the library shell is source) writes the small HTML shell the gateway imports statically, with %ASSET_BASE% placeholders
 //      that lib/mcp/widget/itinerary-resource.ts fills with the configured origin at read time.
 // A missing or wrong build fails HERE, at build time, never as a "widget not built" response.
