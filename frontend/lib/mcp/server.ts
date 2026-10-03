@@ -13,6 +13,7 @@ import { registerItineraryTools } from './tools/itinerary'
 import { LIBRARY_TOOLS, LIBRARY_TOOL_ICONS, registerLibraryTools } from './tools/library'
 import { registerItineraryResource } from './widget/itinerary-resource'
 import { registerLibraryResource } from './widget/library-resource'
+import { MAP_PROBE_TOOL, registerMapProbe, registerMapProbeResource } from './tools/map-probe'
 
 export const SERVER_INFO = { name: 'astrail', title: 'Astrail', version: '1.0.0' } as const
 
@@ -25,7 +26,7 @@ type Handler = (request: unknown, extra: unknown) => Promise<ListToolsResult>
  * than casting them in and hoping. Throws at construction if the SDK internals move — the wire test
  * would catch it too.
  */
-const ICON_TOOLS: string[] = Object.values(LIBRARY_TOOLS)
+const ICON_TOOLS: string[] = [...Object.values(LIBRARY_TOOLS), MAP_PROBE_TOOL]
 
 function exposeTopLevelToolFields(server: McpServer): void {
   const handlers = (server.server as unknown as { _requestHandlers?: Map<string, Handler> })._requestHandlers
@@ -50,8 +51,10 @@ export function createAstrailMcpServer(ctx: ToolContext): McpServer {
   registerListTools(server, ctx)
   registerItineraryTools(server, ctx)
   registerLibraryTools(server, ctx)
+  registerMapProbe(server, ctx)
   registerItineraryResource(server, ctx.config)
   registerLibraryResource(server, ctx.config)
+  registerMapProbeResource(server, ctx.config)
   exposeTopLevelToolFields(server)
   return server
 }

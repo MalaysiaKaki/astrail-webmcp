@@ -9,7 +9,7 @@
     "typecheck": "npm run build:widgets && tsc --noEmit && npm run typecheck:widgets",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build:widgets": "vite build --config mcp-app/vite.config.ts && vite build --config mcp-app/vite.config.ts --mode library && node mcp-app/scripts/emit-module.mjs",
+    "build:widgets": "vite build --config mcp-app/vite.config.ts && vite build --config mcp-app/vite.config.ts --mode library && vite build --config mcp-app/vite.config.ts --mode probe && node mcp-app/scripts/emit-module.mjs",
     "typecheck:widgets": "tsc --noEmit -p mcp-app/tsconfig.json",
     "check:widget-casts": "node mcp-app/scripts/check-casts.mjs",
     "smoke:mcp": "node scripts/mcp-smoke.mjs"

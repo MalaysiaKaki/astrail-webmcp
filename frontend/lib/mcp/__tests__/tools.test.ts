@@ -9,7 +9,7 @@ import {
   DAY_TWO_START_RESPONSE, MULTI_SOURCE_RESPONSE, TRUNCATED_RESPONSE,
 } from '@/mcp-app/src/__fixtures__/multi-source-bundle'
 import {
-  BUNDLE_META_KEY, ITINERARY_RESOURCE_URI, LIBRARY_RESOURCE_URI, LINKS_META_KEY, widgetLinksSchema, itinerarySummarySchema, renderSummarySchema, savedReelsPageSchema, tripsPageSchema,
+  BUNDLE_META_KEY, ITINERARY_RESOURCE_URI, LIBRARY_RESOURCE_URI, MAP_PROBE_RESOURCE_URI, LINKS_META_KEY, widgetLinksSchema, itinerarySummarySchema, renderSummarySchema, savedReelsPageSchema, tripsPageSchema,
 } from '../contract'
 import { handleMcpPost } from '../handler'
 import { loadMcpConfig } from '../config'
@@ -62,6 +62,7 @@ describe('tools/list descriptors', () => {
     const tools = (await call('tools/list', {})).result?.tools as Tool[]
     const uri = (t: Tool) => (t._meta?.ui as { resourceUri?: string } | undefined)?.resourceUri
     expect(Object.fromEntries(tools.filter(uri).map((t) => [t.name, uri(t)]))).toEqual({
+      open_map_probe: MAP_PROBE_RESOURCE_URI,
       open_trip_library: LIBRARY_RESOURCE_URI,
       open_trip_panel: LIBRARY_RESOURCE_URI,
       render_itinerary: ITINERARY_RESOURCE_URI,
@@ -334,13 +335,40 @@ describe('render_itinerary links (_meta["astrail/links"])', () => {
   })
 })
 
+describe('map probe spike', () => {
+  const TOKEN_KEY = 'astrail/mapbox_token'
+  const withEnv = async (value: string, run: () => Promise<void>) => {
+    const prev = process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN
+    process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN = value
+    try { await run() } finally {
+      if (prev === undefined) delete process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN
+      else process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN = prev
+    }
+  }
+
+  it('forwards a pk. token in hidden _meta', async () => {
+    await withEnv('pk.test-public', async () => {
+      const result = await callTool('open_map_probe', {})
+      expect(result.structuredContent).toEqual({ ok: true })
+      expect(result._meta?.[TOKEN_KEY]).toBe('pk.test-public')
+    })
+  })
+
+  it('never forwards an sk. token', async () => {
+    await withEnv('sk.test-secret', async () => {
+      const result = await callTool('open_map_probe', {})
+      expect(result._meta?.[TOKEN_KEY]).toBeNull()
+    })
+  })
+})
+
 describe('OpenAI MCP Extensions entrypoints', () => {
   const ENTRY = { open_trip_library: 'global', open_trip_panel: 'thread' } as const
   type ListedTool = Tool & { title?: string; icons?: { src: string; mimeType?: string }[] }
 
   it('advertises one global and one thread entrypoint, app-only, on the library resource', async () => {
     const tools = (await call('tools/list', {})).result?.tools as ListedTool[]
-    expect(tools.map((t) => t.name).sort()).toEqual(['get_itinerary', 'get_profile', 'list_saved_reels', 'list_trips', 'open_trip_library', 'open_trip_panel', 'render_itinerary'])
+    expect(tools.map((t) => t.name).sort()).toEqual(['get_itinerary', 'get_profile', 'list_saved_reels', 'list_trips', 'open_map_probe', 'open_trip_library', 'open_trip_panel', 'render_itinerary'])
     for (const [name, type] of Object.entries(ENTRY)) {
       const tool = tools.find((t) => t.name === name)!
       expect(tool._meta?.['openai/ui']).toEqual({ entrypoints: [{ type }] })
