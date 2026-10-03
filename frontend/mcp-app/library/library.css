@@ -7,6 +7,16 @@
 @source "../../components/dashboard/nav-icons.tsx";
 @source "../../lib/shell/ui.ts";
 
+/* Light only. The kit is paper-only (no dark tokens), but the host's applyDocumentTheme writes an
+   INLINE `color-scheme: dark` on <html> in a dark ChatGPT — that flips the canvas and system
+   colours, and the fullscreen sidebar view showed black around the cards. !important is the only
+   way past an inline style; the page ground is painted on <html> too so nothing shows through. */
+:root {
+  color-scheme: light !important;
+  background: var(--m-page);
+}
+body { min-height: 100vh; }
+
 /* Mobile tap targets: the reused detail components' More/Less toggles are min-h-11 (44px).
    Raise every control to 48px inside the library only — never edit the shared components or
    src/widget.css (that would change the frozen v3 output). */
