@@ -6,7 +6,7 @@ whole thing by talking to ChatGPT. Every stop says where it came from.
 | | |
 |---|---|
 | **Live app** | https://astrail-webmcp.vercel.app |
-| **Demo video** | https://youtu.be/kzgCUgO_wlM |
+| **Demo video** | https://youtu.be/EaUR26DsrLE |
 | **No account needed** | https://astrail-webmcp.vercel.app/app/trip/demo |
 | **Backend health** | https://astrail-webmcp-api.onrender.com/readiness |
 
